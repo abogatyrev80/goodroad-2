@@ -22,6 +22,101 @@ export default function GoodRoadApp() {
   const [audioWarnings, setAudioWarnings] = useState(true);
   const [vibrationWarnings, setVibrationWarnings] = useState(true);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    setupAudio();
+    return () => {
+      cleanupAudio();
+    };
+  }, []);
+
+  const setupAudio = async () => {
+    try {
+      // Configure audio mode for alerts
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (error) {
+      console.error('Error setting up audio:', error);
+    }
+  };
+
+  const cleanupAudio = async () => {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.unloadAsync();
+      } catch (error) {
+        console.error('Error cleaning up audio:', error);
+      }
+    }
+  };
+
+  const playWarningSound = async () => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      // Create beep sound using data URI
+      const beepSound = {
+        uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCRvT98'
+      };
+
+      const { sound } = await Audio.Sound.createAsync(beepSound, {
+        shouldPlay: true,
+        volume: 1.0,
+        rate: 1.0,
+        positionMillis: 0,
+        progressUpdateIntervalMillis: 100,
+      });
+
+      soundRef.current = sound;
+
+      // Play multiple beeps for urgency
+      for (let i = 0; i < 3; i++) {
+        await sound.replayAsync();
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+    } catch (error) {
+      console.error('Error playing warning sound:', error);
+      
+      // Fallback: Use Web Audio API for browsers
+      if (Platform.OS === 'web') {
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 800; // Frequency in Hz
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          
+          oscillator.start();
+          setTimeout(() => oscillator.stop(), 500);
+        } catch (webAudioError) {
+          console.error('Web Audio API error:', webAudioError);
+        }
+      }
+    }
+  };
+
+  const triggerVibration = () => {
+    if (vibrationWarnings && Platform.OS !== 'web') {
+      // Pattern: vibrate for 200ms, pause 100ms, repeat 3 times
+      Vibration.vibrate([200, 100, 200, 100, 200]);
+    }
+  };
 
   const getRoadConditionColor = (score: number) => {
     if (score >= 80) return '#4CAF50';
@@ -30,10 +125,19 @@ export default function GoodRoadApp() {
     return '#F44336';
   };
 
-  const testWarning = () => {
+  const testWarning = async () => {
+    // Play sound if enabled
+    if (audioWarnings) {
+      await playWarningSound();
+    }
+    
+    // Trigger vibration if enabled
+    triggerVibration();
+    
+    // Show visual alert
     Alert.alert(
       '⚠️ ПРЕДУПРЕЖДЕНИЕ',
-      'Впереди препятствие - яма через 50 метров!',
+      'Впереди препятствие - яма через 50 метров!\n\n🔊 Звуковое оповещение воспроизведено\n📳 Вибрация активирована',
       [{ text: 'OK' }]
     );
   };
