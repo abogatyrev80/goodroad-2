@@ -1,8 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
-from fastapi_cache.decorator import cache
+# Cache imports removed for compatibility
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
