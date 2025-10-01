@@ -20,13 +20,67 @@ import { Audio } from 'expo-av';
 import { router } from 'expo-router';
 import { AppSettings, HazardType } from './settings';
 
+interface Hazard {
+  id: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  severity: 'low' | 'medium' | 'high';
+  distance?: number;
+}
+
+const SETTINGS_KEY = 'good_road_settings';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+// Mock hazards for demonstration
+const mockHazards: Hazard[] = [
+  { id: '1', type: 'pothole', latitude: 55.7558, longitude: 37.6176, severity: 'high' },
+  { id: '2', type: 'speed_bump', latitude: 55.7559, longitude: 37.6177, severity: 'medium' },
+  { id: '3', type: 'pedestrian_crossing', latitude: 55.7560, longitude: 37.6178, severity: 'low' },
+  { id: '4', type: 'railway_crossing', latitude: 55.7562, longitude: 37.6180, severity: 'high' },
+];
+
 export default function GoodRoadApp() {
   const [isTracking, setIsTracking] = useState(false);
   const [roadConditionScore, setRoadConditionScore] = useState<number>(75);
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [speedAutoStart, setSpeedAutoStart] = useState(true);
+  
+  // Location and sensor data
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [currentSpeed, setCurrentSpeed] = useState<number>(0); // km/h
+  const [currentHeading, setCurrentHeading] = useState<number>(0); // degrees
+  
+  // Warnings system
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [activeWarnings, setActiveWarnings] = useState<Hazard[]>([]);
+  const [lastWarningTime, setLastWarningTime] = useState<number>(0);
+  const audioRef = useRef<Audio.Sound | null>(null);
+  
+  // Location tracking
+  const locationSubscription = useRef<Location.LocationSubscription | null>(null);
 
-  // Simplified version for mobile compatibility
+  useEffect(() => {
+    loadSettings();
+    setupAudio();
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isTracking && settings) {
+      startLocationTracking();
+    } else {
+      stopLocationTracking();
+    }
+  }, [isTracking, settings]);
+
+  useEffect(() => {
+    if (currentLocation && settings && isTracking) {
+      checkForHazards();
+    }
+  }, [currentLocation, settings, isTracking]);
 
   const startTracking = async () => {
     try {
