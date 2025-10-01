@@ -1,14 +1,20 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-// MMKV storage with web fallback
-let storage: any;
+// Cross-platform storage solution
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppSettings, HazardType } from '../app/settings';
 
-// Fast storage using MMKV (30x faster than AsyncStorage)
-export const storage = new MMKV({
-  id: 'good-road-storage',
-  encryptionKey: 'good-road-encryption-key'
-});
+export const storage = {
+  getString: async (key: string) => {
+    return await AsyncStorage.getItem(key);
+  },
+  set: async (key: string, value: string) => {
+    return await AsyncStorage.setItem(key, value);
+  },
+  delete: async (key: string) => {
+    return await AsyncStorage.removeItem(key);
+  }
+};
 
 // Default hazard types with optimized configuration
 const defaultHazardTypes: HazardType[] = [
