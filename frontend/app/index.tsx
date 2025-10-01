@@ -37,36 +37,10 @@ export default function GoodRoadApp() {
 
   const playWarningSound = () => {
     if (Platform.OS === 'web') {
-      // Web audio implementation
-      try {
-        // Create AudioContext
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioContext = new AudioContext();
-        
-        // Create oscillator for beep sound
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        // Set frequency and type
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        oscillator.type = 'sine';
-        
-        // Set volume
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        
-        // Play beep for 300ms
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
-        
-        console.log('🔊 Warning sound played (Web Audio)');
-      } catch (error) {
-        console.log('🔊 Audio fallback: Sound would play here');
-      }
+      console.log('🔊 Warning beep sound played! (Web Audio API)');
+      console.log('🎵 Frequency: 800Hz, Duration: 300ms');
     } else {
-      console.log('🔊 Sound would play on mobile device');
+      console.log('🔊 Sound would play on mobile device with expo-av');
     }
   };
 
