@@ -145,12 +145,12 @@ export const useAppStore = create<AppStore>()(
       }
     },
     
-    updateSettings: (newSettings) => {
+    updateSettings: async (newSettings) => {
       const updatedSettings = { ...get().settings, ...newSettings };
       set({ settings: updatedSettings });
       
       try {
-        storage.set('app_settings', JSON.stringify(updatedSettings));
+        await storage.set('app_settings', JSON.stringify(updatedSettings));
       } catch (error) {
         console.error('Error saving settings:', error);
       }
