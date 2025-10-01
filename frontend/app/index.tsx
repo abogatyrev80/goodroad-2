@@ -736,7 +736,49 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 8,
   },
-  settingsCard: {
+  settingsButton: {
+    padding: 8,
+  },
+  warningBanner: {
+    backgroundColor: '#FF572220',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF5722',
+  },
+  warningContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF5722',
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#FF5722',
+    marginVertical: 2,
+  },
+  speedWarningBanner: {
+    backgroundColor: '#FF980220',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  speedWarningText: {
+    fontSize: 14,
+    color: '#FF9800',
+    marginLeft: 8,
+    flex: 1,
+  },
+  quickSettingsCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 16,
@@ -759,33 +801,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     flex: 1,
   },
-  carModeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CAF5020',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  carModeText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  batteryCard: {
-    backgroundColor: '#2a2a2a',
+  settingsNavButton: {
+    backgroundColor: '#2196F3',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-  },
-  batteryRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 20,
   },
-  batteryText: {
-    fontSize: 14,
-    color: '#ffffff',
-    marginLeft: 12,
+  settingsNavText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 8,
   },
 });
