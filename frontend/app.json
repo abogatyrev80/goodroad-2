@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "Good Road",
+    "slug": "good-road",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "goodroad",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a1a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.goodroad.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "background-fetch",
+          "background-processing"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Good Road needs location access to monitor road conditions while driving.",
+        "NSLocationWhenInUseUsageDescription": "Good Road needs location access to monitor road conditions.",
+        "NSMotionUsageDescription": "Good Road uses motion sensors to detect road quality and driving conditions."
+      }
+    },
+    "android": {
+      "package": "com.goodroad.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#1a1a1a"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION", 
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Good Road to use your location to monitor road conditions.",
+          "locationAlwaysPermission": "Allow Good Road to use your location in the background to continuously monitor road conditions while driving.",
+          "locationWhenInUsePermission": "Allow Good Road to use your location to monitor current road conditions.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#4CAF50",
+          "defaultChannel": "road-warnings"
+        }
+      ],
+      [
+        "expo-task-manager"
+      ],
+      [
+        "expo-background-fetch"
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
