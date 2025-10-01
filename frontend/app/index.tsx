@@ -19,41 +19,7 @@ export default function GoodRoadApp() {
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [speedAutoStart, setSpeedAutoStart] = useState(true);
 
-  // Auto-start settings functions removed to fix AsyncStorage dependency issues
-
-  const checkPermissions = async () => {
-    // Request location permissions
-    const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-    if (foregroundStatus !== 'granted') {
-      Alert.alert('Permission denied', 'Location permission is required for road monitoring.');
-      return;
-    }
-
-    const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-    if (backgroundStatus !== 'granted') {
-      Alert.alert(
-        'Background Permission',
-        'Background location access is needed for continuous road monitoring while driving.'
-      );
-    }
-  };
-
-  const setupBackgroundFetch = async () => {
-    // Simplified background data sync - removed BackgroundFetch dependency
-    console.log('Background sync setup completed');
-  };
-
-  const loadStoredData = async () => {
-    try {
-      const storedData = await AsyncStorage.getItem(SENSOR_DATA_KEY);
-      if (storedData) {
-        const data = JSON.parse(storedData);
-        setSensorBuffer(data);
-      }
-    } catch (error) {
-      console.error('Error loading stored data:', error);
-    }
-  };
+  // Simplified version for mobile compatibility
 
   const startTracking = async () => {
     try {
