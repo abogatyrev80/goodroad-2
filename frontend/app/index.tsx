@@ -13,47 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-const BACKGROUND_LOCATION_TASK = 'background-location-task';
-const SENSOR_DATA_KEY = 'sensor_data_buffer';
-const AUTO_START_SETTINGS_KEY = 'auto_start_settings';
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-
-// Background task for location tracking
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
-  if (error) {
-    console.error('Background location task error:', error);
-    return;
-  }
-
-  if (data) {
-    const { locations } = data as any;
-    console.log('Received new locations', locations);
-    
-    // Store location data locally
-    try {
-      const existingData = await AsyncStorage.getItem(SENSOR_DATA_KEY);
-      const sensorBuffer = existingData ? JSON.parse(existingData) : [];
-      
-      locations.forEach((location: any) => {
-        sensorBuffer.push({
-          type: 'location',
-          timestamp: Date.now(),
-          data: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            speed: location.coords.speed || 0,
-            accuracy: location.coords.accuracy,
-          }
-        });
-      });
-
-      await AsyncStorage.setItem(SENSOR_DATA_KEY, JSON.stringify(sensorBuffer));
-    } catch (error) {
-      console.error('Error storing location data:', error);
-    }
-  }
-});
-
 export default function GoodRoadApp() {
   const [isTracking, setIsTracking] = useState(false);
   const [roadConditionScore, setRoadConditionScore] = useState<number>(0);
