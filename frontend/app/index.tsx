@@ -56,22 +56,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
 export default function GoodRoadApp() {
   const [isTracking, setIsTracking] = useState(false);
-  const [locationData, setLocationData] = useState<any>(null);
-  const [accelerometerData, setAccelerometerData] = useState<any>(null);
-  const [sensorBuffer, setSensorBuffer] = useState<any[]>([]);
   const [roadConditionScore, setRoadConditionScore] = useState<number>(0);
-  
-  // Auto-start settings - simplified version
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [speedAutoStart, setSpeedAutoStart] = useState(true);
-  const [carModeDetected, setCarModeDetected] = useState(false);
-
-  useEffect(() => {
-    checkPermissions();
-    setupBackgroundFetch();
-    loadStoredData();
-    loadAutoStartSettings();
-  }, []);
 
   const loadAutoStartSettings = async () => {
     try {
