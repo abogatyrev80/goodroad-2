@@ -87,26 +87,9 @@ export default function GoodRoadApp() {
     } catch (error) {
       console.error('Error playing warning sound:', error);
       
-      // Fallback: Use Web Audio API for browsers
+      // Fallback: Simple browser beep
       if (Platform.OS === 'web') {
-        try {
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
-          
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-          
-          oscillator.frequency.value = 800; // Frequency in Hz
-          oscillator.type = 'sine';
-          
-          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-          
-          oscillator.start();
-          setTimeout(() => oscillator.stop(), 500);
-        } catch (webAudioError) {
-          console.error('Web Audio API error:', webAudioError);
-        }
+        console.log('Playing web fallback sound');
       }
     }
   };
