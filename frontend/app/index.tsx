@@ -374,7 +374,7 @@ export default function GoodRoadApp() {
 
         {/* Auto-Start Settings */}
         <View style={styles.settingsCard}>
-          <Text style={styles.settingsTitle}>🚗 Автозапуск при подключении к авто</Text>
+          <Text style={styles.settingsTitle}>🚗 Автозапуск при движении</Text>
           
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Включить автозапуск</Text>
@@ -386,20 +386,6 @@ export default function GoodRoadApp() {
               }}
               thumbColor={autoStartEnabled ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
-            />
-          </View>
-
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>При подключении зарядки</Text>
-            <Switch
-              value={chargingAutoStart}
-              onValueChange={(value) => {
-                setChargingAutoStart(value);
-                saveAutoStartSettings();
-              }}
-              thumbColor={chargingAutoStart ? '#4CAF50' : '#888'}
-              trackColor={{ false: '#333', true: '#4CAF5050' }}
-              disabled={!autoStartEnabled}
             />
           </View>
 
@@ -424,19 +410,6 @@ export default function GoodRoadApp() {
             </View>
           )}
         </View>
-
-        {/* Battery Status */}
-        {batteryState && (
-          <View style={styles.batteryCard}>
-            <View style={styles.batteryRow}>
-              <Ionicons name="battery-charging" size={24} color={batteryState.state === Battery.BatteryState.CHARGING ? '#4CAF50' : '#888'} />
-              <Text style={styles.batteryText}>
-                Батарея: {Math.round(batteryState.level * 100)}% 
-                {batteryState.state === Battery.BatteryState.CHARGING ? ' (Заряжается)' : ''}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Upload Button */}
         <TouchableOpacity style={styles.uploadButton} onPress={uploadSensorData}>
