@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { MMKV } from 'react-native-mmkv';
+// MMKV storage with web fallback
+let storage: any;
 import { AppSettings, HazardType } from '../app/settings';
 
 // Fast storage using MMKV (30x faster than AsyncStorage)
