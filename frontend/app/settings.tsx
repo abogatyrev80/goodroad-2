@@ -153,19 +153,11 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <View style={styles.sliderContainer}>
+          <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Громкость: {Math.round(settings.warningVolume * 100)}%</Text>
-            <Slider
-              style={styles.slider}
-              value={settings.warningVolume}
-              onValueChange={(value) => updateSetting('warningVolume', value)}
-              minimumValue={0}
-              maximumValue={1}
-              thumbStyle={styles.sliderThumb}
-              trackStyle={styles.sliderTrack}
-              minimumTrackTintColor="#4CAF50"
-              maximumTrackTintColor="#333"
-            />
+            <TouchableOpacity onPress={() => updateSetting('warningVolume', settings.warningVolume > 0.5 ? 0.3 : 0.8)}>
+              <Text style={styles.adjustButton}>{settings.warningVolume > 0.5 ? 'Тише' : 'Громче'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
