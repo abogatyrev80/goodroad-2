@@ -236,6 +236,209 @@ export default function GoodRoadApp() {
     return 'Very Poor Road';
   };
 
+  // Helper functions
+  const loadSettings = async () => {
+    try {
+      const storedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (storedSettings) {
+        setSettings(JSON.parse(storedSettings));
+      } else {
+        // Set default settings
+        const defaultSettings: AppSettings = {
+          audioWarnings: true,
+          vibrationWarnings: true,
+          warningVolume: 0.8,
+          speedThreshold: 15,
+          minWarningDistance: 30,
+          maxWarningDistance: 200,
+          warningCooldown: 5,
+          hazardTypes: [
+            { id: 'pothole', name: 'Ямы', icon: 'alert-circle', enabled: true, criticalDistance: 50 },
+            { id: 'speed_bump', name: 'Лежачие полицейские', icon: 'triangle', enabled: true, criticalDistance: 30 },
+            { id: 'pedestrian_crossing', name: 'Пешеходные переходы', icon: 'walk', enabled: true, criticalDistance: 60 },
+          ]
+        };
+        setSettings(defaultSettings);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const setupAudio = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+        staysActiveInBackground: true,
+      });
+    } catch (error) {
+      console.error('Error setting up audio:', error);
+    }
+  };
+
+  const cleanup = async () => {
+    if (locationSubscription.current) {
+      locationSubscription.current.remove();
+    }
+    if (audioRef.current) {
+      await audioRef.current.unloadAsync();
+    }
+  };
+
+  const startLocationTracking = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Разрешение отклонено', 'Необходимо разрешение на геолокацию');
+        return;
+      }
+
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 2000, // Update every 2 seconds
+          distanceInterval: 5, // Update every 5 meters
+        },
+        (location) => {
+          setCurrentLocation(location);
+          setCurrentSpeed((location.coords.speed || 0) * 3.6); // Convert m/s to km/h
+          if (location.coords.heading) {
+            setCurrentHeading(location.coords.heading);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error starting location tracking:', error);
+      Alert.alert('Ошибка', 'Не удалось запустить отслеживание геолокации');
+    }
+  };
+
+  const stopLocationTracking = () => {
+    if (locationSubscription.current) {
+      locationSubscription.current.remove();
+      locationSubscription.current = null;
+    }
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const isHeadingTowards = (currentLat: number, currentLon: number, targetLat: number, targetLon: number, heading: number): boolean => {
+    const bearing = Math.atan2(
+      Math.sin((targetLon - currentLon) * Math.PI / 180) * Math.cos(targetLat * Math.PI / 180),
+      Math.cos(currentLat * Math.PI / 180) * Math.sin(targetLat * Math.PI / 180) -
+      Math.sin(currentLat * Math.PI / 180) * Math.cos(targetLat * Math.PI / 180) * Math.cos((targetLon - currentLon) * Math.PI / 180)
+    ) * 180 / Math.PI;
+    
+    const normalizedBearing = (bearing + 360) % 360;
+    const headingDiff = Math.abs(normalizedBearing - heading);
+    
+    return headingDiff < 45 || headingDiff > 315; // Within 45 degrees of current heading
+  };
+
+  const checkForHazards = async () => {
+    if (!currentLocation || !settings) return;
+    
+    // Skip if speed is below threshold
+    if (currentSpeed < settings.speedThreshold) {
+      setActiveWarnings([]);
+      return;
+    }
+
+    const { latitude, longitude } = currentLocation.coords;
+    const currentTime = Date.now();
+    
+    // Check cooldown
+    if (currentTime - lastWarningTime < settings.warningCooldown * 1000) {
+      return;
+    }
+
+    const nearbyHazards: Hazard[] = [];
+
+    // Check mock hazards (in real app, fetch from API)
+    mockHazards.forEach(hazard => {
+      const distance = calculateDistance(latitude, longitude, hazard.latitude, hazard.longitude);
+      
+      // Find hazard type settings
+      const hazardType = settings.hazardTypes.find(ht => ht.id === hazard.type);
+      if (!hazardType || !hazardType.enabled) return;
+      
+      // Check if hazard is within warning distance
+      if (distance <= settings.maxWarningDistance && distance >= settings.minWarningDistance) {
+        // Check if we're heading towards the hazard
+        if (isHeadingTowards(latitude, longitude, hazard.latitude, hazard.longitude, currentHeading)) {
+          nearbyHazards.push({ ...hazard, distance: Math.round(distance) });
+        }
+      }
+      
+      // Check critical distance
+      if (distance <= hazardType.criticalDistance) {
+        if (isHeadingTowards(latitude, longitude, hazard.latitude, hazard.longitude, currentHeading)) {
+          triggerWarning(hazard, distance);
+        }
+      }
+    });
+
+    setActiveWarnings(nearbyHazards);
+  };
+
+  const triggerWarning = async (hazard: Hazard, distance: number) => {
+    if (!settings) return;
+    
+    const hazardType = settings.hazardTypes.find(ht => ht.id === hazard.type);
+    const hazardName = hazardType?.name || hazard.type;
+    
+    // Audio warning
+    if (settings.audioWarnings) {
+      try {
+        // Create a simple beep sound programmatically
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCWjT9yIGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zC' },
+          { shouldPlay: true, volume: settings.warningVolume }
+        );
+        audioRef.current = sound;
+      } catch (error) {
+        console.error('Error playing audio warning:', error);
+      }
+    }
+
+    // Vibration warning  
+    if (settings.vibrationWarnings) {
+      Vibration.vibrate([100, 50, 100, 50, 200]);
+    }
+
+    // Visual alert
+    Alert.alert(
+      '⚠️ ПРЕДУПРЕЖДЕНИЕ',
+      `${hazardName} через ${Math.round(distance)}м`,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
+
+    setLastWarningTime(Date.now());
+  };
+
+  const getHazardIcon = (type: string): string => {
+    const hazardType = settings?.hazardTypes.find(ht => ht.id === type);
+    return hazardType?.icon || 'warning';
+  };
+
+  const getRoadConditionColor = (score: number) => {
+    if (score >= 80) return '#4CAF50';
+    if (score >= 60) return '#FF9800';
+    if (score >= 40) return '#FF5722';
+    return '#F44336';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
@@ -243,22 +446,57 @@ export default function GoodRoadApp() {
       <View style={styles.header}>
         <Ionicons name="car-sport" size={32} color="#4CAF50" />
         <Text style={styles.title}>Good Road</Text>
-        <Text style={styles.subtitle}>Smart Road Monitoring</Text>
+        <TouchableOpacity 
+          onPress={() => router.push('/settings')}
+          style={styles.settingsButton}
+        >
+          <Ionicons name="settings" size={24} color="#ffffff" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Active Warnings Banner */}
+        {activeWarnings.length > 0 && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="warning" size={24} color="#FF5722" />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>Впереди препятствия:</Text>
+              {activeWarnings.slice(0, 2).map(warning => (
+                <Text key={warning.id} style={styles.warningText}>
+                  <Ionicons name={getHazardIcon(warning.type) as any} size={14} />
+                  {' '}{warning.distance}м
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Speed Warning */}
+        {settings && currentSpeed < settings.speedThreshold && isTracking && (
+          <View style={styles.speedWarningBanner}>
+            <Ionicons name="speedometer" size={20} color="#FF9800" />
+            <Text style={styles.speedWarningText}>
+              Предупреждения отключены (скорость ниже {settings.speedThreshold} км/ч)
+            </Text>
+          </View>
+        )}
+
+        {/* Road Condition Display */}
         <View style={styles.conditionCard}>
-          <View style={[styles.conditionIndicator, { backgroundColor: '#F44336' }]}>
+          <View style={[styles.conditionIndicator, { backgroundColor: getRoadConditionColor(roadConditionScore) }]}>
             <Text style={styles.conditionScore}>{Math.round(roadConditionScore)}</Text>
           </View>
           <View style={styles.conditionInfo}>
-            <Text style={styles.conditionTitle}>Current Road Condition</Text>
-            <Text style={[styles.conditionText, { color: '#F44336' }]}>
-              Very Poor Road
+            <Text style={styles.conditionTitle}>Качество дороги</Text>
+            <Text style={[styles.conditionText, { color: getRoadConditionColor(roadConditionScore) }]}>
+              {roadConditionScore >= 80 ? 'Отличная дорога' :
+               roadConditionScore >= 60 ? 'Хорошая дорога' :
+               roadConditionScore >= 40 ? 'Удовлетворительная' : 'Плохая дорога'}
             </Text>
           </View>
         </View>
 
+        {/* Tracking Control */}
         <View style={styles.controlCard}>
           <TouchableOpacity
             style={[styles.trackingButton, { backgroundColor: isTracking ? '#F44336' : '#4CAF50' }]}
@@ -270,54 +508,82 @@ export default function GoodRoadApp() {
               color="white" 
             />
             <Text style={styles.buttonText}>
-              {isTracking ? 'Stop Monitoring' : 'Start Monitoring'}
+              {isTracking ? 'Остановить мониторинг' : 'Начать мониторинг'}
             </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Status Cards */}
         <View style={styles.statusGrid}>
           <View style={styles.statusCard}>
-            <Ionicons name="location" size={24} color="#4CAF50" />
-            <Text style={styles.statusTitle}>Позиционирование</Text>
-            <Text style={styles.statusValue}>Ожидание...</Text>
+            <Ionicons name="location" size={24} color={currentLocation ? "#4CAF50" : "#888"} />
+            <Text style={styles.statusTitle}>GPS</Text>
+            <Text style={styles.statusValue}>
+              {currentLocation ? 'Подключен' : 'Ожидание...'}
+            </Text>
+            {currentLocation && (
+              <Text style={styles.statusSubtitle}>
+                Точность: ±{currentLocation.coords.accuracy?.toFixed(0)}м
+              </Text>
+            )}
           </View>
 
           <View style={styles.statusCard}>
-            <Ionicons name="analytics" size={24} color="#2196F3" />
-            <Text style={styles.statusTitle}>Данные сенсоров</Text>
-            <Text style={styles.statusValue}>0 точек</Text>
-            <Text style={styles.statusSubtitle}>Ожидание данных</Text>
+            <Ionicons name="speedometer" size={24} color="#2196F3" />
+            <Text style={styles.statusTitle}>Скорость</Text>
+            <Text style={styles.statusValue}>{Math.round(currentSpeed)} км/ч</Text>
+            <Text style={styles.statusSubtitle}>
+              {settings && currentSpeed >= settings.speedThreshold ? 
+                'Предупреждения активны' : 'Предупреждения отключены'}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.settingsCard}>
-          <Text style={styles.settingsTitle}>🚗 Автозапуск при движении</Text>
+        {/* Audio Settings Quick Toggle */}
+        <View style={styles.quickSettingsCard}>
+          <Text style={styles.settingsTitle}>🔊 Быстрые настройки</Text>
           
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Включить автозапуск</Text>
+            <Text style={styles.settingLabel}>Звуковые предупреждения</Text>
             <Switch
-              value={autoStartEnabled}
-              onValueChange={(value) => setAutoStartEnabled(value)}
-              thumbColor={autoStartEnabled ? '#4CAF50' : '#888'}
+              value={settings?.audioWarnings || false}
+              onValueChange={async (value) => {
+                if (settings) {
+                  const newSettings = { ...settings, audioWarnings: value };
+                  setSettings(newSettings);
+                  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+                }
+              }}
+              thumbColor={settings?.audioWarnings ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>При обнаружении движения</Text>
+            <Text style={styles.settingLabel}>Вибрация</Text>
             <Switch
-              value={speedAutoStart}
-              onValueChange={(value) => setSpeedAutoStart(value)}
-              thumbColor={speedAutoStart ? '#4CAF50' : '#888'}
+              value={settings?.vibrationWarnings || false}
+              onValueChange={async (value) => {
+                if (settings) {
+                  const newSettings = { ...settings, vibrationWarnings: value };
+                  setSettings(newSettings);
+                  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+                }
+              }}
+              thumbColor={settings?.vibrationWarnings ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
-              disabled={!autoStartEnabled}
             />
           </View>
         </View>
 
-        <TouchableOpacity style={styles.uploadButton}>
-          <Ionicons name="cloud-upload" size={20} color="white" />
-          <Text style={styles.uploadButtonText}>Загрузить данные сейчас</Text>
+        {/* Settings Button */}
+        <TouchableOpacity 
+          style={styles.settingsNavButton}
+          onPress={() => router.push('/settings')}
+        >
+          <Ionicons name="settings-outline" size={20} color="white" />
+          <Text style={styles.settingsNavText}>Подробные настройки предупреждений</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
