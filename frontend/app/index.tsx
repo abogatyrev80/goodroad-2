@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function GoodRoadApp() {
   const [isTracking, setIsTracking] = useState(false);
-  const [roadConditionScore, setRoadConditionScore] = useState<number>(0);
+  const [roadConditionScore, setRoadConditionScore] = useState<number>(75);
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [speedAutoStart, setSpeedAutoStart] = useState(true);
 
