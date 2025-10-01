@@ -22,15 +22,6 @@ const SENSOR_DATA_KEY = 'sensor_data_buffer';
 const AUTO_START_SETTINGS_KEY = 'auto_start_settings';
 const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
 // Background task for location tracking
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
@@ -74,20 +65,15 @@ export default function GoodRoadApp() {
   const [sensorBuffer, setSensorBuffer] = useState<any[]>([]);
   const [roadConditionScore, setRoadConditionScore] = useState<number>(0);
   
-  // Auto-start settings
+  // Auto-start settings - simplified version
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
-  const [chargingAutoStart, setChargingAutoStart] = useState(false);
   const [speedAutoStart, setSpeedAutoStart] = useState(true);
   const [carModeDetected, setCarModeDetected] = useState(false);
-  const [batteryState, setBatteryState] = useState<any>(null);
 
   useEffect(() => {
     checkPermissions();
-    setupBackgroundFetch();
-    setupNotifications();
     loadStoredData();
     loadAutoStartSettings();
-    setupCarDetection();
   }, []);
 
   const loadAutoStartSettings = async () => {
