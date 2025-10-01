@@ -62,9 +62,9 @@ export interface Hazard {
 interface AppStore {
   // Settings
   settings: AppSettings;
-  loadSettings: () => void;
-  updateSettings: (newSettings: Partial<AppSettings>) => void;
-  resetSettings: () => void;
+  loadSettings: () => Promise<void>;
+  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  resetSettings: () => Promise<void>;
   
   // Tracking state
   isTracking: boolean;
