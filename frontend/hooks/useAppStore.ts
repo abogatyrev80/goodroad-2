@@ -131,9 +131,9 @@ export const useAppStore = create<AppStore>()(
     // Settings
     settings: defaultSettings,
     
-    loadSettings: () => {
+    loadSettings: async () => {
       try {
-        const stored = storage.getString('app_settings');
+        const stored = await storage.getString('app_settings');
         if (stored) {
           const parsed = JSON.parse(stored);
           set({ settings: { ...defaultSettings, ...parsed } });
