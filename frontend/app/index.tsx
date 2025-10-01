@@ -223,9 +223,9 @@ export default function GoodRoadApp() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Звуковые предупреждения</Text>
             <Switch
-              value={audioWarnings}
-              onValueChange={setAudioWarnings}
-              thumbColor={audioWarnings ? '#4CAF50' : '#888'}
+              value={audioEnabled}
+              onValueChange={setAudioEnabled}
+              thumbColor={audioEnabled ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
           </View>
@@ -233,9 +233,9 @@ export default function GoodRoadApp() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Вибрация</Text>
             <Switch
-              value={vibrationWarnings}
-              onValueChange={setVibrationWarnings}
-              thumbColor={vibrationWarnings ? '#4CAF50' : '#888'}
+              value={vibrationEnabled}
+              onValueChange={setVibrationEnabled}
+              thumbColor={vibrationEnabled ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
           </View>
