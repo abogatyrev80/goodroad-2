@@ -72,6 +72,7 @@ export default function GoodRoadApp() {
 
   useEffect(() => {
     checkPermissions();
+    setupBackgroundFetch();
     loadStoredData();
     loadAutoStartSettings();
   }, []);
