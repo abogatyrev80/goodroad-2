@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Slider from 'react-native-slider';
+// Slider removed for compatibility
 import { router } from 'expo-router';
 
 const SETTINGS_KEY = 'good_road_settings';
