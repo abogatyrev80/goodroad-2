@@ -284,24 +284,22 @@ export default function GoodRoadApp() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Road Condition Display */}
         <View style={styles.conditionCard}>
-          <View style={[styles.conditionIndicator, { backgroundColor: getRoadConditionColor(roadConditionScore) }]}>
+          <View style={[styles.conditionIndicator, { backgroundColor: '#F44336' }]}>
             <Text style={styles.conditionScore}>{Math.round(roadConditionScore)}</Text>
           </View>
           <View style={styles.conditionInfo}>
             <Text style={styles.conditionTitle}>Current Road Condition</Text>
-            <Text style={[styles.conditionText, { color: getRoadConditionColor(roadConditionScore) }]}>
-              {getRoadConditionText(roadConditionScore)}
+            <Text style={[styles.conditionText, { color: '#F44336' }]}>
+              Very Poor Road
             </Text>
           </View>
         </View>
 
-        {/* Tracking Control */}
         <View style={styles.controlCard}>
           <TouchableOpacity
             style={[styles.trackingButton, { backgroundColor: isTracking ? '#F44336' : '#4CAF50' }]}
-            onPress={isTracking ? stopTracking : startTracking}
+            onPress={() => setIsTracking(!isTracking)}
           >
             <Ionicons 
               name={isTracking ? "stop" : "play"} 
@@ -314,49 +312,21 @@ export default function GoodRoadApp() {
           </TouchableOpacity>
         </View>
 
-        {/* Status Cards */}
         <View style={styles.statusGrid}>
           <View style={styles.statusCard}>
             <Ionicons name="location" size={24} color="#4CAF50" />
             <Text style={styles.statusTitle}>Позиционирование</Text>
-            <Text style={styles.statusValue}>
-              {locationData ? 'GPS+ГЛОНАСС+Galileo' : 'Ожидание...'}
-            </Text>
-            <Text style={styles.statusSubtitle}>
-              {locationData && locationData.accuracy ? `±${locationData.accuracy?.toFixed(1)}м` : ''}
-            </Text>
+            <Text style={styles.statusValue}>Ожидание...</Text>
           </View>
 
           <View style={styles.statusCard}>
             <Ionicons name="analytics" size={24} color="#2196F3" />
             <Text style={styles.statusTitle}>Данные сенсоров</Text>
-            <Text style={styles.statusValue}>{sensorBuffer.length} точек</Text>
-            <Text style={styles.statusSubtitle}>
-              {accelerometerData ? 'Акселерометр активен' : 'Ожидание данных'}
-            </Text>
+            <Text style={styles.statusValue}>0 точек</Text>
+            <Text style={styles.statusSubtitle}>Ожидание данных</Text>
           </View>
         </View>
 
-        {/* Current Data Display */}
-        {accelerometerData && (
-          <View style={styles.dataCard}>
-            <Text style={styles.dataTitle}>Live Sensor Data</Text>
-            <View style={styles.dataRow}>
-              <Text style={styles.dataLabel}>Acceleration X:</Text>
-              <Text style={styles.dataValue}>{accelerometerData.x.toFixed(3)}</Text>
-            </View>
-            <View style={styles.dataRow}>
-              <Text style={styles.dataLabel}>Acceleration Y:</Text>
-              <Text style={styles.dataValue}>{accelerometerData.y.toFixed(3)}</Text>
-            </View>
-            <View style={styles.dataRow}>
-              <Text style={styles.dataLabel}>Acceleration Z:</Text>
-              <Text style={styles.dataValue}>{accelerometerData.z.toFixed(3)}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Auto-Start Settings */}
         <View style={styles.settingsCard}>
           <Text style={styles.settingsTitle}>🚗 Автозапуск при движении</Text>
           
@@ -364,10 +334,7 @@ export default function GoodRoadApp() {
             <Text style={styles.settingLabel}>Включить автозапуск</Text>
             <Switch
               value={autoStartEnabled}
-              onValueChange={(value) => {
-                setAutoStartEnabled(value);
-                saveAutoStartSettings();
-              }}
+              onValueChange={(value) => setAutoStartEnabled(value)}
               thumbColor={autoStartEnabled ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
@@ -377,26 +344,15 @@ export default function GoodRoadApp() {
             <Text style={styles.settingLabel}>При обнаружении движения</Text>
             <Switch
               value={speedAutoStart}
-              onValueChange={(value) => {
-                setSpeedAutoStart(value);
-                saveAutoStartSettings();
-              }}
+              onValueChange={(value) => setSpeedAutoStart(value)}
               thumbColor={speedAutoStart ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
               disabled={!autoStartEnabled}
             />
           </View>
-
-          {carModeDetected && (
-            <View style={styles.carModeIndicator}>
-              <Ionicons name="car" size={16} color="#4CAF50" />
-              <Text style={styles.carModeText}>Режим автомобиля активен</Text>
-            </View>
-          )}
         </View>
 
-        {/* Upload Button */}
-        <TouchableOpacity style={styles.uploadButton} onPress={uploadSensorData}>
+        <TouchableOpacity style={styles.uploadButton}>
           <Ionicons name="cloud-upload" size={20} color="white" />
           <Text style={styles.uploadButtonText}>Загрузить данные сейчас</Text>
         </TouchableOpacity>
