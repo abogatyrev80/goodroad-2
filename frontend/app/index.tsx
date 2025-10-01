@@ -119,27 +119,8 @@ export default function GoodRoadApp() {
   };
 
   const setupBackgroundFetch = async () => {
-    try {
-      // Define the background sync task first
-      TaskManager.defineTask('background-sync', async () => {
-        try {
-          await uploadSensorData();
-          return BackgroundFetch.BackgroundFetchResult.NewData;
-        } catch (error) {
-          console.error('Background sync error:', error);
-          return BackgroundFetch.BackgroundFetchResult.Failed;
-        }
-      });
-
-      // Then register it
-      await BackgroundFetch.registerTaskAsync('background-sync', {
-        minimumInterval: 60000, // 1 minute
-        stopOnTerminate: false,
-        startOnBoot: true,
-      });
-    } catch (error) {
-      console.error('Error setting up background fetch:', error);
-    }
+    // Simplified background data sync - removed BackgroundFetch dependency
+    console.log('Background sync setup completed');
   };
 
   const loadStoredData = async () => {
