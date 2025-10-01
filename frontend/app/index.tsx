@@ -127,7 +127,7 @@ export default function GoodRoadApp() {
 
   const testWarning = async () => {
     // Play sound if enabled
-    if (audioWarnings) {
+    if (audioEnabled) {
       await playWarningSound();
     }
     
