@@ -82,7 +82,6 @@ export default function GoodRoadApp() {
       if (settings) {
         const parsed = JSON.parse(settings);
         setAutoStartEnabled(parsed.autoStartEnabled || false);
-        setChargingAutoStart(parsed.chargingAutoStart || false);
         setSpeedAutoStart(parsed.speedAutoStart || true);
       }
     } catch (error) {
@@ -94,97 +93,11 @@ export default function GoodRoadApp() {
     try {
       const settings = {
         autoStartEnabled,
-        chargingAutoStart,
         speedAutoStart,
       };
       await AsyncStorage.setItem(AUTO_START_SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Error saving auto-start settings:', error);
-    }
-  };
-
-  const setupNotifications = async () => {
-    try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      if (finalStatus !== 'granted') {
-        console.log('Notification permissions not granted');
-      }
-    } catch (error) {
-      console.error('Error setting up notifications:', error);
-    }
-  };
-
-  const setupCarDetection = async () => {
-    try {
-      // Monitor battery state changes (charging detection)
-      const batteryLevel = await Battery.getBatteryLevelAsync();
-      const batteryState = await Battery.getBatteryStateAsync();
-      setBatteryState({ level: batteryLevel, state: batteryState });
-
-      // Set up battery monitoring
-      const batterySubscription = Battery.addBatteryStateListener(({ batteryState, batteryLevel }) => {
-        setBatteryState({ level: batteryLevel, state: batteryState });
-        
-        // Auto-start when charging detected (likely connected to car charger)
-        if (chargingAutoStart && batteryState === Battery.BatteryState.CHARGING && !isTracking) {
-          handleAutoStart('Зарядка обнаружена - подключение к автомобилю');
-        }
-      });
-
-      // Speed-based detection
-      if (speedAutoStart) {
-        const locationSubscription = Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 5000,
-            distanceInterval: 50,
-          },
-          (location) => {
-            setLocationData(location.coords);
-            
-            // Auto-start if speed > 5 km/h (likely driving)
-            if (location.coords.speed && location.coords.speed > 1.5 && !isTracking && autoStartEnabled) {
-              handleAutoStart('Движение обнаружено - запуск мониторинга');
-            }
-          }
-        );
-      }
-
-      return () => {
-        batterySubscription?.remove();
-      };
-    } catch (error) {
-      console.error('Error setting up car detection:', error);
-    }
-  };
-
-  const handleAutoStart = async (reason: string) => {
-    try {
-      setCarModeDetected(true);
-      
-      // Show notification
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Good Road - Автозапуск',
-          body: reason,
-          data: { autoStart: true },
-        },
-        trigger: null,
-      });
-
-      // Start tracking automatically
-      await startTracking();
-      
-      console.log('Auto-started tracking:', reason);
-    } catch (error) {
-      console.error('Error in auto-start:', error);
     }
   };
 
