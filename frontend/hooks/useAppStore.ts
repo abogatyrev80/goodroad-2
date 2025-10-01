@@ -156,9 +156,9 @@ export const useAppStore = create<AppStore>()(
       }
     },
     
-    resetSettings: () => {
+    resetSettings: async () => {
       set({ settings: defaultSettings });
-      storage.delete('app_settings');
+      await storage.delete('app_settings');
     },
     
     // Tracking state
