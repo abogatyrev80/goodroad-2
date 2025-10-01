@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,6 @@ import {
   StatusBar,
   Switch,
   Alert,
-  Vibration,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,8 +16,9 @@ import { router } from 'expo-router';
 export default function GoodRoadApp() {
   const [isTracking, setIsTracking] = useState(false);
   const [roadConditionScore, setRoadConditionScore] = useState<number>(75);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [audioWarnings, setAudioWarnings] = useState(true);
+  const [vibrationWarnings, setVibrationWarnings] = useState(true);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
 
   const getRoadConditionColor = (score: number) => {
     if (score >= 80) return '#4CAF50';
@@ -28,44 +27,10 @@ export default function GoodRoadApp() {
     return '#F44336';
   };
 
-  const getRoadConditionText = (score: number) => {
-    if (score >= 80) return 'Отличная дорога';
-    if (score >= 60) return 'Хорошая дорога';
-    if (score >= 40) return 'Удовлетворительная';
-    return 'Плохая дорога';
-  };
-
-  const playWarningSound = () => {
-    if (Platform.OS === 'web') {
-      console.log('🔊 Warning beep sound played! (Web Audio API)');
-      console.log('🎵 Frequency: 800Hz, Duration: 300ms');
-    } else {
-      console.log('🔊 Sound would play on mobile device with expo-av');
-    }
-  };
-
-  const triggerVibration = () => {
-    if (vibrationEnabled && Platform.OS !== 'web') {
-      Vibration.vibrate([200, 100, 200, 100, 200]);
-      console.log('📳 Vibration triggered');
-    } else {
-      console.log('📳 Vibration would trigger on mobile device');
-    }
-  };
-
   const testWarning = () => {
-    // Play sound if enabled
-    if (audioEnabled) {
-      playWarningSound();
-    }
-    
-    // Trigger vibration if enabled
-    triggerVibration();
-    
-    // Show visual alert
     Alert.alert(
       '⚠️ ПРЕДУПРЕЖДЕНИЕ',
-      'Впереди препятствие - яма через 50 метров!\n\n🔊 Звук: ' + (audioEnabled ? 'Воспроизведен' : 'Отключен') + '\n📳 Вибрация: ' + (vibrationEnabled ? 'Активирована' : 'Отключена'),
+      'Впереди препятствие - яма через 50 метров!',
       [{ text: 'OK' }]
     );
   };
@@ -88,10 +53,10 @@ export default function GoodRoadApp() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Warning Banner */}
         <View style={styles.warningBanner}>
-          <Ionicons name="volume-high" size={24} color="#4CAF50" />
+          <Ionicons name="warning" size={24} color="#FF5722" />
           <View style={styles.warningContent}>
-            <Text style={styles.warningTitle}>Система звуковых предупреждений готова!</Text>
-            <Text style={styles.warningText}>🔊 Аудио + 📳 Вибрация работают</Text>
+            <Text style={styles.warningTitle}>Система предупреждений активна</Text>
+            <Text style={styles.warningText}>Мониторинг препятствий включен</Text>
           </View>
         </View>
 
@@ -103,7 +68,9 @@ export default function GoodRoadApp() {
           <View style={styles.conditionInfo}>
             <Text style={styles.conditionTitle}>Качество дороги</Text>
             <Text style={[styles.conditionText, { color: getRoadConditionColor(roadConditionScore) }]}>
-              {getRoadConditionText(roadConditionScore)}
+              {roadConditionScore >= 80 ? 'Отличная дорога' :
+               roadConditionScore >= 60 ? 'Хорошая дорога' :
+               roadConditionScore >= 40 ? 'Удовлетворительная' : 'Плохая дорога'}
             </Text>
           </View>
         </View>
@@ -137,21 +104,21 @@ export default function GoodRoadApp() {
           <View style={styles.statusCard}>
             <Ionicons name="speedometer" size={24} color="#2196F3" />
             <Text style={styles.statusTitle}>Скорость</Text>
-            <Text style={styles.statusValue}>0 км/ч</Text>
+            <Text style={styles.statusValue}>{currentSpeed} км/ч</Text>
             <Text style={styles.statusSubtitle}>Предупреждения активны</Text>
           </View>
         </View>
 
         {/* Audio Settings */}
         <View style={styles.quickSettingsCard}>
-          <Text style={styles.settingsTitle}>🔊 Звуковые настройки</Text>
+          <Text style={styles.settingsTitle}>🔊 Быстрые настройки</Text>
           
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Звуковые предупреждения</Text>
             <Switch
-              value={audioEnabled}
-              onValueChange={setAudioEnabled}
-              thumbColor={audioEnabled ? '#4CAF50' : '#888'}
+              value={audioWarnings}
+              onValueChange={setAudioWarnings}
+              thumbColor={audioWarnings ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
           </View>
@@ -159,9 +126,9 @@ export default function GoodRoadApp() {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Вибрация</Text>
             <Switch
-              value={vibrationEnabled}
-              onValueChange={setVibrationEnabled}
-              thumbColor={vibrationEnabled ? '#4CAF50' : '#888'}
+              value={vibrationWarnings}
+              onValueChange={setVibrationWarnings}
+              thumbColor={vibrationWarnings ? '#4CAF50' : '#888'}
               trackColor={{ false: '#333', true: '#4CAF5050' }}
             />
           </View>
@@ -173,22 +140,8 @@ export default function GoodRoadApp() {
           onPress={testWarning}
         >
           <Ionicons name="volume-high" size={20} color="white" />
-          <Text style={styles.testButtonText}>🔊 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ</Text>
+          <Text style={styles.testButtonText}>Тестовое предупреждение</Text>
         </TouchableOpacity>
-
-        {/* Audio Info */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>🎵 Информация об аудио</Text>
-          <Text style={styles.infoText}>
-            🌐 В браузере: Web Audio API (800Hz синус-волна)
-          </Text>
-          <Text style={styles.infoText}>
-            📱 На мобильном: Полноценное аудио + вибрация
-          </Text>
-          <Text style={styles.infoText}>
-            🔊 Паттерн: 3 коротких сигнала по 300мс
-          </Text>
-        </View>
 
         {/* Settings Navigation */}
         <TouchableOpacity 
@@ -233,14 +186,14 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   warningBanner: {
-    backgroundColor: '#4CAF5020',
+    backgroundColor: '#FF572220',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#FF5722',
   },
   warningContent: {
     flex: 1,
@@ -249,12 +202,12 @@ const styles = StyleSheet.create({
   warningTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#FF5722',
     marginBottom: 4,
   },
   warningText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#FF5722',
   },
   conditionCard: {
     flexDirection: 'row',
@@ -361,33 +314,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF5722',
-    padding: 18,
+    backgroundColor: '#2196F3',
+    padding: 16,
     borderRadius: 12,
     marginBottom: 16,
   },
   testButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  infoCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  infoTitle: {
     fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 4,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   settingsNavButton: {
     backgroundColor: '#2196F3',
