@@ -13,11 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as Battery from 'expo-battery';
-import * as Device from 'expo-device';
-import * as Network from 'expo-network';
-import * as Notifications from 'expo-notifications';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
