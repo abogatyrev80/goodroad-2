@@ -242,9 +242,9 @@ export const useAppStore = create<AppStore>()(
 // Auto-persist critical data
 useAppStore.subscribe(
   (state) => state.settings,
-  (settings) => {
+  async (settings) => {
     try {
-      storage.set('app_settings', JSON.stringify(settings));
+      await storage.set('app_settings', JSON.stringify(settings));
     } catch (error) {
       console.error('Error persisting settings:', error);
     }
