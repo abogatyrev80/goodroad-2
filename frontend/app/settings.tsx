@@ -45,6 +45,44 @@ export interface AppSettings {
   hazardTypes: HazardType[];
 }
 
+const defaultSoundOptions: SoundOption[] = [
+  {
+    id: 'beep_classic',
+    name: 'Классический сигнал',
+    description: 'Стандартный звуковой сигнал',
+    isCustom: false,
+    previewText: '🔊 БИП-БИП-БИП'
+  },
+  {
+    id: 'voice_male',
+    name: 'Мужской голос',
+    description: 'Голосовое предупреждение (мужской)',
+    isCustom: false,
+    previewText: '🗣️ "Внимание! Препятствие впереди!"'
+  },
+  {
+    id: 'voice_female',
+    name: 'Женский голос', 
+    description: 'Голосовое предупреждение (женский)',
+    isCustom: false,
+    previewText: '🗣️ "Осторожно! Впереди препятствие!"'
+  },
+  {
+    id: 'chime_soft',
+    name: 'Мягкий колокольчик',
+    description: 'Приятный мелодичный сигнал',
+    isCustom: false,
+    previewText: '🔔 ДИНЬ-ДИНЬ-ДИНЬ'
+  },
+  {
+    id: 'horn_urgent',
+    name: 'Срочное предупреждение',
+    description: 'Громкий сигнал для экстренных случаев',
+    isCustom: false,
+    previewText: '📯 УУУ-УУУ-УУУ'
+  }
+];
+
 const defaultHazardTypes: HazardType[] = [
   { id: 'pothole', name: 'Ямы', icon: 'alert-circle', enabled: true, criticalDistance: 50 },
   { id: 'speed_bump', name: 'Лежачие полицейские', icon: 'triangle', enabled: true, criticalDistance: 30 },
