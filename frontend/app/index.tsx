@@ -199,42 +199,96 @@ export default function GoodRoadApp() {
     if (!audioEnabled) return;
 
     try {
-      // Web Audio API для браузера
+      // Получаем текущий выбранный звук
+      const selectedSoundId = appSettings.selectedSoundId || 'beep_classic';
+      const volume = appSettings.warningVolume || 0.8;
+      
+      // Ищем выбранный звук в кастомных звуках
+      const customSound = appSettings.customSounds?.find(s => s.id === selectedSoundId);
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Если выбран пользовательский звук и он существует
+      if (customSound && customSound.uri) {
+        try {
+          if (soundRef.current) {
+            await soundRef.current.unloadAsync();
+          }
+
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: customSound.uri },
+            {
+              shouldPlay: false,
+              volume: volume,
+              rate: 1.0,
+            }
+          );
+
+          soundRef.current = sound;
+          await sound.playAsync();
+          console.log(`🔊 Custom sound played: ${customSound.name}`);
+          return;
+        } catch (error) {
+          console.error('Error playing custom sound:', error);
+          // Fallback to default sound
+        }
+      }
+
+      // Web Audio API для браузера (стандартные звуки)
       if (Platform.OS === 'web') {
         // @ts-ignore - Используем Web Audio API
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioContext = new AudioContext();
         
-        // Создаем осциллятор для звукового сигнала
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        // Разные частоты для разных типов предупреждений
+        let frequency = 800;
+        let pattern = [0.2, 0.1, 0.2, 0.1, 0.2]; // По умолчанию
         
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        
-        // Воспроизводим 3 коротких сигнала
-        for (let i = 0; i < 3; i++) {
-          const startTime = audioContext.currentTime + (i * 0.4);
-          const osc = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          
-          osc.connect(gain);
-          gain.connect(audioContext.destination);
-          
-          osc.frequency.setValueAtTime(800, startTime);
-          osc.type = 'sine';
-          gain.gain.setValueAtTime(0.3, startTime);
-          gain.gain.setValueAtTime(0, startTime + 0.2);
-          
-          osc.start(startTime);
-          osc.stop(startTime + 0.2);
+        switch (selectedSoundId) {
+          case 'voice_male':
+          case 'voice_female':
+            frequency = 600;
+            pattern = [0.5, 0.2, 0.3]; // Более длинные сигналы для голоса
+            break;
+          case 'chime_soft':
+            frequency = 1200;
+            pattern = [0.3, 0.15, 0.3, 0.15, 0.3]; // Мягкие колокольчики
+            break;
+          case 'horn_urgent':
+            frequency = 400;
+            pattern = [0.8, 0.1, 0.8]; // Долгие гудки
+            break;
         }
         
-        console.log('🔊 Web Audio warning sound played successfully');
+        // Воспроизводим паттерн звуков
+        let currentTime = audioContext.currentTime;
+        for (let i = 0; i < pattern.length; i += 2) {
+          if (i < pattern.length) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            
+            osc.frequency.setValueAtTime(frequency, currentTime);
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(volume * 0.5, currentTime);
+            gain.gain.setValueAtTime(0, currentTime + pattern[i]);
+            
+            osc.start(currentTime);
+            osc.stop(currentTime + pattern[i]);
+            
+            currentTime += pattern[i] + (pattern[i + 1] || 0);
+          }
+        }
+        
+        console.log(`🔊 Web Audio warning sound played: ${selectedSoundId}`);
         return;
       }
 
@@ -250,7 +304,7 @@ export default function GoodRoadApp() {
         },
         {
           shouldPlay: false,
-          volume: 0.8,
+          volume: volume,
           rate: 1.0,
         }
       );
@@ -259,7 +313,7 @@ export default function GoodRoadApp() {
       
       // Воспроизводим звук
       await sound.playAsync();
-      console.log('🔊 Mobile warning sound played successfully');
+      console.log(`🔊 Mobile warning sound played: ${selectedSoundId}`);
       
     } catch (error) {
       console.error('Sound play error:', error);
