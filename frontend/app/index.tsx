@@ -47,11 +47,26 @@ export default function GoodRoadApp() {
   useEffect(() => {
     setupAudio();
     requestLocationPermission();
+    loadAppSettings();
     
     return () => {
       cleanup();
     };
   }, []);
+
+  const loadAppSettings = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('good_road_settings');
+      if (stored) {
+        const settings = JSON.parse(stored) as AppSettings;
+        setAppSettings(settings);
+        setAudioEnabled(settings.audioWarnings);
+        setVibrationEnabled(settings.vibrationWarnings);
+      }
+    } catch (error) {
+      console.error('Error loading app settings:', error);
+    }
+  };
 
   const setupAudio = async () => {
     try {
