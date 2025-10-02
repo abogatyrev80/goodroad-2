@@ -683,4 +683,77 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 40,
   },
+  soundHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addSoundButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF5020',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  addSoundText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  soundOptionContainer: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  soundOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  soundOptionInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  soundTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  soundName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+  },
+  soundDescription: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  soundPreview: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  testSoundButton: {
+    padding: 4,
+  },
+  deleteSoundButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
 });
