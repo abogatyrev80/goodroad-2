@@ -1,0 +1,80 @@
+<analysis>
+The trajectory details the development of a mobile application named Good Road from scratch. The initial request was to create an Android app that runs in the background, collecting accelerometer and location data to identify poor road conditions. The AI engineer initiated the project using an Expo/React Native frontend and a FastAPI/MongoDB backend.
+
+Development was iterative. Core features like sensor data collection and background processing were implemented first. The user then requested several enhancements: support for all positioning systems, automatic service start upon connecting to a car, and a system for audio warnings about upcoming road hazards with a configurable settings menu.
+
+Each new feature addition was followed by a significant debugging phase. The most persistent issues included a white screen error, which was traced back to missing dependencies (, ) and incorrect plugin configurations in . Another recurring problem was an  error, which was resolved by simplifying the component structure and reverting complex state management attempts (Zustand) back to basic React hooks.
+
+The final development cycle focused on fixing sound alerts, speed display, and GPS accuracy feedback. Despite several attempts, these features remain buggy. The last action was an attempt to fix a missing audio file and an incorrect icon name, but the user immediately reported new, unspecified errors, indicating the application is still in an unstable state. The process highlights a cycle of implementing features followed by extensive, often regressive, debugging.
+</analysis>
+
+<product_requirements>
+The Good Road application is a mobile navigation tool designed to improve driver safety by monitoring road quality.
+
+**Core Functionality:**
+The application must operate as a background service on a mobile device, continuously recording data from the accelerometer and various positioning systems (GPS, GLONASS, etc.). This data, including coordinates, speed, and acceleration patterns, is periodically uploaded to a server.
+
+**Server-Side Analysis:**
+The backend analyzes the collected data to identify locations with sharp acceleration changes, interpreting them as road hazards like potholes, speed bumps, or poor road surfaces. These analyzed hazard locations are then distributed to other users.
+
+**User-Facing Features:**
+1.  **Real-time Road Monitoring:** The app displays the current road quality on a simple scale.
+2.  **Audio-Visual Warnings:** It provides timely audio and visual alerts to the driver as they approach a known road hazard.
+3.  **Automatic Operation:** The monitoring service should start automatically when the user connects their phone to a car (detected via charging or significant motion).
+4.  **Data Display:** The UI must show the current speed, the number of satellites being used for positioning, and the accuracy of the location data in meters.
+5.  **Configurable Settings:** A settings menu allows users to customize warnings, including setting a minimum speed threshold for alerts to be active and selecting which types of hazards to be notified about (e.g., potholes, speed bumps, railway crossings).
+</product_requirements>
+
+<key_technical_concepts>
+- **Frontend:** React Native, Expo, Expo Router for file-based navigation.
+- **Device APIs:**  for multi-system positioning,  for accelerometer data,  for audio playback,  for background tasks.
+- **Backend:** Python with FastAPI for creating REST APIs.
+- **Database:** MongoDB for storing sensor and road condition data.
+- **Storage:**  for persisting user settings on the device.
+</key_technical_concepts>
+
+<code_architecture>
+The application follows a standard full-stack architecture with a mobile frontend and a web backend.
+
+**Directory Structure:**
+
+
+- ****
+  - **Importance:** This is the main screen and the core of the application. It contains the entire user interface, including the road quality indicator, status displays (GPS, speed, sensors), and control buttons. It also houses the primary application logic for initializing sensors, requesting permissions, managing tracking state, processing location and accelerometer data, and triggering audio-visual warnings.
+  - **Changes:** This file has undergone extensive modifications. It was initially built for basic sensor data collection, then expanded to include auto-start logic, a complex warning system, and detailed status indicators. It was repeatedly simplified and refactored to debug white screen and  errors, with complex state management (Zustand) and buggy modules being removed and later re-introduced cautiously. The final version attempts to integrate real-time display of speed, GPS accuracy, and functional audio alerts.
+
+- ****
+  - **Importance:** This file defines the settings screen, allowing users to configure the behavior of the warning system. It's crucial for personalization, letting users toggle specific hazard types and set speed thresholds.
+  - **Changes:** Created to fulfill a user request for customizable alerts. It initially included sliders and complex UI elements that caused dependency issues (). It was later simplified to use basic toggles () to resolve build errors and ensure stability.
+
+- ****
+  - **Importance:** This is the FastAPI backend application. It defines API endpoints for receiving sensor data from mobile clients (), storing it in MongoDB, analyzing it for road hazards, and providing hazard data back to the clients.
+  - **Changes:** The initial version contained basic CRUD operations. An optimized version () was created to introduce more advanced concepts like geospatial queries and caching with Redis, but this was reverted after causing instability. The current version is the simpler, more stable implementation.
+
+- ****
+    - **Importance:** A document created to detail the performance analysis and optimization strategies applied to both the frontend and backend code. It serves as a reference for the architectural improvements made.
+    - **Changes:** Created once during the optimization phase.
+</code_architecture>
+
+<pending_tasks>
+- **Fix Audio Warnings:** The sound alert system is not functional. The user reports not hearing any sound, despite multiple implementation attempts.
+- **Implement Speed Display:** The current vehicle speed is not being displayed correctly during a trip.
+- **Correct GPS Accuracy Display:** The UI for displaying the number of satellites and positioning accuracy is not working as intended.
+- **Resolve Final Errors:** The user is reporting new, unspecified errors after the latest fixes were applied.
+</pending_tasks>
+
+<current_work>
+Immediately before this summary request, the AI engineer was in a critical debugging cycle trying to fix several core features reported as broken by the user: no audible sound, no speed display, and incorrect GPS accuracy display. The user also mentioned new errors.
+
+The AI's last diagnostic effort began by misinterpreting a user report of an error in logoxData.js. After failing to find this file, the AI correctly analyzed the Expo logs and identified the true root cause: the application was crashing because it couldn't find a required sound asset (). Concurrently, it found an error related to an incorrect icon name ( instead of ).
+
+The AI then performed a series of file edits on  to address these specific issues:
+1.  Changed the  name from  to .
+2.  Modified the audio playback logic to handle the missing  file, likely by removing the dependency or providing a fallback.
+
+After applying these fixes, the AI took a screenshot, confirmed the app was running without crashing, and reported to the user that the critical errors had been resolved. However, the user's immediate response was снова ошибки, проаналзируй лог (errors again, analyze the log), indicating that the fixes were either insufficient or introduced new problems, and the core functionality remains broken. The current state is that the application is unstable and does not meet the user's functional requirements.
+</current_work>
+
+<optional_next_step>
+Analyze the latest application logs to diagnose the new errors reported by the user.
+</optional_next_step>
