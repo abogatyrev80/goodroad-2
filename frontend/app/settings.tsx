@@ -97,6 +97,8 @@ const defaultSettings: AppSettings = {
   audioWarnings: true,
   vibrationWarnings: true,
   warningVolume: 0.8,
+  selectedSoundId: 'beep_classic',
+  customSounds: [],
   speedThreshold: 15,
   minWarningDistance: 30,
   maxWarningDistance: 200,
