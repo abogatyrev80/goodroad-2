@@ -23,10 +23,21 @@ export interface HazardType {
   criticalDistance: number;
 }
 
+export interface SoundOption {
+  id: string;
+  name: string;
+  description: string;
+  isCustom: boolean;
+  uri?: string;
+  previewText: string;
+}
+
 export interface AppSettings {
   audioWarnings: boolean;
   vibrationWarnings: boolean;
   warningVolume: number;
+  selectedSoundId: string;
+  customSounds: SoundOption[];
   speedThreshold: number;
   minWarningDistance: number;
   maxWarningDistance: number;
