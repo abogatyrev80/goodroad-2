@@ -296,7 +296,7 @@ export default function GoodRoadApp() {
         
         {/* GPS Status Banner */}
         <View style={[styles.statusBanner, { borderLeftColor: getGPSStatusColor() }]}>
-          <Ionicons name="satellite" size={24} color={getGPSStatusColor()} />
+          <Ionicons name="radio" size={24} color={getGPSStatusColor()} />
           <View style={styles.bannerContent}>
             <Text style={styles.bannerTitle}>GPS Статус: {getGPSStatusText()}</Text>
             <Text style={styles.bannerText}>
