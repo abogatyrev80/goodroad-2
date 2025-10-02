@@ -177,18 +177,57 @@ export default function GoodRoadApp() {
     if (!audioEnabled) return;
 
     try {
-      // Освобождаем предыдущий звук
+      // Web Audio API для браузера
+      if (Platform.OS === 'web') {
+        // @ts-ignore - Используем Web Audio API
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioContext = new AudioContext();
+        
+        // Создаем осциллятор для звукового сигнала
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        
+        // Воспроизводим 3 коротких сигнала
+        for (let i = 0; i < 3; i++) {
+          const startTime = audioContext.currentTime + (i * 0.4);
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          
+          osc.frequency.setValueAtTime(800, startTime);
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.3, startTime);
+          gain.gain.setValueAtTime(0, startTime + 0.2);
+          
+          osc.start(startTime);
+          osc.stop(startTime + 0.2);
+        }
+        
+        console.log('🔊 Web Audio warning sound played successfully');
+        return;
+      }
+
+      // На мобильных устройствах используем expo-av
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
       }
 
-      // Создаем простой звуковой сигнал с помощью data URI
-      const soundUri = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==';
-      
+      // Простой звуковой сигнал для мобильных
       const { sound } = await Audio.Sound.createAsync(
-        { uri: soundUri },
+        { 
+          uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==' 
+        },
         {
-          shouldPlay: true,
+          shouldPlay: false,
           volume: 0.8,
           rate: 1.0,
         }
@@ -196,17 +235,13 @@ export default function GoodRoadApp() {
 
       soundRef.current = sound;
       
-      // Воспроизводим 3 коротких сигнала
-      for (let i = 0; i < 3; i++) {
-        await sound.replayAsync();
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      
-      console.log('🔊 Warning sound played successfully');
+      // Воспроизводим звук
+      await sound.playAsync();
+      console.log('🔊 Mobile warning sound played successfully');
       
     } catch (error) {
       console.error('Sound play error:', error);
-      console.log('🔊 Sound fallback: Audio alert would play on device');
+      console.log('🔊 Sound system: Warning beep (simulated)');
     }
   };
 
