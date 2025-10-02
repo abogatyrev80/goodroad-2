@@ -157,6 +157,112 @@ export default function SettingsScreen() {
     updateSetting(key, newValue);
   };
 
+  const getAllSoundOptions = () => {
+    return [...defaultSoundOptions, ...settings.customSounds];
+  };
+
+  const selectSound = (soundId: string) => {
+    updateSetting('selectedSoundId', soundId);
+  };
+
+  const addCustomSound = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        
+        // Создаем новый звуковой объект
+        const newSound: SoundOption = {
+          id: `custom_${Date.now()}`,
+          name: asset.name.replace(/\.[^/.]+$/, ''), // Убираем расширение
+          description: 'Пользовательский звук',
+          isCustom: true,
+          uri: asset.uri,
+          previewText: '🎵 Пользовательский звук'
+        };
+
+        // Добавляем в список пользовательских звуков
+        const updatedCustomSounds = [...settings.customSounds, newSound];
+        updateSetting('customSounds', updatedCustomSounds);
+        
+        Alert.alert('Успешно!', `Звук "${newSound.name}" добавлен`);
+      }
+    } catch (error) {
+      console.error('Error picking audio file:', error);
+      Alert.alert('Ошибка', 'Не удалось добавить аудиофайл');
+    }
+  };
+
+  const deleteCustomSound = (soundId: string) => {
+    Alert.alert(
+      'Удалить звук?',
+      'Этот звук будет удален без возможности восстановления',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: () => {
+            const updatedCustomSounds = settings.customSounds.filter(s => s.id !== soundId);
+            updateSetting('customSounds', updatedCustomSounds);
+            
+            // Если удаляемый звук был выбран, переключаемся на стандартный
+            if (settings.selectedSoundId === soundId) {
+              updateSetting('selectedSoundId', 'beep_classic');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const testSound = async (soundOption: SoundOption) => {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+      });
+
+      let sound: Audio.Sound;
+      
+      if (soundOption.isCustom && soundOption.uri) {
+        // Воспроизводим пользовательский файл
+        const { sound: customSound } = await Audio.Sound.createAsync(
+          { uri: soundOption.uri },
+          { shouldPlay: true, volume: settings.warningVolume }
+        );
+        sound = customSound;
+      } else {
+        // Воспроизводим стандартные звуки (пока что простой beep)
+        const { sound: defaultSound } = await Audio.Sound.createAsync(
+          {
+            uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ=='
+          },
+          { shouldPlay: true, volume: settings.warningVolume }
+        );
+        sound = defaultSound;
+      }
+
+      // Автоматически выгружаем звук после воспроизведения
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+
+      console.log(`🔊 Testing sound: ${soundOption.name}`);
+      
+    } catch (error) {
+      console.error('Error testing sound:', error);
+      Alert.alert('Ошибка', 'Не удалось воспроизвести звук');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
