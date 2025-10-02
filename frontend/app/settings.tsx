@@ -283,12 +283,12 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Audio Settings */}
+        {/* Sound Selection */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>🔊 Звуковые настройки</Text>
+          <Text style={styles.sectionTitle}>🔊 Звуковые предупреждения</Text>
           
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Звуковые предупреждения</Text>
+            <Text style={styles.settingLabel}>Включить звуковые предупреждения</Text>
             <Switch
               value={settings.audioWarnings}
               onValueChange={(value) => updateSetting('audioWarnings', value)}
@@ -324,6 +324,61 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+
+        {/* Sound Options */}
+        <View style={styles.sectionCard}>
+          <View style={styles.soundHeader}>
+            <Text style={styles.sectionTitle}>🎵 Выбор звукового сигнала</Text>
+            <TouchableOpacity 
+              style={styles.addSoundButton}
+              onPress={addCustomSound}
+            >
+              <Ionicons name="add-circle" size={24} color="#4CAF50" />
+              <Text style={styles.addSoundText}>Добавить</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {getAllSoundOptions().map((soundOption) => (
+            <View key={soundOption.id} style={styles.soundOptionContainer}>
+              <View style={styles.soundOptionHeader}>
+                <TouchableOpacity
+                  style={[styles.radioButton, {
+                    backgroundColor: settings.selectedSoundId === soundOption.id ? '#4CAF50' : 'transparent',
+                    borderColor: settings.selectedSoundId === soundOption.id ? '#4CAF50' : '#666'
+                  }]}
+                  onPress={() => selectSound(soundOption.id)}
+                >
+                  {settings.selectedSoundId === soundOption.id && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
+                </TouchableOpacity>
+                
+                <View style={styles.soundOptionInfo}>
+                  <View style={styles.soundTitleRow}>
+                    <Text style={styles.soundName}>{soundOption.name}</Text>
+                    {soundOption.isCustom && (
+                      <TouchableOpacity 
+                        style={styles.deleteSoundButton}
+                        onPress={() => deleteCustomSound(soundOption.id)}
+                      >
+                        <Ionicons name="trash" size={16} color="#F44336" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.soundDescription}>{soundOption.description}</Text>
+                  <Text style={styles.soundPreview}>{soundOption.previewText}</Text>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.testSoundButton}
+                  onPress={() => testSound(soundOption)}
+                >
+                  <Ionicons name="play-circle" size={24} color="#2196F3" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
         </View>
 
         {/* Speed Settings */}
