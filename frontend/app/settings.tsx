@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
 
 const SETTINGS_KEY = 'good_road_settings';
 
