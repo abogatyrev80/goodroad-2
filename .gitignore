@@ -79,3 +79,7 @@ agenthub/agents/youtube/db
 # Mobile development
 android-sdk/ model.patch
 model.patch
+-e 
+# Environment files
+*.env
+*.env.*
