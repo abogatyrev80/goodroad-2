@@ -30,6 +30,9 @@ export default function GoodRoadApp() {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Настройки звука
+  const [appSettings, setAppSettings] = useState<Partial<AppSettings>>({});
+  
   // GPS и локация данные
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
