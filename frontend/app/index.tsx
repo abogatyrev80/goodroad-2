@@ -182,11 +182,11 @@ export default function GoodRoadApp() {
         await soundRef.current.unloadAsync();
       }
 
-      // Создаем простой звуковой сигнал
+      // Создаем простой звуковой сигнал с помощью data URI
+      const soundUri = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==';
+      
       const { sound } = await Audio.Sound.createAsync(
-        require('expo-av/build/assets/beep.mp3').default || { 
-          uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ=='
-        },
+        { uri: soundUri },
         {
           shouldPlay: true,
           volume: 0.8,
