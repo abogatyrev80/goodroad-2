@@ -396,7 +396,17 @@ export default function GoodRoadApp() {
         <Ionicons name="car-sport" size={32} color="#4CAF50" />
         <Text style={styles.title}>Good Road</Text>
         <TouchableOpacity 
-          onPress={() => router.push('/settings')}
+          onPress={() => {
+            console.log('Navigating to settings from header...');
+            try {
+              router.push('/settings');
+            } catch (error) {
+              console.error('Header navigation error:', error);
+              if (Platform.OS === 'web') {
+                window.location.href = '/settings';
+              }
+            }
+          }}
           style={styles.settingsButton}
         >
           <Ionicons name="settings" size={24} color="#ffffff" />
