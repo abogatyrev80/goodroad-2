@@ -549,7 +549,18 @@ export default function GoodRoadApp() {
         {/* Settings Navigation */}
         <TouchableOpacity 
           style={styles.settingsNavButton}
-          onPress={() => router.push('/settings')}
+          onPress={() => {
+            console.log('Navigating to settings...');
+            try {
+              router.push('/settings');
+            } catch (error) {
+              console.error('Navigation error:', error);
+              // Fallback: redirect with window location
+              if (Platform.OS === 'web') {
+                window.location.href = '/settings';
+              }
+            }
+          }}
         >
           <Ionicons name="settings-outline" size={20} color="white" />
           <Text style={styles.settingsNavText}>Подробные настройки предупреждений</Text>
