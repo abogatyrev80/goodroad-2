@@ -315,27 +315,27 @@ class GoodRoadAPITester:
             return False
 
     def test_analytics_api(self):
-        """Test GET /api/analytics/summary"""
+        """Test GET /api/admin/analytics (updated endpoint)"""
         try:
-            response = requests.get(f"{self.base_url}/analytics/summary")
+            response = requests.get(f"{self.base_url}/admin/analytics")
             
             if response.status_code == 200:
                 data = response.json()
-                expected_keys = ["totalSensorDataBatches", "totalRoadConditions", "totalWarnings", "conditionDistribution", "lastUpdated"]
+                expected_keys = ["total_points", "verified_points", "hazard_points", "avg_road_quality"]
                 if all(key in data for key in expected_keys):
-                    self.log_test("Analytics API", True, 
-                                f"Batches: {data['totalSensorDataBatches']}, "
-                                f"Conditions: {data['totalRoadConditions']}, "
-                                f"Warnings: {data['totalWarnings']}")
+                    self.log_test("Analytics API (Admin)", True, 
+                                f"Points: {data['total_points']}, "
+                                f"Verified: {data['verified_points']}, "
+                                f"Hazards: {data['hazard_points']}")
                     return True
                 else:
-                    self.log_test("Analytics API", False, f"Missing expected keys: {data}")
+                    self.log_test("Analytics API (Admin)", False, f"Missing expected keys: {data}")
                     return False
             else:
-                self.log_test("Analytics API", False, f"Status: {response.status_code}, Response: {response.text}")
+                self.log_test("Analytics API (Admin)", False, f"Status: {response.status_code}, Response: {response.text}")
                 return False
         except Exception as e:
-            self.log_test("Analytics API", False, f"Exception: {str(e)}")
+            self.log_test("Analytics API (Admin)", False, f"Exception: {str(e)}")
             return False
 
     def test_edge_cases(self):
