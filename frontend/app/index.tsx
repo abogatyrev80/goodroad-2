@@ -72,9 +72,16 @@ export default function GoodRoadApp() {
   const [satelliteCount, setSatelliteCount] = useState<number>(0);
   const [locationError, setLocationError] = useState<string | null>(null);
   
+  // Умная система предупреждений
+  const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
+  const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
+  const [speedHistory, setSpeedHistory] = useState<number[]>([]);
+  const [lastHazardCheck, setLastHazardCheck] = useState<number>(0);
+  
   // Refs для управления ресурсами
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setupAudio();
