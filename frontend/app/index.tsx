@@ -363,12 +363,29 @@ export default function GoodRoadApp() {
     console.log('🛑 GPS tracking stopped');
   };
 
+  const triggerVibration = () => {
+    if (!vibrationEnabled) return;
+
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate([200, 100, 200, 100, 200, 100]);
+      console.log('📳 Vibration triggered');
+    } else {
+      console.log('📳 Vibration would work on mobile device');
+    }
+  };
+
   const updateLocationData = (location: Location.LocationObject) => {
     setCurrentLocation(location);
     
     // Обновляем скорость (конвертируем м/с в км/ч)
     const speedKmh = (location.coords.speed || 0) * 3.6;
     setCurrentSpeed(speedKmh);
+    
+    // Обновляем историю скорости для анализа реакции пользователя
+    setSpeedHistory(prev => {
+      const newHistory = [...prev, speedKmh];
+      return newHistory.length > 10 ? newHistory.slice(-10) : newHistory;
+    });
     
     // Обновляем точность GPS
     setGpsAccuracy(location.coords.accuracy || 0);
@@ -380,7 +397,42 @@ export default function GoodRoadApp() {
     console.log(`📍 Location: ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
     console.log(`🚗 Speed: ${speedKmh.toFixed(1)} km/h`);
     console.log(`📡 Accuracy: ±${(location.coords.accuracy || 0).toFixed(1)}m`);
+    
+    // Проверяем препятствия каждые 5 секунд или при значительном изменении координат
+    const now = Date.now();
+    if (now - lastHazardCheck > 5000) {
+      fetchNearbyHazards(location.coords.latitude, location.coords.longitude);
+      setLastHazardCheck(now);
+    }
   };
+
+  // Интеграция умной системы предупреждений с useEffect
+  useEffect(() => {
+    if (isTracking && currentLocation) {
+      // Запускаем обработку предупреждений каждые 2 секунды
+      if (warningIntervalRef.current) {
+        clearInterval(warningIntervalRef.current);
+      }
+      
+      warningIntervalRef.current = setInterval(() => {
+        processWarnings();
+      }, 2000);
+    } else {
+      // Очищаем предупреждения при остановке трекинга
+      if (warningIntervalRef.current) {
+        clearInterval(warningIntervalRef.current);
+        warningIntervalRef.current = null;
+      }
+      setActiveWarnings([]);
+      setNearbyHazards([]);
+    }
+    
+    return () => {
+      if (warningIntervalRef.current) {
+        clearInterval(warningIntervalRef.current);
+      }
+    };
+  }, [isTracking, currentLocation, currentSpeed, nearbyHazards.length]);
 
   const playWarningSound = async () => {
     if (!audioEnabled) return;
