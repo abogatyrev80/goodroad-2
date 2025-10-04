@@ -240,52 +240,49 @@ export default function GoodRoadApp() {
         }
       }
 
-      // Web Audio API для браузера (стандартные звуки)
+      // Web Audio API для браузера (разные звуки по типам)
       if (Platform.OS === 'web') {
         // @ts-ignore - Используем Web Audio API
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioContext = new AudioContext();
         
-        // Разные частоты для разных типов предупреждений
-        let frequency = 800;
-        let pattern = [0.2, 0.1, 0.2, 0.1, 0.2]; // По умолчанию
-        
         switch (selectedSoundId) {
+          case 'beep_classic':
+            // Классический тройной БИП
+            await playWebBeepPattern(audioContext, [
+              {freq: 800, duration: 0.15, gap: 0.1},
+              {freq: 800, duration: 0.15, gap: 0.1}, 
+              {freq: 800, duration: 0.15, gap: 0}
+            ], volume);
+            break;
+            
           case 'voice_male':
+            // Имитация мужского голоса - низкие частоты
+            await playWebVoicePattern(audioContext, 'male', volume);
+            break;
+            
           case 'voice_female':
-            frequency = 600;
-            pattern = [0.5, 0.2, 0.3]; // Более длинные сигналы для голоса
+            // Имитация женского голоса - высокие частоты
+            await playWebVoicePattern(audioContext, 'female', volume);
             break;
+            
           case 'chime_soft':
-            frequency = 1200;
-            pattern = [0.3, 0.15, 0.3, 0.15, 0.3]; // Мягкие колокольчики
+            // Мягкие колокольчики - высокие частоты с fade
+            await playWebChimePattern(audioContext, volume);
             break;
+            
           case 'horn_urgent':
-            frequency = 400;
-            pattern = [0.8, 0.1, 0.8]; // Долгие гудки
+            // Срочный сигнал - долгие низкие гудки
+            await playWebHornPattern(audioContext, volume);
             break;
-        }
-        
-        // Воспроизводим паттерн звуков
-        let currentTime = audioContext.currentTime;
-        for (let i = 0; i < pattern.length; i += 2) {
-          if (i < pattern.length) {
-            const osc = audioContext.createOscillator();
-            const gain = audioContext.createGain();
             
-            osc.connect(gain);
-            gain.connect(audioContext.destination);
-            
-            osc.frequency.setValueAtTime(frequency, currentTime);
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(volume * 0.5, currentTime);
-            gain.gain.setValueAtTime(0, currentTime + pattern[i]);
-            
-            osc.start(currentTime);
-            osc.stop(currentTime + pattern[i]);
-            
-            currentTime += pattern[i] + (pattern[i + 1] || 0);
-          }
+          default:
+            // Fallback к классическому
+            await playWebBeepPattern(audioContext, [
+              {freq: 800, duration: 0.15, gap: 0.1},
+              {freq: 800, duration: 0.15, gap: 0.1}, 
+              {freq: 800, duration: 0.15, gap: 0}
+            ], volume);
         }
         
         console.log(`🔊 Web Audio warning sound played: ${selectedSoundId}`);
@@ -297,7 +294,7 @@ export default function GoodRoadApp() {
         await soundRef.current.unloadAsync();
       }
 
-      // Простой звуковой сигнал для мобильных
+      // Простой звуковой сигнал для мобильных (пока базовый)
       const { sound } = await Audio.Sound.createAsync(
         { 
           uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==' 
@@ -319,6 +316,128 @@ export default function GoodRoadApp() {
       console.error('Sound play error:', error);
       console.log('🔊 Sound system: Warning beep (simulated)');
     }
+  };
+  
+  // Вспомогательные функции для Web Audio
+  const playWebBeepPattern = async (audioContext: AudioContext, pattern: {freq: number, duration: number, gap: number}[], volume: number) => {
+    let currentTime = audioContext.currentTime;
+    
+    pattern.forEach((note, index) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(volume * 0.5, currentTime);
+      gain.gain.setValueAtTime(0, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + note.gap;
+    });
+  };
+  
+  const playWebVoicePattern = async (audioContext: AudioContext, gender: 'male' | 'female', volume: number) => {
+    // Имитируем речь через модуляцию частоты
+    const baseFreq = gender === 'male' ? 120 : 200; // Основная частота голоса
+    const pattern = [
+      {freq: baseFreq * 2, duration: 0.2}, // "Вни"
+      {freq: baseFreq * 1.5, duration: 0.15}, // "ма"  
+      {freq: baseFreq * 1.8, duration: 0.2}, // "ние"
+      {freq: baseFreq * 1.2, duration: 0.3}, // "препят"
+      {freq: baseFreq * 1.6, duration: 0.25}, // "ствие"
+    ];
+    
+    let currentTime = audioContext.currentTime;
+    pattern.forEach(note => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'sawtooth'; // Более голосоподобный тембр
+      gain.gain.setValueAtTime(volume * 0.3, currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + 0.05;
+    });
+  };
+  
+  const playWebChimePattern = async (audioContext: AudioContext, volume: number) => {
+    // Колокольчики - высокие чистые частоты с гармониками
+    const notes = [1200, 1400, 1600]; // До, Ми, Соль в высокой октаве
+    
+    notes.forEach((freq, index) => {
+      const startTime = audioContext.currentTime + (index * 0.3);
+      
+      // Основной тон
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(volume * 0.4, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 1.0);
+      
+      osc.start(startTime);
+      osc.stop(startTime + 1.0);
+      
+      // Гармоника для богатства звука
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      
+      osc2.frequency.setValueAtTime(freq * 2, startTime);
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(volume * 0.2, startTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.8);
+      
+      osc2.start(startTime);
+      osc2.stop(startTime + 0.8);
+    });
+  };
+  
+  const playWebHornPattern = async (audioContext: AudioContext, volume: number) => {
+    // Срочный гудок - низкие частоты, долгие сигналы
+    const pattern = [
+      {freq: 400, duration: 0.6, gap: 0.2},
+      {freq: 350, duration: 0.6, gap: 0.2},
+      {freq: 400, duration: 0.8, gap: 0}
+    ];
+    
+    let currentTime = audioContext.currentTime;
+    
+    pattern.forEach(note => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'square'; // Более грубый звук для срочности
+      gain.gain.setValueAtTime(volume * 0.6, currentTime);
+      gain.gain.setValueAtTime(0, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + note.gap;
+    });
   };
 
   const triggerVibration = () => {
