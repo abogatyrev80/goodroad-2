@@ -450,10 +450,33 @@ export default function AdminPanel() {
           </View>
         </View>
 
-        {/* Map */}
+        {/* Map Section */}
         <View style={styles.mapSection}>
           <Text style={styles.sectionTitle}>🗺️ Карта данных датчиков</Text>
-          {renderMap()}
+          
+          {Platform.OS === 'web' ? (
+            <TouchableOpacity 
+              style={styles.mapWebButton}
+              onPress={() => {
+                const mapUrl = `${window.location.origin}/admin-map.html`;
+                window.open(mapUrl, '_blank');
+              }}
+            >
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="map" size={48} color="#4CAF50" />
+                <Text style={styles.mapPlaceholderText}>Открыть интерактивную карту</Text>
+                <Text style={styles.mapPlaceholderSubtext}>
+                  {filteredData.length} точек данных
+                </Text>
+                <View style={styles.openMapButton}>
+                  <Ionicons name="open-outline" size={16} color="white" />
+                  <Text style={styles.openMapText}>Открыть в новом окне</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            renderMap()
+          )}
         </View>
 
         {/* Data Points List */}
