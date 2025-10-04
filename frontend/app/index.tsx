@@ -939,6 +939,24 @@ export default function GoodRoadApp() {
     return 'Слабый сигнал';
   };
 
+  const getWarningColor = (level: WarningState['warningLevel']) => {
+    switch (level) {
+      case 'critical': return '#F44336';
+      case 'urgent': return '#FF5722';
+      case 'caution': return '#FF9800';
+      default: return '#FFC107';
+    }
+  };
+
+  const getWarningLevelText = (level: WarningState['warningLevel']) => {
+    switch (level) {
+      case 'critical': return 'КРИТИЧНО';
+      case 'urgent': return 'СРОЧНО';
+      case 'caution': return 'ОСТОРОЖНО';
+      default: return 'ВНИМАНИЕ';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
