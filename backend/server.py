@@ -435,9 +435,6 @@ async def update_sensor_data_classification(
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Sensor data point not found")
         
-        # Get updated document
-        updated_doc = await db.sensor_data.find_one({"_id": object_id})
-        
         return {
             "message": "Sensor data point updated successfully",
             "updated_fields": list(update_doc.keys()),
