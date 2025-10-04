@@ -22,6 +22,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Импортируем типы из настроек
 import { AppSettings, SoundOption } from './settings';
 
+// Типы препятствий и предупреждений
+export interface RoadHazard {
+  id: string;
+  type: 'pothole' | 'speed_bump' | 'road_defect' | 'pedestrian_crossing' | 'railway_crossing' | 'construction' | 'unpaved_road';
+  latitude: number;
+  longitude: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  distance?: number;
+}
+
+export interface WarningState {
+  hazard: RoadHazard;
+  distanceToHazard: number;
+  timeToHazard: number;
+  currentSpeed: number;
+  warningLevel: 'initial' | 'caution' | 'urgent' | 'critical';
+  hasUserReacted: boolean;
+  initialSpeed: number;
+  lastWarningTime: number;
+}
+
+const HAZARD_NAMES: Record<string, string> = {
+  pothole: 'яма',
+  speed_bump: 'лежачий полицейский', 
+  road_defect: 'дефект покрытия',
+  pedestrian_crossing: 'пешеходный переход',
+  railway_crossing: 'железнодорожный переезд',
+  construction: 'дорожные работы',
+  unpaved_road: 'грунтовая дорога'
+};
+
 export default function GoodRoadApp() {
   // Состояние приложения
   const [isTracking, setIsTracking] = useState(false);
