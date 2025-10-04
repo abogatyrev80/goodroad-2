@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Административная карта</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: #2a2a2a;
+            border-bottom: 1px solid #333;
+            z-index: 1000;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .control-button {
+            background: #4CAF50;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .control-button:hover {
+            background: #45a049;
+        }
+        
+        .control-button.secondary {
+            background: #666;
+        }
+        
+        .control-button.secondary:hover {
+            background: #777;
+        }
+        
+        .map-container {
+            height: calc(100vh - 60px);
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(26, 26, 26, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 16px;
+            min-width: 200px;
+            z-index: 1000;
+            border: 1px solid #333;
+        }
+        
+        .legend h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #4CAF50;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .stats {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(26, 26, 26, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 16px;
+            min-width: 300px;
+            z-index: 1000;
+            border: 1px solid #333;
+        }
+        
+        .stats h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #4CAF50;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 12px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .stat-label {
+            color: #888;
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 2000;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #333;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 2000;
+            background: rgba(244, 67, 54, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ Good Road - Карта данных</h1>
+        <div class="controls">
+            <button class="control-button secondary" onclick="refreshData()">Обновить</button>
+            <button class="control-button" onclick="fitBounds()">Показать все</button>
+            <button class="control-button secondary" onclick="toggleHeatmap()">Тепловая карта</button>
+        </div>
+    </div>
+    
+    <div class="map-container">
+        <div id="map"></div>
+        
+        <div class="legend">
+            <h3>📊 Легенда</h3>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4CAF50;"></div>
+                <span>Хорошие дороги (70%+)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF9800;"></div>
+                <span>Средние дороги (40-70%)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #F44336;"></div>
+                <span>Плохие дороги (<40%)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FFC107;"></div>
+                <span>Неверифицированные</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #9C27B0;"></div>
+                <span>Препятствия</span>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <h3>📈 Статистика</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Всего точек</div>
+                    <div class="stat-value" id="totalPoints">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Верифицировано</div>
+                    <div class="stat-value" id="verifiedPoints">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Препятствий</div>
+                    <div class="stat-value" id="hazardPoints">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Ср. качество</div>
+                    <div class="stat-value" id="avgQuality">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div>Загрузка данных...</div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;">
+            <div>❌ Ошибка загрузки данных</div>
+            <button class="control-button" onclick="initMap()" style="margin-top: 12px;">Повторить</button>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let markers = [];
+        let heatmap;
+        let isHeatmapVisible = false;
+        
+        // Инициализация карты (используем OpenStreetMap через Leaflet)
+        async function initMap() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+                
+                // Создаем карту (центр - Москва)
+                if (!window.L) {
+                    // Загружаем Leaflet если не загружен
+                    await loadLeaflet();
+                }
+                
+                if (map) {
+                    map.remove();
+                }
+                
+                map = L.map('map').setView([55.7558, 37.6176], 10);
+                
+                // Добавляем слой карты OpenStreetMap
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                // Загружаем данные с backend
+                await loadData();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Map initialization error:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        async function loadLeaflet() {
+            return new Promise((resolve, reject) => {
+                // Загружаем CSS
+                const cssLink = document.createElement('link');
+                cssLink.rel = 'stylesheet';
+                cssLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                document.head.appendChild(cssLink);
+                
+                // Загружаем JS
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
+        async function loadData() {
+            try {
+                // Получаем аналитику
+                const analyticsResponse = await fetch('/api/admin/analytics');
+                if (analyticsResponse.ok) {
+                    const analytics = await analyticsResponse.json();
+                    updateStats(analytics);
+                }
+                
+                // Получаем данные датчиков
+                const sensorResponse = await fetch('/api/admin/sensor-data?limit=1000');
+                if (sensorResponse.ok) {
+                    const sensorData = await sensorResponse.json();
+                    addDataPoints(sensorData.data);
+                }
+                
+                console.log('✅ Data loaded successfully');
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                throw error;
+            }
+        }
+        
+        function updateStats(analytics) {
+            document.getElementById('totalPoints').textContent = analytics.total_points || 0;
+            document.getElementById('verifiedPoints').textContent = analytics.verified_points || 0;
+            document.getElementById('hazardPoints').textContent = analytics.hazard_points || 0;
+            document.getElementById('avgQuality').textContent = 
+                analytics.avg_road_quality ? analytics.avg_road_quality + '%' : '-';
+        }
+        
+        function addDataPoints(dataPoints) {
+            // Очищаем существующие маркеры
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            const bounds = [];
+            
+            dataPoints.forEach(point => {
+                const color = getPointColor(point);
+                const size = getPointSize(point);
+                
+                // Создаем маркер
+                const marker = L.circleMarker([point.latitude, point.longitude], {
+                    color: 'white',
+                    weight: 2,
+                    fillColor: color,
+                    fillOpacity: 0.8,
+                    radius: size
+                }).addTo(map);
+                
+                // Добавляем всплывающую подсказку
+                const popupContent = createPopupContent(point);
+                marker.bindPopup(popupContent);
+                
+                markers.push(marker);
+                bounds.push([point.latitude, point.longitude]);
+            });
+            
+            // Устанавливаем границы карты для показа всех точек
+            if (bounds.length > 0) {
+                map.fitBounds(bounds);
+            }
+            
+            console.log(\`✅ Added \${dataPoints.length} data points to map\`);
+        }
+        
+        function getPointColor(point) {
+            if (!point.is_verified) return '#FFC107'; // Желтый - неверифицированные
+            
+            if (point.hazard_type) {
+                switch (point.severity) {
+                    case 'critical': return '#F44336'; // Красный
+                    case 'high': return '#FF5722';     // Темно-оранжевый
+                    case 'medium': return '#FF9800';   // Оранжевый
+                    default: return '#9C27B0';         // Фиолетовый
+                }
+            }
+            
+            // Цвет по качеству дороги
+            if (point.road_quality_score < 40) return '#F44336';      // Красный - плохо
+            if (point.road_quality_score < 70) return '#FF9800';      // Оранжевый - средне
+            return '#4CAF50';                                          // Зеленый - хорошо
+        }
+        
+        function getPointSize(point) {
+            if (point.hazard_type) return 8; // Препятствия больше
+            return 6; // Обычные точки
+        }
+        
+        function createPopupContent(point) {
+            const date = new Date(point.timestamp).toLocaleString('ru-RU');
+            const hazardText = point.hazard_type ? 
+                \`<div style="color: \${getPointColor(point)}; margin: 8px 0;"><strong>⚠️ \${point.hazard_type} (\${point.severity})</strong></div>\` : '';
+            const statusText = point.is_verified ? 
+                '<span style="color: #4CAF50;">✅ Верифицировано</span>' : 
+                '<span style="color: #FFC107;">⏳ Требует проверки</span>';
+                
+            return \`
+                <div style="min-width: 200px; font-size: 12px; line-height: 1.4;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">📍 Точка данных</div>
+                    <div><strong>Координаты:</strong> \${point.latitude.toFixed(6)}, \${point.longitude.toFixed(6)}</div>
+                    <div><strong>Время:</strong> \${date}</div>
+                    <div><strong>Скорость:</strong> \${point.speed.toFixed(1)} км/ч</div>
+                    <div><strong>Качество дороги:</strong> <span style="color: \${getPointColor(point)};">\${point.road_quality_score}%</span></div>
+                    <div><strong>Точность GPS:</strong> ±\${point.accuracy.toFixed(1)}м</div>
+                    \${hazardText}
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                        \${statusText}
+                    </div>
+                    \${point.admin_notes ? \`<div style="margin-top: 4px;"><strong>Заметки:</strong> \${point.admin_notes}</div>\` : ''}
+                </div>
+            \`;
+        }
+        
+        // Функции управления
+        async function refreshData() {
+            document.getElementById('loading').style.display = 'block';
+            try {
+                await loadData();
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        function fitBounds() {
+            if (markers.length > 0) {
+                const bounds = markers.map(marker => marker.getLatLng());
+                map.fitBounds(bounds);
+            }
+        }
+        
+        function toggleHeatmap() {
+            if (isHeatmapVisible) {
+                // Скрыть тепловую карту, показать маркеры
+                if (heatmap) {
+                    map.removeLayer(heatmap);
+                }
+                markers.forEach(marker => map.addLayer(marker));
+                isHeatmapVisible = false;
+                document.querySelector('[onclick="toggleHeatmap()"]').textContent = 'Тепловая карта';
+            } else {
+                // Показать тепловую карту, скрыть маркеры
+                // Здесь можно добавить реальную тепловую карту
+                markers.forEach(marker => map.removeLayer(marker));
+                isHeatmapVisible = true;
+                document.querySelector('[onclick="toggleHeatmap()"]').textContent = 'Обычный вид';
+                alert('Тепловая карта будет реализована в следующей версии');
+            }
+        }
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+</body>
+</html>
