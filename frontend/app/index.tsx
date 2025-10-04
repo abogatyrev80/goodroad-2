@@ -762,6 +762,34 @@ export default function GoodRoadApp() {
     }
   };
 
+  const playBuiltInSound = async (soundType: string, volume: number) => {
+    try {
+      // Простая реализация встроенных звуков для мобильных устройств
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      // Базовый звуковой сигнал (можно расширить для разных типов)
+      const { sound } = await Audio.Sound.createAsync(
+        { 
+          uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==' 
+        },
+        {
+          shouldPlay: false,
+          volume: volume,
+          rate: soundType.includes('female') ? 1.2 : 0.8, // Изменяем тон для женского/мужского голоса
+        }
+      );
+
+      soundRef.current = sound;
+      await sound.playAsync();
+      console.log(`🔊 Built-in sound played: ${soundType}`);
+      
+    } catch (error) {
+      console.error('Built-in sound error:', error);
+    }
+  };
+
   const playEscalatingBeep = async (intensity: number) => {
     const volume = (appSettings.warningVolume || 0.8) * intensity;
     const frequency = 400 + (intensity * 400); // От 400Hz до 800Hz
