@@ -627,15 +627,134 @@ export default function GoodRoadApp() {
     });
   };
 
-  const triggerVibration = () => {
-    if (!vibrationEnabled) return;
+  const triggerInitialWarning = async (warning: WarningState) => {
+    if (!audioEnabled) return;
 
-    if (Platform.OS !== 'web') {
-      Vibration.vibrate([200, 100, 200, 100, 200, 100]);
-      console.log('📳 Vibration triggered');
-    } else {
-      console.log('📳 Vibration would work on mobile device');
+    try {
+      // Первое предупреждение - голосовое сообщение с типом препятствия и дистанцией
+      const hazardName = HAZARD_NAMES[warning.hazard.type] || 'препятствие';
+      const distance = Math.round(warning.distanceToHazard);
+      
+      console.log(`🗣️ Initial warning: ${hazardName} через ${distance} метров`);
+      
+      // Используем голосовое предупреждение (мужской или женский)
+      const voiceType = appSettings.selectedSoundId === 'voice_female' ? 'female' : 'male';
+      await playVoiceWarning(`Внимание! ${hazardName} через ${distance} метров`, voiceType);
+      
+      // Визуальная индикация
+      if (vibrationEnabled) {
+        triggerVibration();
+      }
+      
+    } catch (error) {
+      console.error('Initial warning error:', error);
     }
+  };
+
+  const triggerEscalatedWarning = async (warning: WarningState) => {
+    if (!audioEnabled) return;
+
+    try {
+      const hazardName = HAZARD_NAMES[warning.hazard.type] || 'препятствие';
+      const distance = Math.round(warning.distanceToHazard);
+      const intensity = getWarningIntensity(warning.warningLevel, warning.timeToHazard);
+      
+      console.log(`🚨 Escalated warning: ${hazardName} ${distance}м, level: ${warning.warningLevel}, intensity: ${intensity}`);
+      
+      // Голосовое предупреждение + зуммер с нарастающей интенсивностью
+      const voiceType = appSettings.selectedSoundId === 'voice_female' ? 'female' : 'male';
+      
+      // Сначала голос
+      await playVoiceWarning(`Снизьте скорость! ${hazardName} ${distance} метров!`, voiceType);
+      
+      // Затем зуммер с интенсивностью в зависимости от близости
+      setTimeout(() => {
+        playEscalatingBeep(intensity);
+      }, 1500);
+      
+      // Вибрация с увеличенной интенсивностью
+      if (vibrationEnabled) {
+        triggerEscalatedVibration(intensity);
+      }
+      
+    } catch (error) {
+      console.error('Escalated warning error:', error);
+    }
+  };
+
+  const getWarningIntensity = (level: WarningState['warningLevel'], timeToHazard: number): number => {
+    switch (level) {
+      case 'critical': return 1.0;
+      case 'urgent': return 0.8;
+      case 'caution': return 0.6;
+      default: return 0.4;
+    }
+  };
+
+  const playVoiceWarning = async (message: string, gender: 'male' | 'female') => {
+    const volume = (appSettings.warningVolume || 0.8) * 1.2; // Увеличиваем громкость для важных сообщений
+    
+    if (Platform.OS === 'web') {
+      // Web Audio API - имитация речи
+      // @ts-ignore
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContext();
+      
+      await playWebVoicePattern(audioContext, gender, volume);
+      console.log(`🗣️ Web voice: "${message}" (${gender})`);
+    } else {
+      // На мобильном можно использовать Text-to-Speech API
+      console.log(`🗣️ Mobile voice: "${message}" (${gender})`);
+      // Fallback к базовому звуку
+      await playBuiltInSound('voice_' + gender, volume);
+    }
+  };
+
+  const playEscalatingBeep = async (intensity: number) => {
+    const volume = (appSettings.warningVolume || 0.8) * intensity;
+    const frequency = 400 + (intensity * 400); // От 400Hz до 800Hz
+    const beepCount = Math.round(2 + intensity * 4); // От 2 до 6 сигналов
+    
+    if (Platform.OS === 'web') {
+      // @ts-ignore
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContext();
+      
+      // Создаем последовательность beep с уменьшающимися интервалами
+      const baseInterval = 0.3 - (intensity * 0.15); // От 0.3с до 0.15с между сигналами
+      
+      for (let i = 0; i < beepCount; i++) {
+        const startTime = audioContext.currentTime + (i * baseInterval);
+        const currentIntensity = intensity + (i * 0.1); // Нарастающая интенсивность
+        
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        
+        osc.frequency.setValueAtTime(frequency + (i * 50), startTime);
+        osc.type = 'square'; // Более резкий звук для критических предупреждений
+        gain.gain.setValueAtTime(volume * Math.min(1.0, currentIntensity), startTime);
+        gain.gain.setValueAtTime(0, startTime + 0.15);
+        
+        osc.start(startTime);
+        osc.stop(startTime + 0.15);
+      }
+      
+      console.log(`📯 Escalating beep: ${beepCount} beeps, intensity: ${intensity.toFixed(1)}`);
+    }
+  };
+
+  const triggerEscalatedVibration = (intensity: number) => {
+    if (!vibrationEnabled || Platform.OS === 'web') return;
+    
+    // Создаем паттерн вибрации в зависимости от интенсивности
+    const basePattern = [100, 50, 100, 50, 100];
+    const intensityPattern = basePattern.map(duration => Math.round(duration * (1 + intensity)));
+    
+    Vibration.vibrate(intensityPattern);
+    console.log(`📳 Escalated vibration: intensity ${intensity.toFixed(1)}`);
   };
 
   const testWarning = async () => {
