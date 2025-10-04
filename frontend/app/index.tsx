@@ -810,20 +810,67 @@ export default function GoodRoadApp() {
   };
 
   const testWarning = async () => {
-    console.log('🚨 Testing warning system...');
+    console.log('🚨 Testing smart warning system...');
     
-    await playWarningSound();
-    triggerVibration();
+    // Создаем тестовое препятствие
+    const testHazard: RoadHazard = {
+      id: 'test_hazard',
+      type: 'pothole',
+      latitude: currentLocation ? currentLocation.coords.latitude + 0.001 : 55.7558,
+      longitude: currentLocation ? currentLocation.coords.longitude + 0.001 : 37.6176,
+      severity: 'high',
+      description: 'Тестовая яма на дороге'
+    };
     
-    Alert.alert(
-      '⚠️ ДОРОЖНОЕ ПРЕДУПРЕЖДЕНИЕ',
-      `Впереди препятствие - яма через 50 метров!
+    const distance = currentLocation ? 
+      calculateDistance(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        testHazard.latitude,
+        testHazard.longitude
+      ) : 150;
+    
+    const testSpeed = Math.max(currentSpeed, 50); // Имитируем скорость для демонстрации
+    const timeToHazard = getTimeToHazard(distance, testSpeed);
+    
+    // Создаем тестовое предупреждение
+    const testWarning: WarningState = {
+      hazard: { ...testHazard, distance },
+      distanceToHazard: distance,
+      timeToHazard,
+      currentSpeed: testSpeed,
+      warningLevel: getWarningLevel(timeToHazard, testHazard.severity),
+      hasUserReacted: false,
+      initialSpeed: testSpeed,
+      lastWarningTime: Date.now()
+    };
+    
+    console.log(`🚨 Test warning: ${testHazard.description} in ${distance.toFixed(0)}m (${timeToHazard.toFixed(1)}s)`);
+    
+    // Демонстрируем первоначальное предупреждение
+    await triggerInitialWarning(testWarning);
+    
+    // Через 3 секунды демонстрируем эскалированное предупреждение
+    setTimeout(async () => {
+      const escalatedWarning = {
+        ...testWarning,
+        warningLevel: 'urgent' as const,
+        distanceToHazard: distance * 0.7,
+        timeToHazard: timeToHazard * 0.7
+      };
       
-🔊 Звук: ${audioEnabled ? 'Воспроизведен ✅' : 'Отключен ❌'}
-📳 Вибрация: ${vibrationEnabled ? 'Активирована ✅' : 'Отключена ❌'}
-📍 GPS: ${isTracking ? 'Активен' : 'Неактивен'}
-🚗 Скорость: ${currentSpeed.toFixed(1)} км/ч`,
-      [{ text: 'Понятно' }]
+      console.log('🚨 Demonstrating escalated warning (user did not react)...');
+      await triggerEscalatedWarning(escalatedWarning);
+    }, 4000);
+    
+    // Показываем визуальное уведомление
+    Alert.alert(
+      '🚨 УМНАЯ СИСТЕМА ПРЕДУПРЕЖДЕНИЙ',
+      `Демонстрация:\n\n` +
+      `1️⃣ Первое предупреждение: "${HAZARD_NAMES[testHazard.type]} через ${Math.round(distance)} метров"\n\n` +
+      `2️⃣ Через 4 секунды: Эскалированное предупреждение с зуммером\n\n` +
+      `📊 Анализ: скорость ${testSpeed.toFixed(1)} км/ч, время до препятствия ${timeToHazard.toFixed(1)} сек`,
+      [{ text: 'Понятно', style: 'default' }]
     );
   };
 
