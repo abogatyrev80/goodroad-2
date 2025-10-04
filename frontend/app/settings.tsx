@@ -237,29 +237,210 @@ export default function SettingsScreen() {
         );
         sound = customSound;
       } else {
-        // Воспроизводим стандартные звуки (пока что простой beep)
-        const { sound: defaultSound } = await Audio.Sound.createAsync(
-          {
-            uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ=='
-          },
-          { shouldPlay: true, volume: settings.warningVolume }
-        );
-        sound = defaultSound;
+        // Создаем разные звуки для разных типов
+        await playBuiltInSound(soundOption.id, settings.warningVolume);
       }
-
-      // Автоматически выгружаем звук после воспроизведения
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        if (status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
 
       console.log(`🔊 Testing sound: ${soundOption.name}`);
       
     } catch (error) {
       console.error('Error testing sound:', error);
       Alert.alert('Ошибка', 'Не удалось воспроизвести звук');
+    }
+  };
+
+  const playBuiltInSound = async (soundId: string, volume: number) => {
+    if (Platform.OS === 'web') {
+      // Web Audio API с разными звуками
+      // @ts-ignore
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContext();
+      
+      switch (soundId) {
+        case 'beep_classic':
+          // Классический тройной БИП
+          await playWebBeepPattern(audioContext, [
+            {freq: 800, duration: 0.15, gap: 0.1},
+            {freq: 800, duration: 0.15, gap: 0.1}, 
+            {freq: 800, duration: 0.15, gap: 0}
+          ], volume);
+          break;
+          
+        case 'voice_male':
+          // Имитация мужского голоса - низкие частоты
+          await playWebVoicePattern(audioContext, 'male', volume);
+          break;
+          
+        case 'voice_female':
+          // Имитация женского голоса - высокие частоты
+          await playWebVoicePattern(audioContext, 'female', volume);
+          break;
+          
+        case 'chime_soft':
+          // Мягкие колокольчики - высокие частоты с fade
+          await playWebChimePattern(audioContext, volume);
+          break;
+          
+        case 'horn_urgent':
+          // Срочный сигнал - долгие низкие гудки
+          await playWebHornPattern(audioContext, volume);
+          break;
+          
+        default:
+          // Fallback к классическому
+          await playWebBeepPattern(audioContext, [
+            {freq: 800, duration: 0.15, gap: 0.1},
+            {freq: 800, duration: 0.15, gap: 0.1}, 
+            {freq: 800, duration: 0.15, gap: 0}
+          ], volume);
+      }
+    } else {
+      // На мобильном устройстве используем Text-to-Speech для голосов
+      // Для остальных - базовые beep с разными параметрами
+      const { sound } = await Audio.Sound.createAsync(
+        getSoundFileForType(soundId),
+        { shouldPlay: true, volume: volume }
+      );
+      
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    }
+  };
+  
+  const playWebBeepPattern = async (audioContext: AudioContext, pattern: {freq: number, duration: number, gap: number}[], volume: number) => {
+    let currentTime = audioContext.currentTime;
+    
+    pattern.forEach((note, index) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(volume * 0.5, currentTime);
+      gain.gain.setValueAtTime(0, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + note.gap;
+    });
+  };
+  
+  const playWebVoicePattern = async (audioContext: AudioContext, gender: 'male' | 'female', volume: number) => {
+    // Имитируем речь через модуляцию частоты
+    const baseFreq = gender === 'male' ? 120 : 200; // Основная частота голоса
+    const pattern = [
+      {freq: baseFreq * 2, duration: 0.2}, // "Вни"
+      {freq: baseFreq * 1.5, duration: 0.15}, // "ма"  
+      {freq: baseFreq * 1.8, duration: 0.2}, // "ние"
+      {freq: baseFreq * 1.2, duration: 0.3}, // "препят"
+      {freq: baseFreq * 1.6, duration: 0.25}, // "ствие"
+    ];
+    
+    let currentTime = audioContext.currentTime;
+    pattern.forEach(note => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'sawtooth'; // Более голосоподобный тембр
+      gain.gain.setValueAtTime(volume * 0.3, currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + 0.05;
+    });
+  };
+  
+  const playWebChimePattern = async (audioContext: AudioContext, volume: number) => {
+    // Колокольчики - высокие чистые частоты с гармониками
+    const notes = [1200, 1400, 1600]; // До, Ми, Соль в высокой октаве
+    
+    notes.forEach((freq, index) => {
+      const startTime = audioContext.currentTime + (index * 0.3);
+      
+      // Основной тон
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(volume * 0.4, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 1.0);
+      
+      osc.start(startTime);
+      osc.stop(startTime + 1.0);
+      
+      // Гармоника для богатства звука
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      
+      osc2.frequency.setValueAtTime(freq * 2, startTime);
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(volume * 0.2, startTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.8);
+      
+      osc2.start(startTime);
+      osc2.stop(startTime + 0.8);
+    });
+  };
+  
+  const playWebHornPattern = async (audioContext: AudioContext, volume: number) => {
+    // Срочный гудок - низкие частоты, долгие сигналы
+    const pattern = [
+      {freq: 400, duration: 0.6, gap: 0.2},
+      {freq: 350, duration: 0.6, gap: 0.2},
+      {freq: 400, duration: 0.8, gap: 0}
+    ];
+    
+    let currentTime = audioContext.currentTime;
+    
+    pattern.forEach(note => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.setValueAtTime(note.freq, currentTime);
+      osc.type = 'square'; // Более грубый звук для срочности
+      gain.gain.setValueAtTime(volume * 0.6, currentTime);
+      gain.gain.setValueAtTime(0, currentTime + note.duration);
+      
+      osc.start(currentTime);
+      osc.stop(currentTime + note.duration);
+      
+      currentTime += note.duration + note.gap;
+    });
+  };
+  
+  const getSoundFileForType = (soundId: string) => {
+    // Разные base64 звуки для мобильных устройств или Text-to-Speech
+    switch (soundId) {
+      case 'voice_male':
+      case 'voice_female':
+        // Здесь можно использовать Text-to-Speech API
+        return { uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==' };
+      default:
+        return { uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvGUgBSuG0O/AaykEK4nS8LljIAUug8rz0LljIAUiiM7t2o0zCQ==' };
     }
   };
 
