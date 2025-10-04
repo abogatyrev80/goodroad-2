@@ -322,32 +322,326 @@ async def get_road_warnings(
         logging.error(f"Error fetching road warnings: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching road warnings: {str(e)}")
 
-@api_router.get("/analytics/summary")
-async def get_analytics_summary():
-    """Get analytics summary of collected data"""
+# Administrative data models
+class AdminSensorDataUpdate(BaseModel):
+    hazard_type: Optional[str] = None
+    severity: Optional[str] = None
+    is_verified: Optional[bool] = None
+    admin_notes: Optional[str] = None
+
+class AdminAnalytics(BaseModel):
+    total_points: int
+    verified_points: int
+    hazard_points: int
+    avg_road_quality: float
+    date_range: str
+
+@api_router.get("/admin/sensor-data")
+async def get_all_sensor_data(
+    limit: int = Query(1000, description="Maximum number of records to return"),
+    skip: int = Query(0, description="Number of records to skip"),
+    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+):
+    """
+    Get all sensor data for administrative analysis
+    """
     try:
-        # Count total data points
-        sensor_data_count = await db.sensor_data.count_documents({})
-        conditions_count = await db.road_conditions.count_documents({})
-        warnings_count = await db.road_warnings.count_documents({})
+        # Build query filters
+        query = {}
         
-        # Get condition distribution
-        pipeline = [
-            {"$group": {"_id": "$severity_level", "count": {"$sum": 1}}}
-        ]
-        condition_distribution = await db.road_conditions.aggregate(pipeline).to_list(10)
+        if date_from or date_to:
+            date_filter = {}
+            if date_from:
+                date_filter["$gte"] = datetime.fromisoformat(date_from)
+            if date_to:
+                date_filter["$lte"] = datetime.fromisoformat(date_to + "T23:59:59")
+            query["timestamp"] = date_filter
+        
+        # Get total count for pagination
+        total_count = await db.sensor_data.count_documents(query)
+        
+        # Get data with sorting (most recent first)
+        cursor = db.sensor_data.find(query).sort("timestamp", -1).skip(skip).limit(limit)
+        
+        data = []
+        async for document in cursor:
+            # Convert ObjectId to string and format data
+            doc_dict = {
+                "_id": str(document["_id"]),
+                "latitude": document.get("latitude", 0),
+                "longitude": document.get("longitude", 0),
+                "timestamp": document.get("timestamp", datetime.now()).isoformat(),
+                "speed": document.get("speed", 0),
+                "accuracy": document.get("accuracy", 0),
+                "accelerometer": document.get("accelerometer", {"x": 0, "y": 0, "z": 0}),
+                "road_quality_score": document.get("road_quality_score", 50),
+                "hazard_type": document.get("hazard_type"),
+                "severity": document.get("severity", "medium"),
+                "is_verified": document.get("is_verified", False),
+                "admin_notes": document.get("admin_notes", "")
+            }
+            data.append(doc_dict)
         
         return {
-            "totalSensorDataBatches": sensor_data_count,
-            "totalRoadConditions": conditions_count,
-            "totalWarnings": warnings_count,
-            "conditionDistribution": {item["_id"]: item["count"] for item in condition_distribution},
-            "lastUpdated": datetime.utcnow()
+            "data": data,
+            "total": total_count,
+            "limit": limit,
+            "skip": skip,
+            "returned": len(data)
         }
         
     except Exception as e:
-        logging.error(f"Error fetching analytics: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching analytics: {str(e)}")
+        logging.error(f"Error getting admin sensor data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving admin data: {str(e)}")
+
+@api_router.patch("/admin/sensor-data/{point_id}")
+async def update_sensor_data_classification(
+    point_id: str,
+    updates: AdminSensorDataUpdate
+):
+    """
+    Update sensor data point classification by administrator
+    """
+    try:
+        from bson import ObjectId
+        
+        # Convert string ID to ObjectId
+        try:
+            object_id = ObjectId(point_id)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid point ID format")
+        
+        # Build update document
+        update_doc = {}
+        if updates.hazard_type is not None:
+            update_doc["hazard_type"] = updates.hazard_type
+        if updates.severity is not None:
+            update_doc["severity"] = updates.severity
+        if updates.is_verified is not None:
+            update_doc["is_verified"] = updates.is_verified
+        if updates.admin_notes is not None:
+            update_doc["admin_notes"] = updates.admin_notes
+        
+        # Add admin timestamp
+        update_doc["admin_updated_at"] = datetime.now()
+        
+        # Update the document
+        result = await db.sensor_data.update_one(
+            {"_id": object_id},
+            {"$set": update_doc}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Sensor data point not found")
+        
+        # Get updated document
+        updated_doc = await db.sensor_data.find_one({"_id": object_id})
+        
+        return {
+            "message": "Sensor data point updated successfully",
+            "updated_fields": list(update_doc.keys()),
+            "point_id": point_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating sensor data point {point_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating data point: {str(e)}")
+
+@api_router.get("/admin/analytics")
+async def get_admin_analytics():
+    """
+    Get analytics data for administrative dashboard
+    """
+    try:
+        # Basic statistics
+        total_points = await db.sensor_data.count_documents({})
+        verified_points = await db.sensor_data.count_documents({"is_verified": True})
+        hazard_points = await db.sensor_data.count_documents({"hazard_type": {"$ne": None}})
+        
+        # Calculate average road quality
+        pipeline = [
+            {"$match": {"road_quality_score": {"$exists": True}}},
+            {"$group": {
+                "_id": None,
+                "avg_quality": {"$avg": "$road_quality_score"},
+                "min_quality": {"$min": "$road_quality_score"},
+                "max_quality": {"$max": "$road_quality_score"}
+            }}
+        ]
+        
+        quality_stats = []
+        async for result in db.sensor_data.aggregate(pipeline):
+            quality_stats.append(result)
+        
+        avg_road_quality = quality_stats[0]["avg_quality"] if quality_stats else 0
+        
+        # Recent activity (last 7 days)
+        week_ago = datetime.now() - timedelta(days=7)
+        recent_points = await db.sensor_data.count_documents({
+            "timestamp": {"$gte": week_ago}
+        })
+        
+        # Hazard types distribution
+        hazard_pipeline = [
+            {"$match": {"hazard_type": {"$ne": None}}},
+            {"$group": {
+                "_id": "$hazard_type",
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"count": -1}}
+        ]
+        
+        hazard_distribution = []
+        async for result in db.sensor_data.aggregate(hazard_pipeline):
+            hazard_distribution.append({
+                "hazard_type": result["_id"],
+                "count": result["count"]
+            })
+        
+        # Quality distribution by ranges
+        quality_ranges = [
+            {"name": "Excellent", "min": 80, "max": 100},
+            {"name": "Good", "min": 60, "max": 79},
+            {"name": "Fair", "min": 40, "max": 59},
+            {"name": "Poor", "min": 20, "max": 39},
+            {"name": "Very Poor", "min": 0, "max": 19}
+        ]
+        
+        quality_distribution = []
+        for range_info in quality_ranges:
+            count = await db.sensor_data.count_documents({
+                "road_quality_score": {
+                    "$gte": range_info["min"],
+                    "$lte": range_info["max"]
+                }
+            })
+            quality_distribution.append({
+                "range": range_info["name"],
+                "min": range_info["min"],
+                "max": range_info["max"],
+                "count": count
+            })
+        
+        return {
+            "total_points": total_points,
+            "verified_points": verified_points,
+            "hazard_points": hazard_points,
+            "unverified_points": total_points - verified_points,
+            "avg_road_quality": round(avg_road_quality, 1) if avg_road_quality else 0,
+            "recent_points_7d": recent_points,
+            "hazard_distribution": hazard_distribution,
+            "quality_distribution": quality_distribution,
+            "quality_stats": quality_stats[0] if quality_stats else {
+                "avg_quality": 0,
+                "min_quality": 0,
+                "max_quality": 100
+            }
+        }
+        
+    except Exception as e:
+        logging.error(f"Error getting admin analytics: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving analytics: {str(e)}")
+
+@api_router.get("/admin/heatmap-data")
+async def get_heatmap_data(
+    southwest_lat: float = Query(..., description="Southwest corner latitude"),
+    southwest_lng: float = Query(..., description="Southwest corner longitude"), 
+    northeast_lat: float = Query(..., description="Northeast corner latitude"),
+    northeast_lng: float = Query(..., description="Northeast corner longitude"),
+    zoom_level: int = Query(10, description="Map zoom level for data density")
+):
+    """
+    Get sensor data formatted for heatmap display on maps
+    """
+    try:
+        # Determine grid size based on zoom level
+        grid_size = max(0.001, 0.1 / (2 ** (zoom_level - 8)))
+        
+        # Build query for the bounding box
+        query = {
+            "latitude": {"$gte": southwest_lat, "$lte": northeast_lat},
+            "longitude": {"$gte": southwest_lng, "$lte": northeast_lng}
+        }
+        
+        # Aggregation pipeline for heatmap data
+        pipeline = [
+            {"$match": query},
+            {
+                "$group": {
+                    "_id": {
+                        "lat_grid": {
+                            "$multiply": [
+                                {"$round": {"$divide": ["$latitude", grid_size]}},
+                                grid_size
+                            ]
+                        },
+                        "lng_grid": {
+                            "$multiply": [
+                                {"$round": {"$divide": ["$longitude", grid_size]}},
+                                grid_size
+                            ]
+                        }
+                    },
+                    "avg_quality": {"$avg": "$road_quality_score"},
+                    "point_count": {"$sum": 1},
+                    "hazard_count": {
+                        "$sum": {
+                            "$cond": [{"$ne": ["$hazard_type", None]}, 1, 0]
+                        }
+                    },
+                    "min_quality": {"$min": "$road_quality_score"},
+                    "max_quality": {"$max": "$road_quality_score"}
+                }
+            },
+            {
+                "$project": {
+                    "latitude": "$_id.lat_grid",
+                    "longitude": "$_id.lng_grid",
+                    "avg_quality": {"$round": ["$avg_quality", 1]},
+                    "point_count": 1,
+                    "hazard_count": 1,
+                    "quality_variance": {
+                        "$subtract": ["$max_quality", "$min_quality"]
+                    },
+                    "intensity": {
+                        "$multiply": [
+                            {"$divide": [{"$subtract": [100, "$avg_quality"]}, 100]},
+                            {"$min": [{"$divide": ["$point_count", 50]}, 1]}
+                        ]
+                    }
+                }
+            },
+            {"$sort": {"point_count": -1}},
+            {"$limit": 5000}  # Limit for performance
+        ]
+        
+        heatmap_points = []
+        async for point in db.sensor_data.aggregate(pipeline):
+            heatmap_points.append({
+                "lat": point["latitude"],
+                "lng": point["longitude"],
+                "quality": point["avg_quality"],
+                "count": point["point_count"],
+                "hazards": point["hazard_count"],
+                "intensity": min(1.0, max(0.1, point["intensity"]))
+            })
+        
+        return {
+            "heatmap_points": heatmap_points,
+            "bounds": {
+                "southwest": {"lat": southwest_lat, "lng": southwest_lng},
+                "northeast": {"lat": northeast_lat, "lng": northeast_lng}
+            },
+            "grid_size": grid_size,
+            "total_points": len(heatmap_points)
+        }
+        
+    except Exception as e:
+        logging.error(f"Error getting heatmap data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving heatmap data: {str(e)}")
 
 @api_router.delete("/data/cleanup")
 async def cleanup_old_data():
