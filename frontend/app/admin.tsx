@@ -767,4 +767,22 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 16,
   },
+  mapWebButton: {
+    width: '100%',
+  },
+  openMapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  openMapText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
 });
