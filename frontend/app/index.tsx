@@ -1177,6 +1177,26 @@ export default function GoodRoadApp() {
           <Text style={styles.settingsNavText}>Подробные настройки предупреждений</Text>
           <Ionicons name="chevron-forward" size={20} color="#888" />
         </TouchableOpacity>
+
+        {/* Admin Panel Navigation */}
+        <TouchableOpacity 
+          style={[styles.settingsNavButton, { backgroundColor: '#FF9800' }]}
+          onPress={() => {
+            console.log('Navigating to admin panel...');
+            try {
+              router.push('/admin');
+            } catch (error) {
+              console.error('Admin navigation error:', error);
+              if (Platform.OS === 'web') {
+                window.location.href = '/admin';
+              }
+            }
+          }}
+        >
+          <Ionicons name="analytics" size={20} color="white" />
+          <Text style={styles.settingsNavText}>Административная панель</Text>
+          <Ionicons name="chevron-forward" size={20} color="white" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
