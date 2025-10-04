@@ -133,6 +133,154 @@ export default function GoodRoadApp() {
         console.error('Sound cleanup error:', error);
       }
     }
+    if (warningIntervalRef.current) {
+      clearInterval(warningIntervalRef.current);
+    }
+  };
+
+  // Функции для умной системы предупреждений
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371000; // Радиус Земли в метрах
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const getTimeToHazard = (distance: number, speed: number): number => {
+    if (speed <= 0) return Infinity;
+    const speedMPS = speed / 3.6; // км/ч в м/с
+    return distance / speedMPS; // время в секундах
+  };
+
+  const checkUserReaction = (warning: WarningState, currentSpeed: number): boolean => {
+    const speedDecrease = warning.initialSpeed - currentSpeed;
+    const requiredDecrease = warning.initialSpeed * 0.1; // Требуется снижение на 10%
+    
+    console.log(`🚗 Checking reaction: Initial: ${warning.initialSpeed.toFixed(1)}, Current: ${currentSpeed.toFixed(1)}, Decrease: ${speedDecrease.toFixed(1)}, Required: ${requiredDecrease.toFixed(1)}`);
+    
+    return speedDecrease >= requiredDecrease;
+  };
+
+  const getWarningLevel = (timeToHazard: number, severity: string): WarningState['warningLevel'] => {
+    if (timeToHazard < 3) return 'critical';
+    if (timeToHazard < 6) return 'urgent';
+    if (timeToHazard < 12) return 'caution';
+    return 'initial';
+  };
+
+  const fetchNearbyHazards = async (latitude: number, longitude: number) => {
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      const response = await fetch(`${backendUrl}/api/warnings?latitude=${latitude}&longitude=${longitude}&radius=500`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const hazards: RoadHazard[] = data.map((item: any) => ({
+          id: item._id,
+          type: item.hazard_type || 'road_defect',
+          latitude: item.latitude,
+          longitude: item.longitude,
+          severity: item.severity || 'medium',
+          description: item.description || HAZARD_NAMES[item.hazard_type] || 'препятствие',
+          distance: calculateDistance(latitude, longitude, item.latitude, item.longitude)
+        }));
+        
+        setNearbyHazards(hazards);
+        console.log(`🚨 Found ${hazards.length} nearby hazards`);
+      }
+    } catch (error) {
+      console.error('Error fetching hazards:', error);
+    }
+  };
+
+  const processWarnings = () => {
+    if (!currentLocation || !isTracking || currentSpeed < (appSettings.speedThreshold || 15)) {
+      return;
+    }
+
+    const now = Date.now();
+    
+    // Проверяем каждое препятствие
+    nearbyHazards.forEach(hazard => {
+      const distance = calculateDistance(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude,
+        hazard.latitude,
+        hazard.longitude
+      );
+
+      const timeToHazard = getTimeToHazard(distance, currentSpeed);
+      const warningLevel = getWarningLevel(timeToHazard, hazard.severity);
+      
+      // Проверяем, есть ли уже активное предупреждение для этого препятствия
+      const existingWarning = activeWarnings.find(w => w.hazard.id === hazard.id);
+      
+      if (distance > (appSettings.maxWarningDistance || 200)) {
+        // Удаляем предупреждение, если слишком далеко
+        if (existingWarning) {
+          setActiveWarnings(prev => prev.filter(w => w.hazard.id !== hazard.id));
+        }
+        return;
+      }
+
+      if (distance < (appSettings.minWarningDistance || 30)) {
+        // Удаляем предупреждение, если слишком близко (проехали)
+        if (existingWarning) {
+          setActiveWarnings(prev => prev.filter(w => w.hazard.id !== hazard.id));
+        }
+        return;
+      }
+
+      if (!existingWarning && timeToHazard < 15) {
+        // Создаем новое предупреждение
+        const newWarning: WarningState = {
+          hazard: { ...hazard, distance },
+          distanceToHazard: distance,
+          timeToHazard,
+          currentSpeed,
+          warningLevel,
+          hasUserReacted: false,
+          initialSpeed: currentSpeed,
+          lastWarningTime: now
+        };
+        
+        setActiveWarnings(prev => [...prev, newWarning]);
+        triggerInitialWarning(newWarning);
+        console.log(`🚨 New warning: ${hazard.description} in ${distance.toFixed(0)}m (${timeToHazard.toFixed(1)}s)`);
+        
+      } else if (existingWarning) {
+        // Обновляем существующее предупреждение
+        const hasReacted = checkUserReaction(existingWarning, currentSpeed);
+        const timeSinceLastWarning = (now - existingWarning.lastWarningTime) / 1000;
+        
+        const updatedWarning: WarningState = {
+          ...existingWarning,
+          distanceToHazard: distance,
+          timeToHazard,
+          currentSpeed,
+          warningLevel,
+          hasUserReacted: hasReacted
+        };
+
+        setActiveWarnings(prev => 
+          prev.map(w => w.hazard.id === hazard.id ? updatedWarning : w)
+        );
+
+        // Эскалация предупреждений, если пользователь не реагирует
+        if (!hasReacted && timeSinceLastWarning > (appSettings.warningCooldown || 5)) {
+          triggerEscalatedWarning(updatedWarning);
+          
+          setActiveWarnings(prev => 
+            prev.map(w => w.hazard.id === hazard.id ? { ...w, lastWarningTime: now } : w)
+          );
+        }
+      }
+    });
   };
 
   const requestLocationPermission = async () => {
