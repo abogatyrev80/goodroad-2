@@ -403,6 +403,227 @@ class GoodRoadAPITester:
             self.log_test("Data Cleanup", False, f"Exception: {str(e)}")
             return False
 
+    # NEW ADMIN ENDPOINT TESTS
+    def test_admin_sensor_data_get(self):
+        """Test GET /api/admin/sensor-data - Get all sensor data for admin analysis"""
+        try:
+            response = requests.get(f"{self.base_url}/admin/sensor-data")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_keys = ['data', 'total', 'limit', 'skip', 'returned']
+                
+                if all(key in data for key in expected_keys):
+                    self.log_test("Admin Sensor Data - Get All", True, 
+                                f"Retrieved {data['returned']} of {data['total']} sensor data points")
+                    return True
+                else:
+                    missing = [k for k in expected_keys if k not in data]
+                    self.log_test("Admin Sensor Data - Get All", False, f"Missing keys: {missing}")
+                    return False
+            else:
+                self.log_test("Admin Sensor Data - Get All", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Admin Sensor Data - Get All", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_sensor_data_pagination(self):
+        """Test GET /api/admin/sensor-data with pagination parameters"""
+        try:
+            params = {"limit": 5, "skip": 0}
+            response = requests.get(f"{self.base_url}/admin/sensor-data", params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data['limit'] == 5 and data['skip'] == 0:
+                    self.log_test("Admin Sensor Data - Pagination", True, 
+                                f"Pagination working: limit={data['limit']}, skip={data['skip']}, returned={data['returned']}")
+                    return True
+                else:
+                    self.log_test("Admin Sensor Data - Pagination", False, 
+                                f"Pagination not working: expected limit=5, skip=0, got limit={data.get('limit')}, skip={data.get('skip')}")
+                    return False
+            else:
+                self.log_test("Admin Sensor Data - Pagination", False, f"Status: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Admin Sensor Data - Pagination", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_sensor_data_date_filter(self):
+        """Test GET /api/admin/sensor-data with date filtering"""
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+            
+            params = {"date_from": yesterday, "date_to": today}
+            response = requests.get(f"{self.base_url}/admin/sensor-data", params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("Admin Sensor Data - Date Filter", True, 
+                            f"Date filtering working: {yesterday} to {today}, returned {data['returned']} records")
+                return True
+            else:
+                self.log_test("Admin Sensor Data - Date Filter", False, f"Status: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Admin Sensor Data - Date Filter", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_sensor_data_update(self):
+        """Test PATCH /api/admin/sensor-data/{id} - Update sensor data classification"""
+        try:
+            # First get some sensor data to update
+            response = requests.get(f"{self.base_url}/admin/sensor-data?limit=1")
+            
+            if response.status_code != 200:
+                self.log_test("Admin Sensor Data - Update (Get Data)", False, 
+                            f"Could not get sensor data: HTTP {response.status_code}")
+                return False
+                
+            data = response.json()
+            if not data['data']:
+                self.log_test("Admin Sensor Data - Update", True, 
+                            "No sensor data available to test update functionality")
+                return True
+                
+            # Get the first data point ID
+            point_id = data['data'][0]['_id']
+            
+            # Test update with admin classification
+            update_data = {
+                "hazard_type": "pothole",
+                "severity": "high", 
+                "is_verified": True,
+                "admin_notes": "Admin testing - verified pothole location"
+            }
+            
+            update_response = requests.patch(f"{self.base_url}/admin/sensor-data/{point_id}", json=update_data)
+            
+            if update_response.status_code == 200:
+                result = update_response.json()
+                if 'message' in result and 'updated_fields' in result:
+                    self.log_test("Admin Sensor Data - Update", True, 
+                                f"Successfully updated sensor data. Fields: {result['updated_fields']}")
+                    return True
+                else:
+                    self.log_test("Admin Sensor Data - Update", False, 
+                                f"Update response missing expected fields: {result}")
+                    return False
+            else:
+                self.log_test("Admin Sensor Data - Update", False, 
+                            f"HTTP {update_response.status_code}: {update_response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Admin Sensor Data - Update", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_analytics(self):
+        """Test GET /api/admin/analytics - Get detailed analytics for admin dashboard"""
+        try:
+            response = requests.get(f"{self.base_url}/admin/analytics")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_keys = [
+                    'total_points', 'verified_points', 'hazard_points', 
+                    'unverified_points', 'avg_road_quality', 'recent_points_7d',
+                    'hazard_distribution', 'quality_distribution', 'quality_stats'
+                ]
+                
+                if all(key in data for key in expected_keys):
+                    self.log_test("Admin Analytics", True, 
+                                f"Analytics working: {data['total_points']} total points, "
+                                f"{data['verified_points']} verified, avg quality: {data['avg_road_quality']}")
+                    return True
+                else:
+                    missing = [k for k in expected_keys if k not in data]
+                    self.log_test("Admin Analytics", False, f"Missing keys: {missing}")
+                    return False
+            else:
+                self.log_test("Admin Analytics", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Admin Analytics", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_heatmap_data(self):
+        """Test GET /api/admin/heatmap-data - Get data for map visualization"""
+        try:
+            # Test with NYC area bounding box
+            params = {
+                'southwest_lat': 40.7000,
+                'southwest_lng': -74.0200,
+                'northeast_lat': 40.7200,
+                'northeast_lng': -73.9800,
+                'zoom_level': 12
+            }
+            
+            response = requests.get(f"{self.base_url}/admin/heatmap-data", params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_keys = ['heatmap_points', 'bounds', 'grid_size', 'total_points']
+                
+                if all(key in data for key in expected_keys):
+                    bounds_correct = (
+                        data['bounds']['southwest']['lat'] == params['southwest_lat'] and
+                        data['bounds']['southwest']['lng'] == params['southwest_lng'] and
+                        data['bounds']['northeast']['lat'] == params['northeast_lat'] and
+                        data['bounds']['northeast']['lng'] == params['northeast_lng']
+                    )
+                    
+                    if bounds_correct:
+                        self.log_test("Admin Heatmap Data", True, 
+                                    f"Heatmap data working: {data['total_points']} points, grid size: {data['grid_size']}")
+                        return True
+                    else:
+                        self.log_test("Admin Heatmap Data", False, "Bounds not correctly returned")
+                        return False
+                else:
+                    missing = [k for k in expected_keys if k not in data]
+                    self.log_test("Admin Heatmap Data", False, f"Missing keys: {missing}")
+                    return False
+            else:
+                self.log_test("Admin Heatmap Data", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Admin Heatmap Data", False, f"Exception: {str(e)}")
+            return False
+
+    def test_admin_error_handling(self):
+        """Test admin endpoints error handling"""
+        try:
+            # Test invalid ID format for update
+            invalid_id = "invalid-id-format"
+            update_data = {"hazard_type": "pothole"}
+            
+            response = requests.patch(f"{self.base_url}/admin/sensor-data/{invalid_id}", json=update_data)
+            
+            if response.status_code == 400:
+                self.log_test("Admin Error Handling - Invalid ID", True, 
+                            "Correctly rejects invalid ID format with HTTP 400")
+            else:
+                self.log_test("Admin Error Handling - Invalid ID", False, 
+                            f"Expected HTTP 400 for invalid ID, got HTTP {response.status_code}")
+                
+            # Test missing required parameters for heatmap
+            response = requests.get(f"{self.base_url}/admin/heatmap-data")
+            
+            if response.status_code == 422:  # FastAPI validation error
+                self.log_test("Admin Error Handling - Missing Params", True, 
+                            "Correctly rejects missing required parameters")
+            else:
+                self.log_test("Admin Error Handling - Missing Params", False, 
+                            f"Expected HTTP 422 for missing params, got HTTP {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Admin Error Handling", False, f"Exception: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run comprehensive test suite"""
         print("=" * 60)
