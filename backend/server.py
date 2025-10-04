@@ -409,7 +409,7 @@ async def update_sensor_data_classification(
         # Convert string ID to ObjectId
         try:
             object_id = ObjectId(point_id)
-        except:
+        except Exception:
             raise HTTPException(status_code=400, detail="Invalid point ID format")
         
         # Build update document
