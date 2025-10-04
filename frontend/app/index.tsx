@@ -1000,6 +1000,37 @@ export default function GoodRoadApp() {
           </View>
         </View>
 
+        {/* Active Warnings */}
+        {activeWarnings.length > 0 && (
+          <View style={styles.warningsContainer}>
+            <Text style={styles.warningsTitle}>🚨 Активные предупреждения</Text>
+            {activeWarnings.map((warning) => (
+              <View key={warning.hazard.id} style={[
+                styles.warningCard,
+                { borderLeftColor: getWarningColor(warning.warningLevel) }
+              ]}>
+                <View style={styles.warningHeader}>
+                  <Text style={styles.warningType}>
+                    {HAZARD_NAMES[warning.hazard.type] || 'препятствие'}
+                  </Text>
+                  <Text style={[
+                    styles.warningLevel,
+                    { color: getWarningColor(warning.warningLevel) }
+                  ]}>
+                    {getWarningLevelText(warning.warningLevel)}
+                  </Text>
+                </View>
+                <Text style={styles.warningDistance}>
+                  📍 {Math.round(warning.distanceToHazard)}м | ⏱️ {warning.timeToHazard.toFixed(1)}с
+                </Text>
+                <Text style={styles.warningReaction}>
+                  {warning.hasUserReacted ? '✅ Реакция водителя' : '⚠️ Снизьте скорость!'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Road Condition Display */}
         <View style={styles.conditionCard}>
           <View style={[styles.conditionIndicator, { backgroundColor: getRoadConditionColor(roadConditionScore) }]}>
