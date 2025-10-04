@@ -1379,4 +1379,50 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+  warningsContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  warningsTitle: {
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  warningCard: {
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  warningType: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  warningLevel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  warningDistance: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 4,
+  },
+  warningReaction: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+  },
 });
