@@ -306,7 +306,6 @@
 
 ## test_plan:
   current_focus:
-    - "Sensor Data Upload API"
     - "Location Tracking with Background Processing"
     - "Accelerometer Data Collection"
   stuck_tasks: []
