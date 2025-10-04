@@ -640,6 +640,18 @@ class GoodRoadAPITester:
         self.test_road_warnings_api()
         self.test_analytics_api()
         
+        # NEW ADMIN ENDPOINT TESTS
+        print("=" * 40)
+        print("ADMIN ENDPOINT TESTS")
+        print("=" * 40)
+        self.test_admin_sensor_data_get()
+        self.test_admin_sensor_data_pagination()
+        self.test_admin_sensor_data_date_filter()
+        self.test_admin_sensor_data_update()
+        self.test_admin_analytics()
+        self.test_admin_heatmap_data()
+        self.test_admin_error_handling()
+        
         # Edge case tests
         self.test_edge_cases()
         
