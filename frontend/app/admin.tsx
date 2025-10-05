@@ -466,6 +466,41 @@ export default function AdminPanel() {
           </View>
         </View>
 
+        {/* Debug Section */}
+        <View style={[styles.statsContainer, { marginBottom: 16 }]}>
+          <TouchableOpacity 
+            style={[styles.statCard, { backgroundColor: '#FF9800' }]}
+            onPress={async () => {
+              Alert.alert('Тест API', 'Тестируем подключение к backend...');
+              try {
+                const testUrl = '/api/admin/analytics';
+                console.log(`Testing API: ${testUrl}`);
+                const response = await fetch(testUrl);
+                console.log(`Response status: ${response.status}`);
+                const data = await response.json();
+                console.log('Response data:', data);
+                Alert.alert('API Тест', `Статус: ${response.status}\nДанные: ${JSON.stringify(data).substring(0, 100)}...`);
+              } catch (error) {
+                console.error('API test error:', error);
+                Alert.alert('API Ошибка', `${error.message || error}`);
+              }
+            }}
+          >
+            <Text style={[styles.statNumber, { fontSize: 16 }]}>🔧</Text>
+            <Text style={styles.statLabel}>Тест API</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.statCard, { backgroundColor: '#4CAF50' }]}
+            onPress={() => {
+              loadSensorData();
+            }}
+          >
+            <Text style={[styles.statNumber, { fontSize: 16 }]}>🔄</Text>
+            <Text style={styles.statLabel}>Обновить</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Map Section */}
         <View style={styles.mapSection}>
           <Text style={styles.sectionTitle}>🗺️ Карта данных датчиков</Text>
