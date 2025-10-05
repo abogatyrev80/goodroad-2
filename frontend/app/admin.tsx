@@ -79,39 +79,53 @@ export default function AdminPanel() {
   const loadSensorData = async () => {
     try {
       setIsLoading(true);
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '/'; // Используем относительный URL
+      const apiUrl = `${backendUrl}api/admin/sensor-data`;
+      
+      console.log(`📡 Loading sensor data from: ${apiUrl}`);
+      console.log(`📡 Backend URL env var: ${process.env.EXPO_PUBLIC_BACKEND_URL}`);
       
       // Получаем все данные датчиков для анализа
-      const response = await fetch(`${backendUrl}/api/admin/sensor-data`);
+      const response = await fetch(apiUrl);
+      
+      console.log(`📡 Response status: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
         const data = await response.json();
         console.log('Raw API response:', data);
+        console.log('Response type:', typeof data);
+        console.log('Data array:', data.data);
         
-        const formattedData: SensorDataPoint[] = data.data.map((item: any) => ({
-          id: item._id || item.id,
-          latitude: item.latitude,
-          longitude: item.longitude,
-          timestamp: item.timestamp,
-          speed: item.speed || 0,
-          accuracy: item.accuracy || 0,
-          accelerometer: item.accelerometer || { x: 0, y: 0, z: 0 },
-          roadQuality: item.road_quality_score || 50,
-          hazardType: item.hazard_type,
-          severity: item.severity || 'medium',
-          isVerified: item.is_verified || false,
-          adminNotes: item.admin_notes || ''
-        }));
-        
-        setSensorData(formattedData);
-        console.log(`📊 Loaded ${formattedData.length} sensor data points`);
+        if (data && data.data && Array.isArray(data.data)) {
+          const formattedData: SensorDataPoint[] = data.data.map((item: any) => ({
+            id: item._id || item.id,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            timestamp: item.timestamp,
+            speed: item.speed || 0,
+            accuracy: item.accuracy || 0,
+            accelerometer: item.accelerometer || { x: 0, y: 0, z: 0 },
+            roadQuality: item.road_quality_score || 50,
+            hazardType: item.hazard_type,
+            severity: item.severity || 'medium',
+            isVerified: item.is_verified || false,
+            adminNotes: item.admin_notes || ''
+          }));
+          
+          setSensorData(formattedData);
+          console.log(`✅ Loaded ${formattedData.length} sensor data points`);
+        } else {
+          console.error('Invalid data structure:', data);
+          Alert.alert('Ошибка', 'Неверная структура данных');
+        }
       } else {
-        console.error('Failed to load sensor data:', response.status, response.statusText);
-        Alert.alert('Ошибка', `Не удалось загрузить данные датчиков (${response.status})`);
+        const errorText = await response.text();
+        console.error('Failed to load sensor data:', response.status, response.statusText, errorText);
+        Alert.alert('Ошибка', `Не удалось загрузить данные датчиков (${response.status}): ${errorText}`);
       }
     } catch (error) {
       console.error('Error loading sensor data:', error);
-      Alert.alert('Ошибка', `Ошибка загрузки данных: ${error.message}`);
+      Alert.alert('Ошибка', `Ошибка загрузки данных: ${error.message || error}`);
     } finally {
       setIsLoading(false);
     }
