@@ -86,7 +86,9 @@ export default function AdminPanel() {
       
       if (response.ok) {
         const data = await response.json();
-        const formattedData: SensorDataPoint[] = data.map((item: any) => ({
+        console.log('Raw API response:', data);
+        
+        const formattedData: SensorDataPoint[] = data.data.map((item: any) => ({
           id: item._id || item.id,
           latitude: item.latitude,
           longitude: item.longitude,
@@ -104,12 +106,12 @@ export default function AdminPanel() {
         setSensorData(formattedData);
         console.log(`📊 Loaded ${formattedData.length} sensor data points`);
       } else {
-        console.error('Failed to load sensor data:', response.status);
-        Alert.alert('Ошибка', 'Не удалось загрузить данные датчиков');
+        console.error('Failed to load sensor data:', response.status, response.statusText);
+        Alert.alert('Ошибка', `Не удалось загрузить данные датчиков (${response.status})`);
       }
     } catch (error) {
       console.error('Error loading sensor data:', error);
-      Alert.alert('Ошибка', 'Ошибка загрузки данных');
+      Alert.alert('Ошибка', `Ошибка загрузки данных: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
