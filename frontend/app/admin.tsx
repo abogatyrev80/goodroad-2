@@ -79,22 +79,26 @@ export default function AdminPanel() {
   const loadSensorData = async () => {
     try {
       setIsLoading(true);
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '/'; // Используем относительный URL
-      const apiUrl = `${backendUrl}api/admin/sensor-data`;
+      
+      // Используем правильный URL для Expo dev server
+      const apiUrl = '/api/admin/sensor-data';
       
       console.log(`📡 Loading sensor data from: ${apiUrl}`);
-      console.log(`📡 Backend URL env var: ${process.env.EXPO_PUBLIC_BACKEND_URL}`);
       
-      // Получаем все данные датчиков для анализа
-      const response = await fetch(apiUrl);
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
       
       console.log(`📡 Response status: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Raw API response:', data);
-        console.log('Response type:', typeof data);
-        console.log('Data array:', data.data);
+        console.log('✅ Raw API response:', data);
+        console.log('Response structure:', typeof data, Object.keys(data));
         
         if (data && data.data && Array.isArray(data.data)) {
           const formattedData: SensorDataPoint[] = data.data.map((item: any) => ({
@@ -113,19 +117,33 @@ export default function AdminPanel() {
           }));
           
           setSensorData(formattedData);
-          console.log(`✅ Loaded ${formattedData.length} sensor data points`);
+          console.log(`✅ Successfully loaded ${formattedData.length} sensor data points`);
         } else {
-          console.error('Invalid data structure:', data);
-          Alert.alert('Ошибка', 'Неверная структура данных');
+          console.error('❌ Invalid data structure received:', data);
+          Alert.alert('Ошибка', 'Неверная структура данных от сервера');
         }
       } else {
         const errorText = await response.text();
-        console.error('Failed to load sensor data:', response.status, response.statusText, errorText);
-        Alert.alert('Ошибка', `Не удалось загрузить данные датчиков (${response.status}): ${errorText}`);
+        console.error(`❌ HTTP Error ${response.status}: ${response.statusText}`);
+        console.error('Error details:', errorText);
+        Alert.alert('Ошибка сервера', `HTTP ${response.status}: ${response.statusText}`);
       }
-    } catch (error) {
-      console.error('Error loading sensor data:', error);
-      Alert.alert('Ошибка', `Ошибка загрузки данных: ${error.message || error}`);
+    } catch (error: any) {
+      console.error('❌ Network/fetch error:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      
+      if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
+        Alert.alert(
+          'Ошибка подключения', 
+          'Не удалось подключиться к серверу. Проверьте:\n\n' +
+          '• Запущен ли backend сервер\n' +
+          '• Правильность настроек прокси\n' +
+          '• Подключение к интернету'
+        );
+      } else {
+        Alert.alert('Ошибка', `Произошла ошибка: ${error.message || error}`);
+      }
     } finally {
       setIsLoading(false);
     }
