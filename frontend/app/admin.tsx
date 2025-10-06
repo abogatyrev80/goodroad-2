@@ -193,11 +193,13 @@ export default function AdminPanel() {
 
   const updatePointClassification = async (pointId: string, updates: Partial<SensorDataPoint>) => {
     try {
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      // Используем прямой запрос к локальному backend
+      const apiUrl = `/api/admin/sensor-data/${pointId}`;
       
-      const response = await fetch(`${backendUrl}/api/admin/sensor-data/${pointId}`, {
+      const response = await fetch(apiUrl, {
         method: 'PATCH',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updates),
@@ -214,11 +216,14 @@ export default function AdminPanel() {
         console.log(`✅ Updated point ${pointId}`);
         Alert.alert('Успешно', 'Данные точки обновлены');
       } else {
-        throw new Error('Failed to update point');
+        const errorText = await response.text();
+        console.error(`❌ Failed to update point: ${response.status} ${response.statusText}`);
+        console.error('Error details:', errorText);
+        Alert.alert('Ошибка', `Не удалось обновить данные точки: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Error updating point:', error);
-      Alert.alert('Ошибка', 'Не удалось обновить данные точки');
+    } catch (error: any) {
+      console.error('❌ Error updating point:', error);
+      Alert.alert('Ошибка', `Произошла ошибка: ${error.message || error}`);
     }
   };
 
