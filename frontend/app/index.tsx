@@ -119,6 +119,11 @@ export default function GoodRoadApp() {
   }, []);
 
   const initializeOfflineSystem = async () => {
+    if (Platform.OS === 'web' || !syncService) {
+      console.log('📱 Offline system skipped for web platform');
+      return;
+    }
+    
     try {
       await syncService.initialize();
       console.log('✅ Offline system initialized');
@@ -160,8 +165,13 @@ export default function GoodRoadApp() {
     return (bearing + 360) % 360; // Нормализуем к 0-360
   };
 
-  // Функция для обновления локальных предупреждений
+  // Функция для обновления локальных предупреждений (только мобильные)
   const updateNearbyWarnings = async (latitude: number, longitude: number) => {
+    if (Platform.OS === 'web' || !syncService) {
+      console.log('📱 Nearby warnings update skipped for web platform');
+      return;
+    }
+    
     try {
       // Получаем предупреждения из локальной БД (offline)
       const localWarnings = await syncService.getNearbyWarningsOffline(latitude, longitude, 2); // 2км радиус
@@ -169,10 +179,10 @@ export default function GoodRoadApp() {
 
       if (localWarnings.length > 0) {
         // Находим ближайшее предупреждение
-        const warningsWithDistance = localWarnings.map(warning => ({
+        const warningsWithDistance = localWarnings.map((warning: any) => ({
           ...warning,
           distance: calculateDistance(latitude, longitude, warning.latitude, warning.longitude)
-        })).sort((a, b) => a.distance - b.distance);
+        })).sort((a: any, b: any) => a.distance - b.distance);
 
         const closest = warningsWithDistance[0];
         setClosestWarning(closest);
@@ -193,8 +203,13 @@ export default function GoodRoadApp() {
     }
   };
 
-  // Функция сохранения данных локально (offline)
+  // Функция сохранения данных локально (только мобильные)
   const saveSensorDataOffline = async (location: Location.LocationObject) => {
+    if (Platform.OS === 'web' || !syncService) {
+      console.log('📱 Offline sensor saving skipped for web platform');
+      return;
+    }
+    
     try {
       await syncService.saveOfflineSensorData(
         location.coords.latitude,
