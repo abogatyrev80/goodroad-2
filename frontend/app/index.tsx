@@ -1120,13 +1120,51 @@ export default function GoodRoadApp() {
           </View>
         )}
 
-        {/* Road Condition Display */}
+        {/* Road Condition Display with Direction Indicator */}
         <View style={styles.conditionCard}>
           <View style={[styles.conditionIndicator, { backgroundColor: getRoadConditionColor(roadConditionScore) }]}>
             <Text style={styles.conditionScore}>{Math.round(roadConditionScore)}</Text>
           </View>
           <View style={styles.conditionInfo}>
             <Text style={styles.conditionTitle}>Качество дороги</Text>
+            
+            {/* Direction Indicator */}
+            {closestWarning && (
+              <View style={styles.directionIndicator}>
+                <View 
+                  style={[
+                    styles.directionArrow,
+                    { 
+                      transform: [{ rotate: `${warningDirection}deg` }],
+                      backgroundColor: closestWarning.severity === 'critical' ? '#F44336' :
+                                     closestWarning.severity === 'high' ? '#FF5722' :
+                                     closestWarning.severity === 'medium' ? '#FF9800' : '#4CAF50'
+                    }
+                  ]}
+                >
+                  <Text style={styles.arrowText}>▲</Text>
+                </View>
+                <View style={styles.warningInfo}>
+                  <Text style={styles.warningType}>
+                    {HAZARD_NAMES[closestWarning.hazardType] || closestWarning.hazardType}
+                  </Text>
+                  <Text style={styles.warningDistance}>
+                    {warningDistance < 1000 ? 
+                      `${Math.round(warningDistance)}м` : 
+                      `${(warningDistance/1000).toFixed(1)}км`}
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {/* Offline Indicator */}
+            {isOffline && (
+              <View style={styles.offlineIndicator}>
+                <Ionicons name="cloud-offline" size={16} color="#FF9800" />
+                <Text style={styles.offlineText}>Offline режим</Text>
+              </View>
+            )}
+            
             <Text style={[styles.conditionText, { color: getRoadConditionColor(roadConditionScore) }]}>
               {getRoadConditionText(roadConditionScore)}
             </Text>
