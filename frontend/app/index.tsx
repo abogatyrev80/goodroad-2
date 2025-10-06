@@ -1572,4 +1572,42 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '500',
   },
+  directionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    padding: 8,
+    backgroundColor: '#333',
+    borderRadius: 8,
+  },
+  directionArrow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  arrowText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  warningInfo: {
+    flex: 1,
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+    padding: 6,
+    backgroundColor: '#444',
+    borderRadius: 6,
+  },
+  offlineText: {
+    color: '#FF9800',
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
 });
