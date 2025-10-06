@@ -97,11 +97,21 @@ export default function GoodRoadApp() {
     setupAudio();
     requestLocationPermission();
     loadAppSettings();
+    initializeOfflineSystem();
     
     return () => {
       cleanup();
     };
   }, []);
+
+  const initializeOfflineSystem = async () => {
+    try {
+      await syncService.initialize();
+      console.log('✅ Offline system initialized');
+    } catch (error) {
+      console.error('❌ Offline system initialization error:', error);
+    }
+  };
 
   const loadAppSettings = async () => {
     try {
@@ -114,6 +124,75 @@ export default function GoodRoadApp() {
       }
     } catch (error) {
       console.error('Error loading app settings:', error);
+    }
+  };
+
+  // Функция для расчета направления к точке
+  const calculateDirection = (
+    fromLat: number, 
+    fromLon: number, 
+    toLat: number, 
+    toLon: number
+  ): number => {
+    const dLon = (toLon - fromLon) * Math.PI / 180;
+    const fromLatRad = fromLat * Math.PI / 180;
+    const toLatRad = toLat * Math.PI / 180;
+    
+    const y = Math.sin(dLon) * Math.cos(toLatRad);
+    const x = Math.cos(fromLatRad) * Math.sin(toLatRad) - 
+              Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(dLon);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360; // Нормализуем к 0-360
+  };
+
+  // Функция для обновления локальных предупреждений
+  const updateNearbyWarnings = async (latitude: number, longitude: number) => {
+    try {
+      // Получаем предупреждения из локальной БД (offline)
+      const localWarnings = await syncService.getNearbyWarningsOffline(latitude, longitude, 2); // 2км радиус
+      setNearbyWarnings(localWarnings);
+
+      if (localWarnings.length > 0) {
+        // Находим ближайшее предупреждение
+        const warningsWithDistance = localWarnings.map(warning => ({
+          ...warning,
+          distance: calculateDistance(latitude, longitude, warning.latitude, warning.longitude)
+        })).sort((a, b) => a.distance - b.distance);
+
+        const closest = warningsWithDistance[0];
+        setClosestWarning(closest);
+        
+        // Рассчитываем направление и дистанцию
+        const direction = calculateDirection(latitude, longitude, closest.latitude, closest.longitude);
+        setWarningDirection(direction);
+        setWarningDistance(closest.distance);
+
+        console.log(`🎯 Closest warning: ${closest.hazardType} at ${closest.distance.toFixed(0)}m, direction: ${direction.toFixed(0)}°`);
+      } else {
+        setClosestWarning(null);
+        setWarningDirection(0);
+        setWarningDistance(0);
+      }
+    } catch (error) {
+      console.error('Error updating nearby warnings:', error);
+    }
+  };
+
+  // Функция сохранения данных локально (offline)
+  const saveSensorDataOffline = async (location: Location.LocationObject) => {
+    try {
+      await syncService.saveOfflineSensorData(
+        location.coords.latitude,
+        location.coords.longitude,
+        currentSpeed,
+        location.coords.accuracy || 0,
+        { x: 0, y: 0, z: 0 }, // Акселерометр можно добавить позже
+        roadConditionScore
+      );
+      console.log('💾 Sensor data saved offline');
+    } catch (error) {
+      console.error('Error saving sensor data offline:', error);
     }
   };
 
