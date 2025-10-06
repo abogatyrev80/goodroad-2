@@ -19,6 +19,10 @@ import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Импортируем offline системы
+import { syncService } from '../services/SyncService';
+import { localDB, LocalWarning } from '../services/LocalDatabase';
+
 // Импортируем типы из настроек
 import { AppSettings, SoundOption } from './settings';
 
