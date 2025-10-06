@@ -85,6 +85,7 @@ export default function GoodRoadApp() {
   
   // Умная система предупреждений
   const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
+  const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
   const [speedHistory, setSpeedHistory] = useState<number[]>([]);
   const [lastHazardCheck, setLastHazardCheck] = useState<number>(0);
   
