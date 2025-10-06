@@ -491,6 +491,7 @@ export default function GoodRoadApp() {
     const now = Date.now();
     if (now - lastHazardCheck > 5000) {
       fetchNearbyHazards(location.coords.latitude, location.coords.longitude);
+      updateNearbyWarnings(location.coords.latitude, location.coords.longitude);
       setLastHazardCheck(now);
     }
   };
