@@ -1345,11 +1345,11 @@ export default function GoodRoadApp() {
           onPress={() => {
             console.log('Navigating to admin panel...');
             try {
-              router.push('/admin');
+              router.push('/admin-simple');
             } catch (error) {
               console.error('Admin navigation error:', error);
               if (Platform.OS === 'web') {
-                window.location.href = '/admin';
+                window.location.href = '/admin-simple';
               }
             }
           }}
