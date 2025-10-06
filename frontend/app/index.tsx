@@ -488,10 +488,14 @@ export default function GoodRoadApp() {
     console.log(`🚗 Speed: ${speedKmh.toFixed(1)} km/h`);
     console.log(`📡 Accuracy: ±${(location.coords.accuracy || 0).toFixed(1)}m`);
     
-    // Проверяем препятствия каждые 5 секунд или при значительном изменении координат
+    // Сохраняем данные локально (offline первым делом)
+    if (isTracking) {
+      saveSensorDataOffline(location);
+    }
+    
+    // Обновляем ближайшие предупреждения
     const now = Date.now();
     if (now - lastHazardCheck > 5000) {
-      fetchNearbyHazards(location.coords.latitude, location.coords.longitude);
       updateNearbyWarnings(location.coords.latitude, location.coords.longitude);
       setLastHazardCheck(now);
     }
