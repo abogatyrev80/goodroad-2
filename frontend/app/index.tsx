@@ -1330,6 +1330,26 @@ export default function GoodRoadApp() {
           <Text style={styles.settingsNavText}>Административная панель</Text>
           <Ionicons name="chevron-forward" size={20} color="white" />
         </TouchableOpacity>
+
+        {/* Offline Settings Navigation */}
+        <TouchableOpacity 
+          style={[styles.settingsNavButton, { backgroundColor: '#2196F3' }]}
+          onPress={() => {
+            console.log('Navigating to offline settings...');
+            try {
+              router.push('/offline');
+            } catch (error) {
+              console.error('Offline navigation error:', error);
+              if (Platform.OS === 'web') {
+                window.location.href = '/offline';
+              }
+            }
+          }}
+        >
+          <Ionicons name="cloud-download" size={20} color="white" />
+          <Text style={styles.settingsNavText}>Offline режим и загрузка регионов</Text>
+          <Ionicons name="chevron-forward" size={20} color="white" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
