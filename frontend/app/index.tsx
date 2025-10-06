@@ -76,9 +76,15 @@ export default function GoodRoadApp() {
   const [satelliteCount, setSatelliteCount] = useState<number>(0);
   const [locationError, setLocationError] = useState<string | null>(null);
   
+  // Offline система
+  const [isOffline, setIsOffline] = useState(false);
+  const [nearbyWarnings, setNearbyWarnings] = useState<LocalWarning[]>([]);
+  const [closestWarning, setClosestWarning] = useState<LocalWarning | null>(null);
+  const [warningDirection, setWarningDirection] = useState<number>(0); // угол в градусах
+  const [warningDistance, setWarningDistance] = useState<number>(0); // дистанция в метрах
+  
   // Умная система предупреждений
   const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
-  const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
   const [speedHistory, setSpeedHistory] = useState<number[]>([]);
   const [lastHazardCheck, setLastHazardCheck] = useState<number>(0);
   
