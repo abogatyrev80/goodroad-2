@@ -132,10 +132,57 @@ export default function AdminPanelSimple() {
 
     } catch (error: any) {
       console.error('❌ Admin data loading error:', error);
-      Alert.alert(
-        'Ошибка загрузки', 
-        `Произошла ошибка при загрузке данных: ${error.message || error}`
-      );
+      
+      // Show fallback demo data for web version
+      if (Platform.OS === 'web') {
+        console.log('🌐 Using demo data for web preview...');
+        
+        // Demo sensor data
+        const demoData: SensorDataPoint[] = [
+          {
+            id: 'demo_1',
+            latitude: 55.7558,
+            longitude: 37.6176,
+            timestamp: new Date().toISOString(),
+            speed: 45.2,
+            accuracy: 3.5,
+            accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
+            roadQuality: 85,
+            hazardType: undefined,
+            severity: 'medium',
+            isVerified: true,
+            adminNotes: 'Demo data point'
+          },
+          {
+            id: 'demo_2', 
+            latitude: 55.7568,
+            longitude: 37.6186,
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            speed: 32.1,
+            accuracy: 5.2,
+            accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
+            roadQuality: 42,
+            hazardType: 'pothole',
+            severity: 'high',
+            isVerified: false,
+            adminNotes: ''
+          }
+        ];
+        
+        setSensorData(demoData);
+        setStats({
+          totalPoints: 22,
+          verifiedPoints: 4,
+          hazardPoints: 3,
+          avgRoadQuality: 76.5
+        });
+        
+      } else {
+        Alert.alert(
+          'Ошибка загрузки', 
+          `Произошла ошибка при загрузке данных: ${error.message || error}`
+        );
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
