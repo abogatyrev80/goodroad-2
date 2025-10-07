@@ -289,8 +289,8 @@ export default function GoodRoadApp() {
     const testHazard: RoadHazard = {
       id: 'test_hazard',
       type: 'pothole',
-      latitude: currentLocation ? currentLocation.coords.latitude + 0.001 : 55.7568,
-      longitude: currentLocation ? currentLocation.coords.longitude + 0.001 : 37.6186,
+      latitude: 55.7568, // Фиксированные координаты для веб-демо
+      longitude: 37.6186,
       severity: 'high',
       description: 'Тестовая яма для демонстрации',
       distance: 150
@@ -300,26 +300,20 @@ export default function GoodRoadApp() {
       setNearbyHazards([testHazard]);
       console.log('📍 Добавлено тестовое препятствие для демонстрации стрелки');
       
-      // Вычисляем направление
-      if (currentLocation) {
-        const bearing = calculateBearing(
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude,
-          testHazard.latitude,
-          testHazard.longitude
-        );
-        setWarningDirection(bearing);
-      }
+      // Устанавливаем направление (северо-восток, 45 градусов) для демо
+      setWarningDirection(45);
+      console.log('🧭 Direction set to 45° (northeast) for demo');
     } else {
       setNearbyHazards([]);
+      setWarningDirection(0);
       console.log('🧹 Убрано тестовое препятствие');
     }
     
     Alert.alert(
       '🚨 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ',
       nearbyHazards.length === 0 ? 
-        'Добавлено тестовое препятствие! Смотрите на стрелку направления выше.' :
-        'Убрано тестовое препятствие. Стрелка показывает "нет препятствий".',
+        'Добавлено тестовое препятствие! Стрелка теперь красная и указывает направление (северо-восток).' :
+        'Убрано тестовое препятствие. Стрелка снова зеленая с галочкой.',
       [{ text: 'OK' }]
     );
   };
