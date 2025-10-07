@@ -488,10 +488,10 @@ export default function GoodRoadApp() {
           <Ionicons name="settings-outline" size={20} color="white" />
           <Text style={styles.settingsNavText}>Подробные настройки предупреждений</Text>
           <Ionicons name="chevron-forward" size={20} color="#888" />
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Admin Panel Navigation */}
-        <TouchableOpacity 
+        <Pressable 
           style={[styles.settingsNavButton, { backgroundColor: '#FF9800' }]}
           onPress={() => {
             console.log('Navigating to admin panel...');
