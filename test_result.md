@@ -240,6 +240,21 @@
         - agent: "testing"
         - comment: "✅ TESTED: Admin heatmap data endpoint working perfectly. Correctly processes bounding box parameters (southwest_lat, southwest_lng, northeast_lat, northeast_lng), calculates appropriate grid size based on zoom level (grid_size: 0.00625 for zoom 12), returns properly formatted heatmap points with lat/lng/quality/count/hazards/intensity. Handles empty datasets and geographic aggregation correctly. Proper error handling for missing required parameters (HTTP 422)."
 
+  - task: "Zero Coordinates Cleanup API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Implemented DELETE /api/admin/cleanup-zero-coords endpoint to remove all sensor data records with invalid GPS coordinates (0.0, 0.0)"
+        - working: true
+        - agent: "testing"
+        - comment: "✅ TESTED: Zero coordinates cleanup endpoint working perfectly! Successfully executed complete cleanup operation: 1) Initial state: Found 3 records with (0.0, 0.0) coordinates out of 28 total records. 2) Cleanup execution: Successfully deleted 8 records with zero coordinates. 3) Verification: No zero coordinates remain in database, only valid GPS coordinates preserved (Moscow area: 55.7568, 37.6186 and New York area: 40.713, -74.0062). 4) Analytics updated: Total records reduced from 28 to 20, maintaining 4 verified points and 4 hazard points. Database cleanup operation completed successfully with all invalid GPS data removed."
+
 ## frontend:
   - task: "Location Tracking with Background Processing"
     implemented: true
