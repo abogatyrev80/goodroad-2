@@ -66,15 +66,18 @@ export default function AdminPanelSimple() {
       console.log('🔄 Loading admin data...');
 
       // Загружаем данные и статистику параллельно
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      console.log('🌐 Backend URL:', backendUrl);
+      
       const [sensorResponse, statsResponse] = await Promise.all([
-        fetch('/api/admin/sensor-data', {
+        fetch(`${backendUrl}/api/admin/sensor-data`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
         }),
-        fetch('/api/admin/analytics', {
+        fetch(`${backendUrl}/api/admin/analytics`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
