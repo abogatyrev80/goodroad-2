@@ -313,9 +313,9 @@ export default function AdminPanelSimple() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <Pressable onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.headerTitle}>Административная панель</Text>
         <TouchableOpacity onPress={handleRefresh} disabled={isRefreshing}>
           {isRefreshing ? (
