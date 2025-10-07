@@ -369,9 +369,9 @@ export default function AdminPanelSimple() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Детали точки данных</Text>
-              <TouchableOpacity onPress={() => setShowDetails(false)}>
+              <Pressable onPress={() => setShowDetails(false)}>
                 <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
+              </Pressable>
             </View>
             
             <ScrollView style={styles.modalScroll}>
