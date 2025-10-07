@@ -196,33 +196,26 @@ def test_zero_coordinates_cleanup():
         return False
 
 def main():
-    """Main investigation function"""
-    print("Starting GPS Coordinates Investigation...")
-    print(f"Backend URL: {BACKEND_URL}")
-    print("="*80)
+    """Run the zero coordinates cleanup test"""
+    print("🚗 Good Road Backend API - Zero Coordinates Cleanup Test")
+    print(f"🌐 Backend URL: {BACKEND_URL}")
+    print(f"⏰ Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    investigator = GPSCoordinatesInvestigation()
+    # Run the specific test requested
+    success = test_zero_coordinates_cleanup()
     
-    # Run all investigation tests
-    print("Test 1: Getting raw sensor data...")
-    investigator.test_1_get_raw_sensor_data()
+    print(f"\n{'='*60}")
+    if success:
+        print("🎉 ZERO COORDINATES CLEANUP TEST COMPLETED SUCCESSFULLY")
+        print("✅ All records with (0.0, 0.0) coordinates have been removed")
+        print("✅ Only records with valid GPS coordinates remain")
+        print("✅ Database cleanup operation successful")
+    else:
+        print("❌ ZERO COORDINATES CLEANUP TEST FAILED")
+        print("⚠️  Some issues were found with the cleanup operation")
+    print(f"{'='*60}")
     
-    print("Test 2: Getting latest 10 records...")
-    investigator.test_2_get_latest_10_records()
-    
-    print("Test 3: Testing POST with correct GPS data...")
-    investigator.test_3_post_correct_gps_data()
-    
-    print("Test 4: Checking for non-zero coordinates...")
-    investigator.test_4_check_non_zero_coordinates()
-    
-    print("Test 5: Analyzing data structure...")
-    investigator.test_5_analyze_data_structure()
-    
-    # Generate final report
-    investigator.generate_investigation_report()
-    
-    return investigator.test_results
+    return 0 if success else 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
