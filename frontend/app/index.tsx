@@ -508,7 +508,7 @@ export default function GoodRoadApp() {
           <Ionicons name="analytics" size={20} color="white" />
           <Text style={styles.settingsNavText}>Административная панель</Text>
           <Ionicons name="chevron-forward" size={20} color="white" />
-        </TouchableOpacity>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
