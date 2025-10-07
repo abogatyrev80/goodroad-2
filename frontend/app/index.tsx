@@ -458,7 +458,7 @@ export default function GoodRoadApp() {
         </View>
 
         {/* Test Warning Button */}
-        <TouchableOpacity 
+        <Pressable 
           style={[styles.testButton, { 
             backgroundColor: audioEnabled ? '#FF5722' : '#666' 
           }]}
