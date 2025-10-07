@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-## user_problem_statement: Build a mobile application "Good Road" for Android that works as background process registering sensor data (acceleration and position). It should record coordinates, speed and acceleration characteristics to database. Server periodically analyzes and identifies characteristic coordinates with sharp acceleration changes that can be interpreted as road obstacles, bad roads. Analyzed data is then distributed to other users for generating warnings while driving.
+## user_problem_statement: Fixed the critical HTTP 500 error in the "Good Road" mobile application. The issue was caused by SQLite modules loading in the web environment during bundling. Resolved by creating web-only versions of components and temporarily disabling offline modules. The main app and admin panel now work correctly in the web browser.
 
 ## backend:
   - task: "Sensor Data Upload API"
