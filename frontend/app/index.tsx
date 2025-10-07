@@ -299,7 +299,7 @@ export default function GoodRoadApp() {
       <View style={styles.header}>
         <Ionicons name="car-sport" size={32} color="#4CAF50" />
         <Text style={styles.title}>Good Road</Text>
-        <TouchableOpacity 
+        <Pressable 
           onPress={() => {
             console.log('Navigating to settings from header...');
             try {
