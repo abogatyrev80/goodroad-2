@@ -380,7 +380,7 @@ export default function GoodRoadApp() {
               {isLoading ? 'Подключение к GPS...' : 
                isTracking ? 'Остановить мониторинг' : 'Начать мониторинг'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {/* Status Cards */}
