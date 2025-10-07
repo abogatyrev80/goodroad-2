@@ -414,7 +414,7 @@ export default function AdminPanelSimple() {
               </TouchableOpacity>
             </ScrollView>
             
-            <TouchableOpacity 
+            <Pressable 
               style={styles.closeButton}
               onPress={() => setShowDetails(false)}
             >
