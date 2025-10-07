@@ -759,4 +759,37 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+  // Новые стили для стрелки направления
+  directionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  compassBackground: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  directionArrowLarge: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hazardDetails: {
+    marginTop: 4,
+  },
+  distanceText: {
+    fontSize: 14,
+    color: '#FF9800',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  directionText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
 });
