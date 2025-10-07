@@ -396,7 +396,7 @@ export default function AdminPanelSimple() {
                 </Text>
               </View>
               
-              <TouchableOpacity
+              <Pressable
                 style={[styles.verifyButton, selectedPoint.isVerified && styles.verifyButtonActive]}
                 onPress={() => {
                   updatePointVerification(selectedPoint.id, !selectedPoint.isVerified);
@@ -411,7 +411,7 @@ export default function AdminPanelSimple() {
                 <Text style={[styles.verifyButtonText, selectedPoint.isVerified && { color: 'white' }]}>
                   {selectedPoint.isVerified ? 'Верифицировано' : 'Верифицировать'}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </ScrollView>
             
             <Pressable 
