@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Good Road API - GPS Coordinates Investigation
-Focus: Investigating null coordinates (0.0, 0.0) issue in sensor data
+Backend Testing Suite for Good Road API - GPS Coordinates Fix Verification
+Focus: Testing fixed admin endpoint /api/admin/sensor-data for proper GPS coordinate extraction
+ЦЕЛЬ: Убедиться что исправление /api/admin/sensor-data теперь правильно извлекает GPS координаты из rawData
 """
 
 import requests
