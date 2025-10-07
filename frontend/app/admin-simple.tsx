@@ -258,7 +258,7 @@ export default function AdminPanelSimple() {
   };
 
   const renderDataPoint = (point: SensorDataPoint) => (
-    <TouchableOpacity
+    <Pressable
       key={point.id}
       style={[styles.dataPointCard, { borderLeftColor: getPointColor(point) }]}
       onPress={() => {
