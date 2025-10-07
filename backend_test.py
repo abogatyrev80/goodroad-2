@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 
 # Get backend URL from environment
-BACKEND_URL = "https://roadmonitor-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
 
 class GoodRoadAPITester:
     def __init__(self):
