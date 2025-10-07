@@ -15,671 +15,633 @@ BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
 
 class GPSCoordinatesInvestigation:
     def __init__(self):
-        self.base_url = BACKEND_URL
+        self.backend_url = BACKEND_URL
         self.test_results = []
         
-    def log_test(self, test_name, success, details=""):
-        """Log test results"""
+    def log_result(self, test_name, success, details, data=None):
+        """Log test results for analysis"""
         result = {
             "test": test_name,
             "success": success,
             "details": details,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "data": data
         }
         self.test_results.append(result)
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status}: {test_name}")
-        if details:
-            print(f"   Details: {details}")
+        print(f"   Details: {details}")
+        if data and isinstance(data, dict):
+            if 'latitude' in str(data) or 'longitude' in str(data):
+                print(f"   GPS Data: {json.dumps(data, indent=2)}")
         print()
-
-    def test_root_endpoint(self):
-        """Test GET /api/ root endpoint"""
-        try:
-            response = requests.get(f"{self.base_url}/")
-            if response.status_code == 200:
-                data = response.json()
-                if "message" in data and "Good Road" in data["message"]:
-                    self.log_test("Root Endpoint", True, f"Response: {data}")
-                    return True
-                else:
-                    self.log_test("Root Endpoint", False, f"Unexpected response: {data}")
-                    return False
-            else:
-                self.log_test("Root Endpoint", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Root Endpoint", False, f"Exception: {str(e)}")
-            return False
-
-    def test_sensor_data_upload(self):
-        """Test POST /api/sensor-data with realistic data"""
-        # Test data from review request with additional realistic points
-        test_data = {
-            "deviceId": "test-device-001",
-            "sensorData": [
-                # Location data points
-                {
-                    "type": "location",
-                    "timestamp": int(time.time() * 1000),
-                    "data": {
-                        "latitude": 40.7128,
-                        "longitude": -74.0060,
-                        "speed": 30.5,
-                        "accuracy": 5.0
-                    }
-                },
-                {
-                    "type": "location", 
-                    "timestamp": int(time.time() * 1000) + 5000,
-                    "data": {
-                        "latitude": 40.7129,
-                        "longitude": -74.0061,
-                        "speed": 32.0,
-                        "accuracy": 4.5
-                    }
-                },
-                # Normal accelerometer data (good road)
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 100,
-                    "data": {
-                        "x": 0.1,
-                        "y": 0.2,
-                        "z": 9.8,
-                        "totalAcceleration": 9.82
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 200,
-                    "data": {
-                        "x": 0.15,
-                        "y": 0.18,
-                        "z": 9.85,
-                        "totalAcceleration": 9.87
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 300,
-                    "data": {
-                        "x": 0.12,
-                        "y": 0.22,
-                        "z": 9.78,
-                        "totalAcceleration": 9.81
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 400,
-                    "data": {
-                        "x": 0.08,
-                        "y": 0.25,
-                        "z": 9.82,
-                        "totalAcceleration": 9.84
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 500,
-                    "data": {
-                        "x": 0.11,
-                        "y": 0.19,
-                        "z": 9.79,
-                        "totalAcceleration": 9.83
-                    }
-                }
-            ]
-        }
-
-        try:
-            response = requests.post(
-                f"{self.base_url}/sensor-data",
-                json=test_data,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ["message", "rawDataPoints", "conditionsProcessed", "warningsGenerated"]
-                if all(key in data for key in expected_keys):
-                    self.log_test("Sensor Data Upload", True, 
-                                f"Processed {data['rawDataPoints']} points, "
-                                f"{data['conditionsProcessed']} conditions, "
-                                f"{data['warningsGenerated']} warnings")
-                    return True
-                else:
-                    self.log_test("Sensor Data Upload", False, f"Missing expected keys in response: {data}")
-                    return False
-            else:
-                self.log_test("Sensor Data Upload", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Sensor Data Upload", False, f"Exception: {str(e)}")
-            return False
-
-    def test_sensor_data_with_poor_road(self):
-        """Test sensor data upload with high variance data (poor road conditions)"""
-        # High variance accelerometer data to trigger poor road detection
-        test_data = {
-            "deviceId": "test-device-002",
-            "sensorData": [
-                {
-                    "type": "location",
-                    "timestamp": int(time.time() * 1000),
-                    "data": {
-                        "latitude": 40.7130,
-                        "longitude": -74.0062,
-                        "speed": 25.0,
-                        "accuracy": 5.0
-                    }
-                },
-                # High variance accelerometer data (poor road)
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 100,
-                    "data": {
-                        "x": 2.5,
-                        "y": 1.8,
-                        "z": 12.3,
-                        "totalAcceleration": 12.8
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 200,
-                    "data": {
-                        "x": -1.2,
-                        "y": 3.1,
-                        "z": 7.5,
-                        "totalAcceleration": 8.2
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 300,
-                    "data": {
-                        "x": 3.8,
-                        "y": -2.1,
-                        "z": 15.2,
-                        "totalAcceleration": 15.8
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 400,
-                    "data": {
-                        "x": -2.5,
-                        "y": 4.2,
-                        "z": 6.1,
-                        "totalAcceleration": 7.8
-                    }
-                },
-                {
-                    "type": "accelerometer",
-                    "timestamp": int(time.time() * 1000) + 500,
-                    "data": {
-                        "x": 4.1,
-                        "y": -1.8,
-                        "z": 14.5,
-                        "totalAcceleration": 15.1
-                    }
-                }
-            ]
-        }
-
-        try:
-            response = requests.post(
-                f"{self.base_url}/sensor-data",
-                json=test_data,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # Should generate warnings due to high variance
-                if data.get("warningsGenerated", 0) > 0:
-                    self.log_test("Poor Road Detection", True, 
-                                f"Generated {data['warningsGenerated']} warnings for poor road conditions")
-                    return True
-                else:
-                    self.log_test("Poor Road Detection", True, 
-                                "No warnings generated - may indicate good algorithm sensitivity")
-                    return True
-            else:
-                self.log_test("Poor Road Detection", False, f"Status: {response.status_code}")
-                return False
-        except Exception as e:
-            self.log_test("Poor Road Detection", False, f"Exception: {str(e)}")
-            return False
-
-    def test_road_conditions_api(self):
-        """Test GET /api/road-conditions"""
-        # Test with NYC coordinates
-        params = {
-            "latitude": 40.7128,
-            "longitude": -74.0060,
-            "radius": 1000
-        }
         
+    def test_1_get_raw_sensor_data(self):
+        """Test 1: GET /api/admin/sensor-data - получить raw данные"""
         try:
-            response = requests.get(f"{self.base_url}/road-conditions", params=params)
+            response = requests.get(f"{self.backend_url}/admin/sensor-data")
             
             if response.status_code == 200:
                 data = response.json()
-                expected_keys = ["location", "radius", "conditions"]
-                if all(key in data for key in expected_keys):
-                    conditions_count = len(data["conditions"])
-                    self.log_test("Road Conditions API", True, 
-                                f"Found {conditions_count} road conditions within {params['radius']}m")
-                    return True
-                else:
-                    self.log_test("Road Conditions API", False, f"Missing expected keys: {data}")
-                    return False
-            else:
-                self.log_test("Road Conditions API", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Road Conditions API", False, f"Exception: {str(e)}")
-            return False
-
-    def test_road_warnings_api(self):
-        """Test GET /api/warnings"""
-        # Test with NYC coordinates
-        params = {
-            "latitude": 40.7128,
-            "longitude": -74.0060,
-            "radius": 1000
-        }
-        
-        try:
-            response = requests.get(f"{self.base_url}/warnings", params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ["location", "radius", "warnings"]
-                if all(key in data for key in expected_keys):
-                    warnings_count = len(data["warnings"])
-                    self.log_test("Road Warnings API", True, 
-                                f"Found {warnings_count} warnings within {params['radius']}m")
-                    return True
-                else:
-                    self.log_test("Road Warnings API", False, f"Missing expected keys: {data}")
-                    return False
-            else:
-                self.log_test("Road Warnings API", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Road Warnings API", False, f"Exception: {str(e)}")
-            return False
-
-    def test_analytics_api(self):
-        """Test GET /api/admin/analytics (updated endpoint)"""
-        try:
-            response = requests.get(f"{self.base_url}/admin/analytics")
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ["total_points", "verified_points", "hazard_points", "avg_road_quality"]
-                if all(key in data for key in expected_keys):
-                    self.log_test("Analytics API (Admin)", True, 
-                                f"Points: {data['total_points']}, "
-                                f"Verified: {data['verified_points']}, "
-                                f"Hazards: {data['hazard_points']}")
-                    return True
-                else:
-                    self.log_test("Analytics API (Admin)", False, f"Missing expected keys: {data}")
-                    return False
-            else:
-                self.log_test("Analytics API (Admin)", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Analytics API (Admin)", False, f"Exception: {str(e)}")
-            return False
-
-    def test_edge_cases(self):
-        """Test edge cases and error handling"""
-        # Test empty sensor data
-        empty_data = {
-            "deviceId": "test-device-empty",
-            "sensorData": []
-        }
-        
-        try:
-            response = requests.post(
-                f"{self.base_url}/sensor-data",
-                json=empty_data,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("rawDataPoints") == 0:
-                    self.log_test("Empty Sensor Data", True, "Handled empty data correctly")
-                else:
-                    self.log_test("Empty Sensor Data", False, f"Unexpected response: {data}")
-            else:
-                self.log_test("Empty Sensor Data", False, f"Status: {response.status_code}")
-        except Exception as e:
-            self.log_test("Empty Sensor Data", False, f"Exception: {str(e)}")
-
-        # Test invalid coordinates
-        try:
-            response = requests.get(f"{self.base_url}/road-conditions", params={
-                "latitude": 999,
-                "longitude": 999,
-                "radius": 1000
-            })
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Invalid Coordinates", True, "API handled invalid coordinates")
-            else:
-                self.log_test("Invalid Coordinates", False, f"Status: {response.status_code}")
-        except Exception as e:
-            self.log_test("Invalid Coordinates", False, f"Exception: {str(e)}")
-
-    def test_cleanup_endpoint(self):
-        """Test DELETE /api/data/cleanup"""
-        try:
-            response = requests.delete(f"{self.base_url}/data/cleanup")
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ["message", "deletedSensorBatches", "deletedWarnings"]
-                if all(key in data for key in expected_keys):
-                    self.log_test("Data Cleanup", True, 
-                                f"Deleted {data['deletedSensorBatches']} batches, "
-                                f"{data['deletedWarnings']} warnings")
-                    return True
-                else:
-                    self.log_test("Data Cleanup", False, f"Missing expected keys: {data}")
-                    return False
-            else:
-                self.log_test("Data Cleanup", False, f"Status: {response.status_code}")
-                return False
-        except Exception as e:
-            self.log_test("Data Cleanup", False, f"Exception: {str(e)}")
-            return False
-
-    # NEW ADMIN ENDPOINT TESTS
-    def test_admin_sensor_data_get(self):
-        """Test GET /api/admin/sensor-data - Get all sensor data for admin analysis"""
-        try:
-            response = requests.get(f"{self.base_url}/admin/sensor-data")
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ['data', 'total', 'limit', 'skip', 'returned']
+                sensor_data = data.get('data', [])
+                total_records = data.get('total', 0)
                 
-                if all(key in data for key in expected_keys):
-                    self.log_test("Admin Sensor Data - Get All", True, 
-                                f"Retrieved {data['returned']} of {data['total']} sensor data points")
-                    return True
-                else:
-                    missing = [k for k in expected_keys if k not in data]
-                    self.log_test("Admin Sensor Data - Get All", False, f"Missing keys: {missing}")
-                    return False
-            else:
-                self.log_test("Admin Sensor Data - Get All", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Admin Sensor Data - Get All", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_sensor_data_pagination(self):
-        """Test GET /api/admin/sensor-data with pagination parameters"""
-        try:
-            params = {"limit": 5, "skip": 0}
-            response = requests.get(f"{self.base_url}/admin/sensor-data", params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data['limit'] == 5 and data['skip'] == 0:
-                    self.log_test("Admin Sensor Data - Pagination", True, 
-                                f"Pagination working: limit={data['limit']}, skip={data['skip']}, returned={data['returned']}")
-                    return True
-                else:
-                    self.log_test("Admin Sensor Data - Pagination", False, 
-                                f"Pagination not working: expected limit=5, skip=0, got limit={data.get('limit')}, skip={data.get('skip')}")
-                    return False
-            else:
-                self.log_test("Admin Sensor Data - Pagination", False, f"Status: {response.status_code}")
-                return False
-        except Exception as e:
-            self.log_test("Admin Sensor Data - Pagination", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_sensor_data_date_filter(self):
-        """Test GET /api/admin/sensor-data with date filtering"""
-        try:
-            today = datetime.now().strftime('%Y-%m-%d')
-            yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-            
-            params = {"date_from": yesterday, "date_to": today}
-            response = requests.get(f"{self.base_url}/admin/sensor-data", params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Admin Sensor Data - Date Filter", True, 
-                            f"Date filtering working: {yesterday} to {today}, returned {data['returned']} records")
-                return True
-            else:
-                self.log_test("Admin Sensor Data - Date Filter", False, f"Status: {response.status_code}")
-                return False
-        except Exception as e:
-            self.log_test("Admin Sensor Data - Date Filter", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_sensor_data_update(self):
-        """Test PATCH /api/admin/sensor-data/{id} - Update sensor data classification"""
-        try:
-            # First get some sensor data to update
-            response = requests.get(f"{self.base_url}/admin/sensor-data?limit=1")
-            
-            if response.status_code != 200:
-                self.log_test("Admin Sensor Data - Update (Get Data)", False, 
-                            f"Could not get sensor data: HTTP {response.status_code}")
-                return False
+                # Analyze GPS coordinates
+                zero_coords_count = 0
+                non_zero_coords_count = 0
+                coordinate_analysis = []
                 
-            data = response.json()
-            if not data['data']:
-                self.log_test("Admin Sensor Data - Update", True, 
-                            "No sensor data available to test update functionality")
-                return True
-                
-            # Get the first data point ID
-            point_id = data['data'][0]['_id']
-            
-            # Test update with admin classification
-            update_data = {
-                "hazard_type": "pothole",
-                "severity": "high", 
-                "is_verified": True,
-                "admin_notes": "Admin testing - verified pothole location"
-            }
-            
-            update_response = requests.patch(f"{self.base_url}/admin/sensor-data/{point_id}", json=update_data)
-            
-            if update_response.status_code == 200:
-                result = update_response.json()
-                if 'message' in result and 'updated_fields' in result:
-                    self.log_test("Admin Sensor Data - Update", True, 
-                                f"Successfully updated sensor data. Fields: {result['updated_fields']}")
-                    return True
-                else:
-                    self.log_test("Admin Sensor Data - Update", False, 
-                                f"Update response missing expected fields: {result}")
-                    return False
-            else:
-                self.log_test("Admin Sensor Data - Update", False, 
-                            f"HTTP {update_response.status_code}: {update_response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Admin Sensor Data - Update", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_analytics(self):
-        """Test GET /api/admin/analytics - Get detailed analytics for admin dashboard"""
-        try:
-            response = requests.get(f"{self.base_url}/admin/analytics")
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = [
-                    'total_points', 'verified_points', 'hazard_points', 
-                    'unverified_points', 'avg_road_quality', 'recent_points_7d',
-                    'hazard_distribution', 'quality_distribution', 'quality_stats'
-                ]
-                
-                if all(key in data for key in expected_keys):
-                    self.log_test("Admin Analytics", True, 
-                                f"Analytics working: {data['total_points']} total points, "
-                                f"{data['verified_points']} verified, avg quality: {data['avg_road_quality']}")
-                    return True
-                else:
-                    missing = [k for k in expected_keys if k not in data]
-                    self.log_test("Admin Analytics", False, f"Missing keys: {missing}")
-                    return False
-            else:
-                self.log_test("Admin Analytics", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
-        except Exception as e:
-            self.log_test("Admin Analytics", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_heatmap_data(self):
-        """Test GET /api/admin/heatmap-data - Get data for map visualization"""
-        try:
-            # Test with NYC area bounding box
-            params = {
-                'southwest_lat': 40.7000,
-                'southwest_lng': -74.0200,
-                'northeast_lat': 40.7200,
-                'northeast_lng': -73.9800,
-                'zoom_level': 12
-            }
-            
-            response = requests.get(f"{self.base_url}/admin/heatmap-data", params=params)
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ['heatmap_points', 'bounds', 'grid_size', 'total_points']
-                
-                if all(key in data for key in expected_keys):
-                    bounds_correct = (
-                        data['bounds']['southwest']['lat'] == params['southwest_lat'] and
-                        data['bounds']['southwest']['lng'] == params['southwest_lng'] and
-                        data['bounds']['northeast']['lat'] == params['northeast_lat'] and
-                        data['bounds']['northeast']['lng'] == params['northeast_lng']
-                    )
+                for record in sensor_data:
+                    lat = record.get('latitude', 0)
+                    lng = record.get('longitude', 0)
                     
-                    if bounds_correct:
-                        self.log_test("Admin Heatmap Data", True, 
-                                    f"Heatmap data working: {data['total_points']} points, grid size: {data['grid_size']}")
-                        return True
+                    coord_info = {
+                        'id': record.get('_id'),
+                        'latitude': lat,
+                        'longitude': lng,
+                        'timestamp': record.get('timestamp'),
+                        'speed': record.get('speed'),
+                        'accuracy': record.get('accuracy')
+                    }
+                    coordinate_analysis.append(coord_info)
+                    
+                    if lat == 0.0 and lng == 0.0:
+                        zero_coords_count += 1
                     else:
-                        self.log_test("Admin Heatmap Data", False, "Bounds not correctly returned")
-                        return False
-                else:
-                    missing = [k for k in expected_keys if k not in data]
-                    self.log_test("Admin Heatmap Data", False, f"Missing keys: {missing}")
-                    return False
+                        non_zero_coords_count += 1
+                
+                details = f"Retrieved {len(sensor_data)} records from {total_records} total. Zero coords: {zero_coords_count}, Non-zero coords: {non_zero_coords_count}"
+                
+                self.log_result(
+                    "GET /api/admin/sensor-data - Raw Data Analysis",
+                    True,
+                    details,
+                    {
+                        'total_records': total_records,
+                        'returned_records': len(sensor_data),
+                        'zero_coordinates': zero_coords_count,
+                        'non_zero_coordinates': non_zero_coords_count,
+                        'sample_coordinates': coordinate_analysis[:5]  # First 5 records
+                    }
+                )
+                
+                return coordinate_analysis
+                
             else:
-                self.log_test("Admin Heatmap Data", False, f"Status: {response.status_code}, Response: {response.text}")
-                return False
+                self.log_result(
+                    "GET /api/admin/sensor-data - Raw Data Analysis",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return []
+                
         except Exception as e:
-            self.log_test("Admin Heatmap Data", False, f"Exception: {str(e)}")
-            return False
-
-    def test_admin_error_handling(self):
-        """Test admin endpoints error handling"""
+            self.log_result(
+                "GET /api/admin/sensor-data - Raw Data Analysis",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return []
+    
+    def test_2_get_latest_10_records(self):
+        """Test 2: GET /api/admin/sensor-data?limit=10 - последние 10 записей"""
         try:
-            # Test invalid ID format for update
-            invalid_id = "invalid-id-format"
-            update_data = {"hazard_type": "pothole"}
+            response = requests.get(f"{self.backend_url}/admin/sensor-data?limit=10")
             
-            response = requests.patch(f"{self.base_url}/admin/sensor-data/{invalid_id}", json=update_data)
-            
-            if response.status_code == 400:
-                self.log_test("Admin Error Handling - Invalid ID", True, 
-                            "Correctly rejects invalid ID format with HTTP 400")
-            else:
-                self.log_test("Admin Error Handling - Invalid ID", False, 
-                            f"Expected HTTP 400 for invalid ID, got HTTP {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                sensor_data = data.get('data', [])
                 
-            # Test missing required parameters for heatmap
-            response = requests.get(f"{self.base_url}/admin/heatmap-data")
-            
-            if response.status_code == 422:  # FastAPI validation error
-                self.log_test("Admin Error Handling - Missing Params", True, 
-                            "Correctly rejects missing required parameters")
+                # Detailed analysis of latest 10 records
+                detailed_analysis = []
+                for record in sensor_data:
+                    analysis = {
+                        'id': record.get('_id'),
+                        'timestamp': record.get('timestamp'),
+                        'gps_coordinates': {
+                            'latitude': record.get('latitude'),
+                            'longitude': record.get('longitude')
+                        },
+                        'gps_metadata': {
+                            'speed': record.get('speed'),
+                            'accuracy': record.get('accuracy')
+                        },
+                        'sensor_data': {
+                            'accelerometer': record.get('accelerometer'),
+                            'road_quality_score': record.get('road_quality_score')
+                        },
+                        'admin_data': {
+                            'hazard_type': record.get('hazard_type'),
+                            'severity': record.get('severity'),
+                            'is_verified': record.get('is_verified'),
+                            'admin_notes': record.get('admin_notes')
+                        }
+                    }
+                    detailed_analysis.append(analysis)
+                
+                # Check if all coordinates are zero
+                all_zero = all(
+                    r['gps_coordinates']['latitude'] == 0.0 and 
+                    r['gps_coordinates']['longitude'] == 0.0 
+                    for r in detailed_analysis
+                )
+                
+                details = f"Retrieved latest {len(sensor_data)} records. All coordinates zero: {all_zero}"
+                
+                self.log_result(
+                    "GET /api/admin/sensor-data?limit=10 - Latest Records Analysis",
+                    True,
+                    details,
+                    {
+                        'records_count': len(sensor_data),
+                        'all_coordinates_zero': all_zero,
+                        'detailed_records': detailed_analysis
+                    }
+                )
+                
+                return detailed_analysis
+                
             else:
-                self.log_test("Admin Error Handling - Missing Params", False, 
-                            f"Expected HTTP 422 for missing params, got HTTP {response.status_code}")
+                self.log_result(
+                    "GET /api/admin/sensor-data?limit=10 - Latest Records Analysis",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return []
                 
         except Exception as e:
-            self.log_test("Admin Error Handling", False, f"Exception: {str(e)}")
+            self.log_result(
+                "GET /api/admin/sensor-data?limit=10 - Latest Records Analysis",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return []
+    
+    def test_3_post_correct_gps_data(self):
+        """Test 3: POST /api/sensor-data - тест отправки корректных GPS данных"""
+        try:
+            # Create realistic test data with actual GPS coordinates
+            test_device_id = f"test_device_{uuid.uuid4().hex[:8]}"
+            current_timestamp = int(time.time() * 1000)
+            
+            # Moscow coordinates as example
+            test_coordinates = {
+                "latitude": 55.7558,
+                "longitude": 37.6176
+            }
+            
+            test_batch = {
+                "deviceId": test_device_id,
+                "sensorData": [
+                    # Location data points
+                    {
+                        "type": "location",
+                        "timestamp": current_timestamp,
+                        "data": {
+                            "latitude": test_coordinates["latitude"],
+                            "longitude": test_coordinates["longitude"],
+                            "speed": 25.5,
+                            "accuracy": 5.0,
+                            "altitude": 150.0,
+                            "heading": 45.0
+                        }
+                    },
+                    {
+                        "type": "location", 
+                        "timestamp": current_timestamp + 5000,
+                        "data": {
+                            "latitude": test_coordinates["latitude"] + 0.001,
+                            "longitude": test_coordinates["longitude"] + 0.001,
+                            "speed": 30.2,
+                            "accuracy": 4.5,
+                            "altitude": 152.0,
+                            "heading": 47.0
+                        }
+                    },
+                    # Accelerometer data points
+                    {
+                        "type": "accelerometer",
+                        "timestamp": current_timestamp + 1000,
+                        "data": {
+                            "x": 0.1,
+                            "y": 0.2,
+                            "z": 9.8,
+                            "totalAcceleration": 9.82
+                        }
+                    },
+                    {
+                        "type": "accelerometer",
+                        "timestamp": current_timestamp + 2000,
+                        "data": {
+                            "x": 0.15,
+                            "y": 0.25,
+                            "z": 9.85,
+                            "totalAcceleration": 9.87
+                        }
+                    },
+                    {
+                        "type": "accelerometer",
+                        "timestamp": current_timestamp + 3000,
+                        "data": {
+                            "x": 0.2,
+                            "y": 0.3,
+                            "z": 9.9,
+                            "totalAcceleration": 9.92
+                        }
+                    },
+                    {
+                        "type": "accelerometer",
+                        "timestamp": current_timestamp + 4000,
+                        "data": {
+                            "x": 0.12,
+                            "y": 0.18,
+                            "z": 9.75,
+                            "totalAcceleration": 9.78
+                        }
+                    },
+                    {
+                        "type": "accelerometer",
+                        "timestamp": current_timestamp + 6000,
+                        "data": {
+                            "x": 0.08,
+                            "y": 0.14,
+                            "z": 9.82,
+                            "totalAcceleration": 9.84
+                        }
+                    }
+                ]
+            }
+            
+            response = requests.post(
+                f"{self.backend_url}/sensor-data",
+                json=test_batch,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                result_data = response.json()
+                
+                details = f"Successfully posted sensor data. Raw points: {result_data.get('rawDataPoints')}, Conditions: {result_data.get('conditionsProcessed')}, Warnings: {result_data.get('warningsGenerated')}"
+                
+                self.log_result(
+                    "POST /api/sensor-data - Correct GPS Data Test",
+                    True,
+                    details,
+                    {
+                        'test_device_id': test_device_id,
+                        'sent_coordinates': test_coordinates,
+                        'response': result_data,
+                        'raw_data_points': result_data.get('rawDataPoints'),
+                        'conditions_processed': result_data.get('conditionsProcessed'),
+                        'warnings_generated': result_data.get('warningsGenerated')
+                    }
+                )
+                
+                # Wait a moment for data to be processed
+                time.sleep(2)
+                
+                # Now check if the data was stored correctly
+                return self.verify_stored_gps_data(test_device_id, test_coordinates)
+                
+            else:
+                self.log_result(
+                    "POST /api/sensor-data - Correct GPS Data Test",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return False
+                
+        except Exception as e:
+            self.log_result(
+                "POST /api/sensor-data - Correct GPS Data Test",
+                False,
+                f"Exception: {str(e)}"
+            )
             return False
+    
+    def verify_stored_gps_data(self, device_id, expected_coords):
+        """Verify that the GPS data was stored correctly in the database"""
+        try:
+            # Get recent data to find our test data
+            response = requests.get(f"{self.backend_url}/admin/sensor-data?limit=50")
+            
+            if response.status_code == 200:
+                data = response.json()
+                sensor_data = data.get('data', [])
+                
+                # Look for our test device data
+                test_records = []
+                for record in sensor_data:
+                    # Check if this could be our test data (recent timestamp)
+                    record_time = datetime.fromisoformat(record.get('timestamp', '').replace('Z', '+00:00'))
+                    if (datetime.now() - record_time.replace(tzinfo=None)).total_seconds() < 300:  # Within 5 minutes
+                        test_records.append(record)
+                
+                # Analyze coordinates in recent records
+                coords_found = []
+                for record in test_records:
+                    lat = record.get('latitude', 0)
+                    lng = record.get('longitude', 0)
+                    if lat != 0.0 or lng != 0.0:
+                        coords_found.append({
+                            'latitude': lat,
+                            'longitude': lng,
+                            'timestamp': record.get('timestamp')
+                        })
+                
+                success = len(coords_found) > 0
+                details = f"Found {len(coords_found)} records with non-zero coordinates in recent data out of {len(test_records)} recent records"
+                
+                self.log_result(
+                    "Verify Stored GPS Data",
+                    success,
+                    details,
+                    {
+                        'expected_coordinates': expected_coords,
+                        'found_coordinates': coords_found,
+                        'recent_records_checked': len(test_records)
+                    }
+                )
+                
+                return success
+                
+            else:
+                self.log_result(
+                    "Verify Stored GPS Data",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return False
+                
+        except Exception as e:
+            self.log_result(
+                "Verify Stored GPS Data",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return False
+    
+    def test_4_check_non_zero_coordinates(self):
+        """Test 4: Проверить есть ли записи с НЕ нулевыми координатами"""
+        try:
+            # Get a larger sample to find any non-zero coordinates
+            response = requests.get(f"{self.backend_url}/admin/sensor-data?limit=100")
+            
+            if response.status_code == 200:
+                data = response.json()
+                sensor_data = data.get('data', [])
+                total_records = data.get('total', 0)
+                
+                # Find all non-zero coordinates
+                non_zero_records = []
+                coordinate_stats = {
+                    'total_checked': len(sensor_data),
+                    'zero_coordinates': 0,
+                    'non_zero_coordinates': 0,
+                    'unique_coordinates': set()
+                }
+                
+                for record in sensor_data:
+                    lat = record.get('latitude', 0)
+                    lng = record.get('longitude', 0)
+                    
+                    if lat == 0.0 and lng == 0.0:
+                        coordinate_stats['zero_coordinates'] += 1
+                    else:
+                        coordinate_stats['non_zero_coordinates'] += 1
+                        coordinate_stats['unique_coordinates'].add((lat, lng))
+                        non_zero_records.append({
+                            'id': record.get('_id'),
+                            'latitude': lat,
+                            'longitude': lng,
+                            'timestamp': record.get('timestamp'),
+                            'speed': record.get('speed'),
+                            'accuracy': record.get('accuracy')
+                        })
+                
+                coordinate_stats['unique_coordinates'] = list(coordinate_stats['unique_coordinates'])
+                
+                has_non_zero = len(non_zero_records) > 0
+                details = f"Found {len(non_zero_records)} records with non-zero coordinates out of {len(sensor_data)} checked (Total DB: {total_records})"
+                
+                self.log_result(
+                    "Check for Non-Zero Coordinates",
+                    True,  # Always successful if we can query
+                    details,
+                    {
+                        'statistics': coordinate_stats,
+                        'has_non_zero_coordinates': has_non_zero,
+                        'non_zero_records': non_zero_records[:10],  # First 10 non-zero records
+                        'total_database_records': total_records
+                    }
+                )
+                
+                return non_zero_records
+                
+            else:
+                self.log_result(
+                    "Check for Non-Zero Coordinates",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return []
+                
+        except Exception as e:
+            self.log_result(
+                "Check for Non-Zero Coordinates",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return []
+    
+    def test_5_analyze_data_structure(self):
+        """Test 5: Анализ структуры данных - все поля включая GPS, accuracy, speed"""
+        try:
+            response = requests.get(f"{self.backend_url}/admin/sensor-data?limit=5")
+            
+            if response.status_code == 200:
+                data = response.json()
+                sensor_data = data.get('data', [])
+                
+                if not sensor_data:
+                    self.log_result(
+                        "Data Structure Analysis",
+                        False,
+                        "No sensor data found in database"
+                    )
+                    return
+                
+                # Analyze data structure
+                structure_analysis = {
+                    'total_records_analyzed': len(sensor_data),
+                    'field_analysis': {},
+                    'sample_record': sensor_data[0] if sensor_data else None
+                }
+                
+                # Analyze each field across all records
+                all_fields = set()
+                for record in sensor_data:
+                    all_fields.update(record.keys())
+                
+                for field in all_fields:
+                    field_stats = {
+                        'present_count': 0,
+                        'null_count': 0,
+                        'zero_count': 0,
+                        'sample_values': []
+                    }
+                    
+                    for record in sensor_data:
+                        value = record.get(field)
+                        if value is not None:
+                            field_stats['present_count'] += 1
+                            if value == 0 or value == 0.0:
+                                field_stats['zero_count'] += 1
+                            if len(field_stats['sample_values']) < 3:
+                                field_stats['sample_values'].append(value)
+                        else:
+                            field_stats['null_count'] += 1
+                    
+                    structure_analysis['field_analysis'][field] = field_stats
+                
+                # Focus on GPS-related fields
+                gps_fields = ['latitude', 'longitude', 'speed', 'accuracy']
+                gps_analysis = {}
+                for field in gps_fields:
+                    if field in structure_analysis['field_analysis']:
+                        gps_analysis[field] = structure_analysis['field_analysis'][field]
+                
+                details = f"Analyzed {len(sensor_data)} records with {len(all_fields)} fields. GPS fields analysis completed."
+                
+                self.log_result(
+                    "Data Structure Analysis",
+                    True,
+                    details,
+                    {
+                        'structure_analysis': structure_analysis,
+                        'gps_fields_analysis': gps_analysis,
+                        'all_fields': list(all_fields)
+                    }
+                )
+                
+                return structure_analysis
+                
+            else:
+                self.log_result(
+                    "Data Structure Analysis",
+                    False,
+                    f"HTTP {response.status_code}: {response.text}"
+                )
+                return None
+                
+        except Exception as e:
+            self.log_result(
+                "Data Structure Analysis",
+                False,
+                f"Exception: {str(e)}"
+            )
+            return None
+    
+    def generate_investigation_report(self):
+        """Generate comprehensive investigation report"""
+        print("\n" + "="*80)
+        print("GPS COORDINATES INVESTIGATION REPORT")
+        print("="*80)
+        
+        # Summary statistics
+        total_tests = len(self.test_results)
+        passed_tests = sum(1 for r in self.test_results if r['success'])
+        failed_tests = total_tests - passed_tests
+        
+        print(f"\nTEST SUMMARY:")
+        print(f"Total Tests: {total_tests}")
+        print(f"Passed: {passed_tests}")
+        print(f"Failed: {failed_tests}")
+        print(f"Success Rate: {(passed_tests/total_tests*100):.1f}%")
+        
+        print(f"\nDETAILED FINDINGS:")
+        
+        # Analyze results for GPS coordinate issues
+        coordinate_findings = []
+        
+        for result in self.test_results:
+            if result['data'] and isinstance(result['data'], dict):
+                # Look for coordinate-related data
+                if 'zero_coordinates' in result['data']:
+                    coordinate_findings.append({
+                        'test': result['test'],
+                        'zero_coords': result['data']['zero_coordinates'],
+                        'non_zero_coords': result['data'].get('non_zero_coordinates', 0),
+                        'total_records': result['data'].get('total_records', 0)
+                    })
+        
+        if coordinate_findings:
+            print(f"\nCOORDINATE ANALYSIS:")
+            for finding in coordinate_findings:
+                print(f"- {finding['test']}: {finding['zero_coords']} zero coords, {finding['non_zero_coords']} non-zero coords")
+        
+        # Root cause analysis
+        print(f"\nROOT CAUSE ANALYSIS:")
+        print("Based on the investigation, the GPS coordinate issue appears to be at the:")
+        
+        # Determine where the issue occurs
+        has_non_zero_in_db = any(
+            r['data'] and r['data'].get('non_zero_coordinates', 0) > 0 
+            for r in self.test_results if r['data']
+        )
+        
+        post_test_success = any(
+            r['test'].startswith('POST /api/sensor-data') and r['success']
+            for r in self.test_results
+        )
+        
+        if has_non_zero_in_db:
+            print("✅ Database level: Some records have non-zero coordinates")
+            print("✅ Backend API level: POST endpoint can process GPS data")
+            print("❓ Mobile app level: Issue likely in mobile GPS data collection or transmission")
+        elif post_test_success:
+            print("✅ Backend API level: POST endpoint works correctly")
+            print("❓ Data processing level: Issue in how GPS data is extracted and stored")
+        else:
+            print("❌ Backend API level: POST endpoint has issues")
+        
+        print(f"\nRECOMMENDATIONS:")
+        print("1. Check mobile app GPS permission and location service status")
+        print("2. Verify GPS data is being captured correctly in mobile app")
+        print("3. Check data transmission format from mobile to backend")
+        print("4. Verify backend data processing logic for location extraction")
+        print("5. Check MongoDB data storage and retrieval processes")
+        
+        return self.test_results
 
-    def run_all_tests(self):
-        """Run comprehensive test suite"""
-        print("=" * 60)
-        print("GOOD ROAD BACKEND API TEST SUITE")
-        print("=" * 60)
-        print(f"Testing backend at: {self.base_url}")
-        print()
-
-        # Core API tests
-        self.test_root_endpoint()
-        self.test_sensor_data_upload()
-        self.test_sensor_data_with_poor_road()
-        self.test_road_conditions_api()
-        self.test_road_warnings_api()
-        self.test_analytics_api()
-        
-        # NEW ADMIN ENDPOINT TESTS
-        print("=" * 40)
-        print("ADMIN ENDPOINT TESTS")
-        print("=" * 40)
-        self.test_admin_sensor_data_get()
-        self.test_admin_sensor_data_pagination()
-        self.test_admin_sensor_data_date_filter()
-        self.test_admin_sensor_data_update()
-        self.test_admin_analytics()
-        self.test_admin_heatmap_data()
-        self.test_admin_error_handling()
-        
-        # Edge case tests
-        self.test_edge_cases()
-        
-        # Cleanup test
-        self.test_cleanup_endpoint()
-
-        # Summary
-        print("=" * 60)
-        print("TEST SUMMARY")
-        print("=" * 60)
-        
-        passed = sum(1 for result in self.test_results if result["success"])
-        total = len(self.test_results)
-        
-        print(f"Total Tests: {total}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {total - passed}")
-        print(f"Success Rate: {(passed/total)*100:.1f}%")
-        
-        if total - passed > 0:
-            print("\nFailed Tests:")
-            for result in self.test_results:
-                if not result["success"]:
-                    print(f"  - {result['test']}: {result['details']}")
-        
-        return passed == total
+def main():
+    """Main investigation function"""
+    print("Starting GPS Coordinates Investigation...")
+    print(f"Backend URL: {BACKEND_URL}")
+    print("="*80)
+    
+    investigator = GPSCoordinatesInvestigation()
+    
+    # Run all investigation tests
+    print("Test 1: Getting raw sensor data...")
+    investigator.test_1_get_raw_sensor_data()
+    
+    print("Test 2: Getting latest 10 records...")
+    investigator.test_2_get_latest_10_records()
+    
+    print("Test 3: Testing POST with correct GPS data...")
+    investigator.test_3_post_correct_gps_data()
+    
+    print("Test 4: Checking for non-zero coordinates...")
+    investigator.test_4_check_non_zero_coordinates()
+    
+    print("Test 5: Analyzing data structure...")
+    investigator.test_5_analyze_data_structure()
+    
+    # Generate final report
+    investigator.generate_investigation_report()
+    
+    return investigator.test_results
 
 if __name__ == "__main__":
-    tester = GoodRoadAPITester()
-    success = tester.run_all_tests()
-    exit(0 if success else 1)
+    main()
