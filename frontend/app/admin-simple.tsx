@@ -295,7 +295,7 @@ export default function AdminPanelSimple() {
           ⚠️ {point.hazardType} ({point.severity})
         </Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 
   if (isLoading) {
