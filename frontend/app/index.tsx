@@ -359,7 +359,7 @@ export default function GoodRoadApp() {
 
         {/* Tracking Control */}
         <View style={styles.controlCard}>
-          <TouchableOpacity
+          <Pressable
             style={[styles.trackingButton, { 
               backgroundColor: isTracking ? '#F44336' : '#4CAF50',
               opacity: isLoading ? 0.7 : 1 
