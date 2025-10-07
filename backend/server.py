@@ -366,15 +366,38 @@ async def get_all_sensor_data(
         
         data = []
         async for document in cursor:
+            # Extract GPS data from rawData array
+            latitude = 0
+            longitude = 0
+            speed = 0
+            accuracy = 0
+            accelerometer = {"x": 0, "y": 0, "z": 0}
+            
+            raw_data = document.get("rawData", [])
+            for item in raw_data:
+                if item.get("type") == "location" and "data" in item:
+                    location_data = item["data"]
+                    latitude = location_data.get("latitude", 0)
+                    longitude = location_data.get("longitude", 0)
+                    speed = location_data.get("speed", 0)
+                    accuracy = location_data.get("accuracy", 0)
+                elif item.get("type") == "accelerometer" and "data" in item:
+                    accel_data = item["data"]
+                    accelerometer = {
+                        "x": accel_data.get("x", 0),
+                        "y": accel_data.get("y", 0),
+                        "z": accel_data.get("z", 0)
+                    }
+            
             # Convert ObjectId to string and format data
             doc_dict = {
                 "_id": str(document["_id"]),
-                "latitude": document.get("latitude", 0),
-                "longitude": document.get("longitude", 0),
+                "latitude": latitude,
+                "longitude": longitude,
                 "timestamp": document.get("timestamp", datetime.now()).isoformat(),
-                "speed": document.get("speed", 0),
-                "accuracy": document.get("accuracy", 0),
-                "accelerometer": document.get("accelerometer", {"x": 0, "y": 0, "z": 0}),
+                "speed": speed,
+                "accuracy": accuracy,
+                "accelerometer": accelerometer,
                 "road_quality_score": document.get("road_quality_score", 50),
                 "hazard_type": document.get("hazard_type"),
                 "severity": document.get("severity", "medium"),
