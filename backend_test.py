@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Good Road API - GPS Coordinates Fix Verification
-Focus: Testing fixed admin endpoint /api/admin/sensor-data for proper GPS coordinate extraction
-ЦЕЛЬ: Убедиться что исправление /api/admin/sensor-data теперь правильно извлекает GPS координаты из rawData
+Backend API Testing Suite for Good Road Application
+Testing the zero coordinates cleanup endpoint as requested
 """
 
 import requests
 import json
-import uuid
-from datetime import datetime, timedelta
-import time
+import sys
+from datetime import datetime
+import os
 
-# Backend URL from frontend/.env
+# Get backend URL from environment
 BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
 
 class GPSCoordinatesInvestigation:
