@@ -468,10 +468,10 @@ export default function GoodRoadApp() {
           <Text style={styles.testButtonText}>
             🚨 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ
           </Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Navigation Buttons */}
-        <TouchableOpacity 
+        <Pressable 
           style={styles.settingsNavButton}
           onPress={() => {
             console.log('Navigating to settings...');
