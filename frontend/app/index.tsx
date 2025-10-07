@@ -19,22 +19,10 @@ import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Импортируем offline системы только для мобильных устройств
+// Offline системы будут загружены динамически только для мобильных устройств
 let syncService: any = null;
 let localDB: any = null;
 let LocalWarning: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    const offlineModule = require('../services/SyncService');
-    const dbModule = require('../services/LocalDatabase');
-    syncService = offlineModule.syncService;
-    localDB = dbModule.localDB;
-    LocalWarning = dbModule.LocalWarning;
-  } catch (error) {
-    console.warn('Offline modules not available on web platform');
-  }
-}
 
 // Импортируем типы из настроек
 import { AppSettings, SoundOption } from './settings';
