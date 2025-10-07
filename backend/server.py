@@ -689,6 +689,59 @@ async def cleanup_old_data():
         logging.error(f"Error during data cleanup: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during data cleanup: {str(e)}")
 
+@api_router.delete("/admin/cleanup-zero-coords")
+async def cleanup_zero_coordinates():
+    """
+    Delete all sensor data records with zero GPS coordinates (0.0, 0.0)
+    This removes invalid/corrupted GPS data from the database
+    """
+    try:
+        # Find all records with zero coordinates
+        # Since we now extract coordinates from rawData, we need to check rawData structure
+        
+        # First, let's get all records and check which ones have no valid GPS data
+        cursor = db.sensor_data.find({})
+        
+        records_to_delete = []
+        async for document in cursor:
+            has_valid_gps = False
+            raw_data = document.get("rawData", [])
+            
+            for item in raw_data:
+                if item.get("type") == "location" and "data" in item:
+                    location_data = item["data"]
+                    lat = location_data.get("latitude", 0)
+                    lng = location_data.get("longitude", 0)
+                    
+                    # If we found non-zero coordinates, this record is valid
+                    if lat != 0.0 and lng != 0.0:
+                        has_valid_gps = True
+                        break
+            
+            # If no valid GPS data found, mark for deletion
+            if not has_valid_gps:
+                records_to_delete.append(document["_id"])
+        
+        # Delete records without valid GPS coordinates
+        if records_to_delete:
+            delete_result = await db.sensor_data.delete_many({
+                "_id": {"$in": records_to_delete}
+            })
+            deleted_count = delete_result.deleted_count
+        else:
+            deleted_count = 0
+        
+        return {
+            "message": "Zero coordinate cleanup completed",
+            "deleted_records": deleted_count,
+            "analyzed_records": len(records_to_delete) + await db.sensor_data.count_documents({}) if records_to_delete else await db.sensor_data.count_documents({}),
+            "remaining_records": await db.sensor_data.count_documents({})
+        }
+        
+    except Exception as e:
+        logging.error(f"Error during zero coordinate cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
+
 
 # Include the router in the main app
 app.include_router(api_router)
