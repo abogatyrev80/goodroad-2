@@ -146,7 +146,8 @@ export default function AdminPanelSimple() {
 
   const updatePointVerification = async (pointId: string, verified: boolean) => {
     try {
-      const response = await fetch(`/api/admin/sensor-data/${pointId}`, {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      const response = await fetch(`${backendUrl}/api/admin/sensor-data/${pointId}`, {
         method: 'PATCH',
         headers: {
           'Accept': 'application/json',
