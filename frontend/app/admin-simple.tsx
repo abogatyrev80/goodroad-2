@@ -86,6 +86,9 @@ export default function AdminPanelSimple() {
         })
       ]);
 
+      console.log('📊 Sensor response status:', sensorResponse.status);
+      console.log('📈 Stats response status:', statsResponse.status);
+
       if (sensorResponse.ok) {
         const sensorData = await sensorResponse.json();
         console.log('✅ Sensor data loaded:', sensorData.data?.length || 0, 'points');
