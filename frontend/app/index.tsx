@@ -284,9 +284,42 @@ export default function GoodRoadApp() {
 
   const testWarning = async () => {
     console.log('🚨 Testing warning system...');
+    
+    // Добавляем тестовое препятствие для демонстрации стрелки направления
+    const testHazard: RoadHazard = {
+      id: 'test_hazard',
+      type: 'pothole',
+      latitude: currentLocation ? currentLocation.coords.latitude + 0.001 : 55.7568,
+      longitude: currentLocation ? currentLocation.coords.longitude + 0.001 : 37.6186,
+      severity: 'high',
+      description: 'Тестовая яма для демонстрации',
+      distance: 150
+    };
+    
+    if (nearbyHazards.length === 0) {
+      setNearbyHazards([testHazard]);
+      console.log('📍 Добавлено тестовое препятствие для демонстрации стрелки');
+      
+      // Вычисляем направление
+      if (currentLocation) {
+        const bearing = calculateBearing(
+          currentLocation.coords.latitude,
+          currentLocation.coords.longitude,
+          testHazard.latitude,
+          testHazard.longitude
+        );
+        setWarningDirection(bearing);
+      }
+    } else {
+      setNearbyHazards([]);
+      console.log('🧹 Убрано тестовое препятствие');
+    }
+    
     Alert.alert(
       '🚨 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ',
-      'Демонстрация системы предупреждений в веб-версии. На мобильных устройствах будут работать звуки и вибрация.',
+      nearbyHazards.length === 0 ? 
+        'Добавлено тестовое препятствие! Смотрите на стрелку направления выше.' :
+        'Убрано тестовое препятствие. Стрелка показывает "нет препятствий".',
       [{ text: 'OK' }]
     );
   };
