@@ -343,16 +343,49 @@ export default function GoodRoadApp() {
           </View>
         </View>
 
-        {/* Road Condition Display */}
+        {/* Direction Indicator to Nearest Hazard */}
         <View style={styles.conditionCard}>
-          <View style={[styles.conditionIndicator, { backgroundColor: getRoadConditionColor(roadConditionScore) }]}>
-            <Text style={styles.conditionScore}>{Math.round(roadConditionScore)}</Text>
+          <View style={styles.directionContainer}>
+            <View style={[styles.compassBackground, { 
+              backgroundColor: nearbyHazards.length > 0 ? '#FF5722' : '#4CAF50' 
+            }]}>
+              {nearbyHazards.length > 0 ? (
+                <View 
+                  style={[
+                    styles.directionArrowLarge,
+                    { 
+                      transform: [{ rotate: `${warningDirection}deg` }],
+                    }
+                  ]}
+                >
+                  <Ionicons name="arrow-up" size={32} color="white" />
+                </View>
+              ) : (
+                <Ionicons name="checkmark-circle" size={32} color="white" />
+              )}
+            </View>
           </View>
           <View style={styles.conditionInfo}>
-            <Text style={styles.conditionTitle}>Качество дороги</Text>
-            <Text style={[styles.conditionText, { color: getRoadConditionColor(roadConditionScore) }]}>
-              {getRoadConditionText(roadConditionScore)}
-            </Text>
+            <Text style={styles.conditionTitle}>Вектор направления</Text>
+            {nearbyHazards.length > 0 ? (
+              <View style={styles.hazardDetails}>
+                <Text style={[styles.conditionText, { color: '#FF5722' }]}>
+                  {HAZARD_NAMES[nearbyHazards[0]?.type] || 'Препятствие'}
+                </Text>
+                <Text style={styles.distanceText}>
+                  {nearbyHazards[0]?.distance < 1000 ? 
+                    `${Math.round(nearbyHazards[0]?.distance)}м` : 
+                    `${(nearbyHazards[0]?.distance/1000).toFixed(1)}км`}
+                </Text>
+                <Text style={styles.directionText}>
+                  {warningDirection.toFixed(0)}° от севера
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.conditionText, { color: '#4CAF50' }]}>
+                Препятствий не обнаружено
+              </Text>
+            )}
           </View>
         </View>
 
