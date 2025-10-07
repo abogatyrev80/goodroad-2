@@ -191,6 +191,9 @@
         - working: true
         - agent: "testing"
         - comment: "✅ TESTED: Admin sensor data endpoint working perfectly. Retrieved 19 sensor data points with proper pagination (limit=5, skip=0), date filtering functional, all required fields present (_id, latitude, longitude, timestamp, speed, accuracy, accelerometer, road_quality_score, hazard_type, severity, is_verified, admin_notes). Handles empty datasets correctly."
+        - working: true
+        - agent: "testing"
+        - comment: "✅ GPS FIX VERIFIED (2025-10-07): GPS coordinate extraction fix is working perfectly! Tested GET /api/admin/sensor-data?limit=5 - found 4/5 records with real GPS coordinates (80% success rate). Real coordinates include Moscow (55.7568, 37.6186) and NYC (40.713, -74.0062) locations. Speed and accuracy properly extracted (25.0-32.0 speed, 4.5-5.0 accuracy). Accelerometer data correct with realistic gravity components (z=9.82). Only 1 older record still shows (0.0, 0.0) which is expected for pre-fix data. The admin endpoint now correctly extracts GPS coordinates from rawData array instead of document root."
 
   - task: "Admin Sensor Data Update API"
     implemented: true
