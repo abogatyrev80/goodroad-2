@@ -255,6 +255,20 @@ export default function GoodRoadApp() {
     const estimatedSatellites = Math.max(4, Math.min(12, Math.round(20 - (location.coords.accuracy || 50) / 5)));
     setSatelliteCount(estimatedSatellites);
     
+    // Обновляем направление к ближайшему препятствию
+    if (nearbyHazards.length > 0) {
+      const closestHazard = nearbyHazards[0];
+      const bearing = calculateBearing(
+        location.coords.latitude,
+        location.coords.longitude,
+        closestHazard.latitude,
+        closestHazard.longitude
+      );
+      setWarningDirection(bearing);
+      
+      console.log(`🧭 Direction to hazard: ${bearing.toFixed(0)}° (${HAZARD_NAMES[closestHazard.type] || closestHazard.type})`);
+    }
+    
     console.log(`📍 Location: ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
     console.log(`🚗 Speed: ${speedKmh.toFixed(1)} km/h`);
     console.log(`📡 Accuracy: ±${(location.coords.accuracy || 0).toFixed(1)}m`);
