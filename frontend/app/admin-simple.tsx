@@ -90,7 +90,9 @@ export default function AdminPanelSimple() {
             'Content-Type': 'application/json',
           },
         })
-      ]);
+      ]),
+      timeoutPromise
+    ]);
 
       console.log('📊 Sensor response status:', sensorResponse.status);
       console.log('📈 Stats response status:', statsResponse.status);
