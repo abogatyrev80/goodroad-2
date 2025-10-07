@@ -14,20 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-// Условный импорт offline модулей только для мобильных устройств
+// Offline модули будут загружены динамически только для мобильных устройств
 let syncService: any = null;
 let SyncStatus: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    const offlineModule = require('../services/SyncService');
-    const dbModule = require('../services/LocalDatabase');
-    syncService = offlineModule.syncService;
-    SyncStatus = dbModule.SyncStatus;
-  } catch (error) {
-    console.warn('Offline modules not available on this platform');
-  }
-}
 
 export default function OfflineSettings() {
   // Web fallback component
