@@ -419,7 +419,7 @@ export default function AdminPanelSimple() {
               onPress={() => setShowDetails(false)}
             >
               <Text style={styles.closeButtonText}>Закрыть</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       )}
