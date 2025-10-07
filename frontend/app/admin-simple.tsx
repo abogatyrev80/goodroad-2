@@ -317,13 +317,13 @@ export default function AdminPanelSimple() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </Pressable>
         <Text style={styles.headerTitle}>Административная панель</Text>
-        <TouchableOpacity onPress={handleRefresh} disabled={isRefreshing}>
+        <Pressable onPress={handleRefresh} disabled={isRefreshing}>
           {isRefreshing ? (
             <ActivityIndicator size={20} color="#4CAF50" />
           ) : (
             <Ionicons name="refresh" size={24} color="#ffffff" />
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <ScrollView style={styles.content}>
