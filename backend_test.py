@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Good Road Backend API Testing Suite
-Tests all backend endpoints with realistic sensor data
+Backend Testing Suite for Good Road API - GPS Coordinates Investigation
+Focus: Investigating null coordinates (0.0, 0.0) issue in sensor data
 """
 
 import requests
 import json
-import time
-import os
+import uuid
 from datetime import datetime, timedelta
+import time
 
-# Get backend URL from environment
+# Backend URL from frontend/.env
 BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
 
-class GoodRoadAPITester:
+class GPSCoordinatesInvestigation:
     def __init__(self):
         self.base_url = BACKEND_URL
         self.test_results = []
