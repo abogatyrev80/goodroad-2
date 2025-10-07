@@ -78,6 +78,9 @@ export default function GoodRoadApp() {
   const [speedHistory, setSpeedHistory] = useState<number[]>([]);
   const [lastHazardCheck, setLastHazardCheck] = useState<number>(0);
   
+  // Направление к ближайшему препятствию
+  const [warningDirection, setWarningDirection] = useState<number>(0);
+  
   // Refs для управления ресурсами
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
