@@ -314,7 +314,7 @@ export default function GoodRoadApp() {
           style={styles.settingsButton}
         >
           <Ionicons name="settings" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
