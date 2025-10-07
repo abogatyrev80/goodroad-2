@@ -107,12 +107,19 @@ export default function GoodRoadApp() {
   }, []);
 
   const initializeOfflineSystem = async () => {
-    if (Platform.OS === 'web' || !syncService) {
+    if (Platform.OS === 'web') {
       console.log('📱 Offline system skipped for web platform');
       return;
     }
     
     try {
+      // Динамически загружаем offline модули только для мобильных устройств
+      const offlineModule = await import('../services/SyncService');
+      const dbModule = await import('../services/LocalDatabase');
+      syncService = offlineModule.syncService;
+      localDB = dbModule.localDB;
+      LocalWarning = dbModule.LocalWarning;
+      
       await syncService.initialize();
       console.log('✅ Offline system initialized');
     } catch (error) {
