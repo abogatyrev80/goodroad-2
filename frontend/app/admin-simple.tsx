@@ -70,13 +70,8 @@ export default function AdminPanelSimple() {
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
       console.log('🌐 Backend URL:', backendUrl);
       
-      // Add timeout to requests
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 8000);
-      });
-      
-      const [sensorResponse, statsResponse] = await Promise.race([
-        Promise.all([
+      // Загружаем данные и статистику параллельно с таймаутом
+      const [sensorResponse, statsResponse] = await Promise.all([
         fetch(`${backendUrl}/api/admin/sensor-data`, {
           method: 'GET',
           headers: {
@@ -91,9 +86,7 @@ export default function AdminPanelSimple() {
             'Content-Type': 'application/json',
           },
         })
-      ]),
-      timeoutPromise
-    ]);
+      ]);
 
       console.log('📊 Sensor response status:', sensorResponse.status);
       console.log('📈 Stats response status:', statsResponse.status);
