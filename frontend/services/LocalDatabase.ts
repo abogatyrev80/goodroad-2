@@ -248,7 +248,10 @@ class LocalDatabaseManager {
   }
 
   async getNearbyWarnings(latitude: number, longitude: number, radiusKm: number = 1): Promise<LocalWarning[]> {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - returning empty warnings');
+      return [];
+    }
 
     // Простое приближение для поиска в радиусе
     const latRange = radiusKm / 111; // ~1 градус = 111 км
