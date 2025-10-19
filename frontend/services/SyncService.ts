@@ -29,13 +29,19 @@ export class SyncService {
     
     try {
       await localDB.initialize();
-      this.startPeriodicSync();
+      
+      // Only start periodic sync if database is available
+      if (localDB.getDatabaseStats) {
+        this.startPeriodicSync();
+      }
+      
       this.isInitialized = true;
       
       console.log('✅ Sync service initialized');
     } catch (error) {
       console.error('❌ Sync service initialization error:', error);
-      throw error;
+      console.warn('⚠️ Sync service continuing without local database');
+      this.isInitialized = true; // Allow service to continue without local DB
     }
   }
 
