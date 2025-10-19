@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
 """
-Good Road Database Activity Analysis Test
-Analyzing when the database was last populated with data points
+URGENT DIAGNOSTIC: Good Road Mobile App Data Reception Test
+Testing why mobile app data is not reaching the database (last data from Oct 7th)
 """
 
 import requests
 import json
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv('/app/frontend/.env')
 
-# Get backend URL from environment
+# Get backend URL from frontend environment
 BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
+
+print(f"🔍 URGENT DIAGNOSTIC: Testing Good Road Mobile Data Reception")
+print(f"📡 Backend URL: {API_BASE}")
+print(f"📅 Issue: No new data since October 7th despite mobile app usage today")
+print("=" * 80)
 
 def test_database_activity_analysis():
     """
