@@ -1,6 +1,16 @@
-import * as SQLite from 'expo-sqlite';
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+
+// Conditional SQLite import only for mobile platforms
+let SQLite: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    SQLite = require('expo-sqlite');
+  } catch (error) {
+    console.warn('SQLite not available on this platform');
+  }
+}
 
 // Типы для локальных данных
 export interface LocalSensorData {
