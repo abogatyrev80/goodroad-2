@@ -200,7 +200,12 @@ class LocalDatabaseManager {
   }
 
   async markSensorDataSynced(localIds: number[], serverIds?: string[]) {
-    if (!this.db || localIds.length === 0) return;
+    if (!this.db || !SQLite || localIds.length === 0) {
+      if (!this.db || !SQLite) {
+        console.warn('Database not available - sensor data sync status not updated');
+      }
+      return;
+    }
 
     const placeholders = localIds.map(() => '?').join(',');
     
