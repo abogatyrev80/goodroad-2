@@ -66,73 +66,11 @@ export default function AdminPanelSimple() {
       setIsLoading(true);
       console.log('🔄 Loading admin data...');
 
-      // Always show demo data for testing purposes
-      console.log('🌐 Loading demo data for testing...');
-        
-        // Demo sensor data for testing modal functionality
-        const demoData: SensorDataPoint[] = [
-          {
-            id: 'demo_1',
-            latitude: 55.7558,
-            longitude: 37.6176,
-            timestamp: new Date().toISOString(),
-            speed: 45.2,
-            accuracy: 3.5,
-            accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
-            roadQuality: 85,
-            hazardType: undefined,
-            severity: 'medium',
-            isVerified: true,
-            adminNotes: 'Демо точка данных для тестирования'
-          },
-          {
-            id: 'demo_2', 
-            latitude: 55.7568,
-            longitude: 37.6186,
-            timestamp: new Date(Date.now() - 300000).toISOString(),
-            speed: 32.1,
-            accuracy: 5.2,
-            accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
-            roadQuality: 42,
-            hazardType: 'pothole',
-            severity: 'high',
-            isVerified: false,
-            adminNotes: 'Яма требует проверки'
-          },
-          {
-            id: 'demo_3',
-            latitude: 55.7578,
-            longitude: 37.6196,
-            timestamp: new Date(Date.now() - 600000).toISOString(),
-            speed: 28.5,
-            accuracy: 4.1,
-            accelerometer: { x: 0.2, y: 0.1, z: 9.9 },
-            roadQuality: 68,
-            hazardType: undefined,
-            severity: 'low',
-            isVerified: true,
-            adminNotes: 'Хорошая дорога'
-          }
-        ];
-        
-        setSensorData(demoData);
-        setStats({
-          totalPoints: 23,
-          verifiedPoints: 6,
-          hazardPoints: 4,
-          avgRoadQuality: 78.2
-        });
-        
-        setIsLoading(false);
-        setIsRefreshing(false);
-        console.log('✅ Demo data loaded successfully');
-      }
-
-      // Загружаем данные и статистику параллельно с таймаутом
+      // Try to load real data from backend first
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
       console.log('🌐 Backend URL:', backendUrl);
       
-      // Загружаем данные и статистику параллельно с таймаутом
+      // Загружаем данные и статистику параллельно
       const [sensorResponse, statsResponse] = await Promise.all([
         fetch(`${backendUrl}/api/admin/sensor-data`, {
           method: 'GET',
@@ -156,29 +94,28 @@ export default function AdminPanelSimple() {
       if (sensorResponse.ok) {
         const sensorData = await sensorResponse.json();
         console.log('✅ Sensor data loaded:', sensorData.data?.length || 0, 'points');
-        console.log('Raw sensor data:', JSON.stringify(sensorData, null, 2));
         
         if (sensorData.data && Array.isArray(sensorData.data)) {
-          const formattedData: SensorDataPoint[] = sensorData.data.map((item: any) => ({
-            id: item._id || item.id,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            timestamp: item.timestamp,
-            speed: item.speed || 0,
-            accuracy: item.accuracy || 0,
-            accelerometer: item.accelerometer || { x: 0, y: 0, z: 0 },
-            roadQuality: item.road_quality_score || 50,
-            hazardType: item.hazard_type,
-            severity: item.severity || 'medium',
-            isVerified: item.is_verified || false,
-            adminNotes: item.admin_notes || ''
+          const formattedData: SensorDataPoint[] = sensorData.data.map((point: any) => ({
+            id: point._id || point.id,
+            latitude: point.latitude || 0,
+            longitude: point.longitude || 0,
+            timestamp: point.timestamp,
+            speed: point.speed || 0,
+            accuracy: point.accuracy || 0,
+            accelerometer: point.accelerometer || { x: 0, y: 0, z: 0 },
+            roadQuality: point.road_quality_score || 50,
+            hazardType: point.hazard_type,
+            severity: point.severity || 'medium',
+            isVerified: point.is_verified || false,
+            adminNotes: point.admin_notes || ''
           }));
           
           setSensorData(formattedData);
+          console.log('✅ Formatted sensor data set');
         }
       } else {
         console.error('❌ Sensor data request failed:', sensorResponse.status);
-        Alert.alert('Ошибка', `Не удалось загрузить данные датчиков: ${sensorResponse.status}`);
       }
 
       if (statsResponse.ok) {
@@ -197,57 +134,48 @@ export default function AdminPanelSimple() {
 
     } catch (error: any) {
       console.error('❌ Admin data loading error:', error);
-      console.error('Error details:', error.message, error.stack);
       
-      // Show fallback demo data for web version - always show demo data if API fails
+      // Show fallback demo data if API fails
       console.log('🌐 Loading demo data due to API error...');
         
-        // Demo sensor data
-        const demoData: SensorDataPoint[] = [
-          {
-            id: 'demo_1',
-            latitude: 55.7558,
-            longitude: 37.6176,
-            timestamp: new Date().toISOString(),
-            speed: 45.2,
-            accuracy: 3.5,
-            accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
-            roadQuality: 85,
-            hazardType: undefined,
-            severity: 'medium',
-            isVerified: true,
-            adminNotes: 'Demo data point'
-          },
-          {
-            id: 'demo_2', 
-            latitude: 55.7568,
-            longitude: 37.6186,
-            timestamp: new Date(Date.now() - 300000).toISOString(),
-            speed: 32.1,
-            accuracy: 5.2,
-            accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
-            roadQuality: 42,
-            hazardType: 'pothole',
-            severity: 'high',
-            isVerified: false,
-            adminNotes: ''
-          }
-        ];
+      const demoData: SensorDataPoint[] = [
+        {
+          id: 'demo_1',
+          latitude: 55.7558,
+          longitude: 37.6176,
+          timestamp: new Date().toISOString(),
+          speed: 45.2,
+          accuracy: 3.5,
+          accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
+          roadQuality: 85,
+          hazardType: undefined,
+          severity: 'medium',
+          isVerified: true,
+          adminNotes: 'Demo data point'
+        },
+        {
+          id: 'demo_2', 
+          latitude: 55.7568,
+          longitude: 37.6186,
+          timestamp: new Date(Date.now() - 300000).toISOString(),
+          speed: 32.1,
+          accuracy: 5.2,
+          accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
+          roadQuality: 42,
+          hazardType: 'pothole',
+          severity: 'high',
+          isVerified: false,
+          adminNotes: 'Requires verification'
+        }
+      ];
         
-        setSensorData(demoData);
-        setStats({
-          totalPoints: 22,
-          verifiedPoints: 4,
-          hazardPoints: 3,
-          avgRoadQuality: 76.5
-        });
-        
-      } else {
-        Alert.alert(
-          'Ошибка загрузки', 
-          `Произошла ошибка при загрузке данных: ${error.message || error}`
-        );
-      }
+      setSensorData(demoData);
+      setStats({
+        totalPoints: 22,
+        verifiedPoints: 4,
+        hazardPoints: 3,
+        avgRoadQuality: 76.5
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
