@@ -134,10 +134,10 @@ export default function AdminPanelSimple() {
 
     } catch (error: any) {
       console.error('❌ Admin data loading error:', error);
+      console.error('Error details:', error.message, error.stack);
       
-      // Show fallback demo data for web version
-      if (Platform.OS === 'web') {
-        console.log('🌐 Using demo data for web preview...');
+      // Show fallback demo data for web version - always show demo data if API fails
+      console.log('🌐 Loading demo data due to API error...');
         
         // Demo sensor data
         const demoData: SensorDataPoint[] = [
