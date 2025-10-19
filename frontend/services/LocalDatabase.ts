@@ -171,7 +171,10 @@ class LocalDatabaseManager {
   }
 
   async getUnsyncedSensorData(): Promise<LocalSensorData[]> {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - returning empty unsynced data');
+      return [];
+    }
 
     const result = await this.db.getAllAsync(`
       SELECT * FROM sensor_data WHERE is_synced = 0 ORDER BY created_at
