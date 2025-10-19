@@ -215,7 +215,12 @@ class LocalDatabaseManager {
 
   // === WARNINGS MANAGEMENT ===
   async saveWarnings(warnings: LocalWarning[]) {
-    if (!this.db || warnings.length === 0) return;
+    if (!this.db || !SQLite || warnings.length === 0) {
+      if (!this.db || !SQLite) {
+        console.warn('Database not available - warnings not saved locally');
+      }
+      return;
+    }
 
     const statement = await this.db.prepareAsync(`
       INSERT OR REPLACE INTO warnings (
