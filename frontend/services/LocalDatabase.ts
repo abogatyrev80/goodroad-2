@@ -293,7 +293,10 @@ class LocalDatabaseManager {
 
   // === REGION MANAGEMENT ===
   async updateRegionSyncStatus(regionCode: string, regionName: string, warningCount: number) {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - region sync status not updated');
+      return;
+    }
 
     await this.db.runAsync(`
       INSERT OR REPLACE INTO sync_regions (region_code, region_name, last_sync, warning_count)
