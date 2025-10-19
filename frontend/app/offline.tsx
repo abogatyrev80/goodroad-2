@@ -26,9 +26,9 @@ export default function OfflineSettings() {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <Pressable onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#ffffff" />
-          </TouchableOpacity>
+          </Pressable>
           <Text style={styles.headerTitle}>Offline режим</Text>
           <View style={styles.placeholder} />
         </View>
