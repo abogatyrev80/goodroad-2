@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Suite for Good Road Application
-Testing the zero coordinates cleanup endpoint as requested
+Good Road Database Activity Analysis Test
+Analyzing when the database was last populated with data points
 """
 
 import requests
 import json
-import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('/app/frontend/.env')
 
 # Get backend URL from environment
-BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
+BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
+API_BASE = f"{BACKEND_URL}/api"
 
 def print_test_header(test_name):
     print(f"\n{'='*60}")
