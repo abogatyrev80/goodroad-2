@@ -19,6 +19,18 @@ import { router } from 'expo-router';
 let syncService: any = null;
 let SyncStatus: any = null;
 
+// Попытка динамической загрузки только для мобильных платформ
+if (Platform.OS !== 'web') {
+  try {
+    const syncModule = require('../services/SyncService');
+    syncService = syncModule.syncService;
+    // SyncStatus можно загрузить отсюда же если нужен
+    console.log('✅ Offline services loaded for mobile platform');
+  } catch (error) {
+    console.warn('⚠️ Offline services not available:', error.message);
+  }
+}
+
 export default function OfflineSettings() {
   // Web fallback component
   if (Platform.OS === 'web') {
