@@ -20,7 +20,8 @@ export class SyncService {
   private isInitialized = false;
 
   constructor() {
-    this.backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '/';
+    this.backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://smoothroad.emergent.host/';
+    console.log('🔗 SyncService backend URL:', this.backendUrl);
   }
 
   async initialize() {
