@@ -750,6 +750,25 @@ async def cleanup_zero_coordinates():
         raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
 
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for production monitoring"""
+    try:
+        # Test database connection
+        await db.command("ping")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "message": "Good Road API is running"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected", 
+            "error": str(e)
+        }
+
 # Include the router in the main app
 app.include_router(api_router)
 
