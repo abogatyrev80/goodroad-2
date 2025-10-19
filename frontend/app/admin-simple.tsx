@@ -66,6 +66,70 @@ export default function AdminPanelSimple() {
       setIsLoading(true);
       console.log('🔄 Loading admin data...');
 
+      // For web demo, show demo data immediately
+      if (Platform.OS === 'web') {
+        console.log('🌐 Loading demo data for web version...');
+        
+        // Demo sensor data for testing modal functionality
+        const demoData: SensorDataPoint[] = [
+          {
+            id: 'demo_1',
+            latitude: 55.7558,
+            longitude: 37.6176,
+            timestamp: new Date().toISOString(),
+            speed: 45.2,
+            accuracy: 3.5,
+            accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
+            roadQuality: 85,
+            hazardType: undefined,
+            severity: 'medium',
+            isVerified: true,
+            adminNotes: 'Демо точка данных для тестирования'
+          },
+          {
+            id: 'demo_2', 
+            latitude: 55.7568,
+            longitude: 37.6186,
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            speed: 32.1,
+            accuracy: 5.2,
+            accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
+            roadQuality: 42,
+            hazardType: 'pothole',
+            severity: 'high',
+            isVerified: false,
+            adminNotes: 'Яма требует проверки'
+          },
+          {
+            id: 'demo_3',
+            latitude: 55.7578,
+            longitude: 37.6196,
+            timestamp: new Date(Date.now() - 600000).toISOString(),
+            speed: 28.5,
+            accuracy: 4.1,
+            accelerometer: { x: 0.2, y: 0.1, z: 9.9 },
+            roadQuality: 68,
+            hazardType: undefined,
+            severity: 'low',
+            isVerified: true,
+            adminNotes: 'Хорошая дорога'
+          }
+        ];
+        
+        setSensorData(demoData);
+        setStats({
+          totalPoints: 23,
+          verifiedPoints: 6,
+          hazardPoints: 4,
+          avgRoadQuality: 78.2
+        });
+        
+        setIsLoading(false);
+        setIsRefreshing(false);
+        console.log('✅ Demo data loaded successfully');
+        return;
+      }
+
       // Загружаем данные и статистику параллельно с таймаутом
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
       console.log('🌐 Backend URL:', backendUrl);
