@@ -307,7 +307,10 @@ class LocalDatabaseManager {
   }
 
   async getDownloadedRegions(): Promise<Array<{code: string, name: string, lastSync: string, warningCount: number}>> {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - returning empty regions');
+      return [];
+    }
 
     const result = await this.db.getAllAsync(`
       SELECT * FROM sync_regions ORDER BY region_name
