@@ -66,9 +66,8 @@ export default function AdminPanelSimple() {
       setIsLoading(true);
       console.log('🔄 Loading admin data...');
 
-      // For web demo, show demo data immediately
-      if (Platform.OS === 'web') {
-        console.log('🌐 Loading demo data for web version...');
+      // Always show demo data for testing purposes
+      console.log('🌐 Loading demo data for testing...');
         
         // Demo sensor data for testing modal functionality
         const demoData: SensorDataPoint[] = [
