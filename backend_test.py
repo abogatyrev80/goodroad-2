@@ -283,26 +283,22 @@ def test_database_activity_analysis():
         return {"error": str(e)}
 
 def main():
-    """Run the zero coordinates cleanup test"""
-    print("🚗 Good Road Backend API - Zero Coordinates Cleanup Test")
-    print(f"🌐 Backend URL: {BACKEND_URL}")
-    print(f"⏰ Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    """Main test execution"""
+    print("🚀 Starting Good Road Database Activity Analysis...")
+    print()
     
-    # Run the specific test requested
-    success = test_zero_coordinates_cleanup()
+    # Run the comprehensive database analysis
+    results = test_database_activity_analysis()
     
-    print(f"\n{'='*60}")
-    if success:
-        print("🎉 ZERO COORDINATES CLEANUP TEST COMPLETED SUCCESSFULLY")
-        print("✅ All records with (0.0, 0.0) coordinates have been removed")
-        print("✅ Only records with valid GPS coordinates remain")
-        print("✅ Database cleanup operation successful")
-    else:
-        print("❌ ZERO COORDINATES CLEANUP TEST FAILED")
-        print("⚠️  Some issues were found with the cleanup operation")
-    print(f"{'='*60}")
+    # Save results to file for reference
+    try:
+        with open('/app/database_activity_analysis.json', 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False, default=str)
+        print(f"\n💾 Results saved to: /app/database_activity_analysis.json")
+    except Exception as e:
+        print(f"⚠️  Could not save results: {e}")
     
-    return 0 if success else 1
+    print("\n🎉 Analysis Complete!")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
