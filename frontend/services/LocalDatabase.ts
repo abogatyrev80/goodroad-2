@@ -363,7 +363,10 @@ class LocalDatabaseManager {
   }
 
   async getDatabaseStats() {
-    if (!this.db) return null;
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - returning null stats');
+      return null;
+    }
 
     const sensorCount = await this.db.getFirstAsync(`SELECT COUNT(*) as count FROM sensor_data`) as {count: number};
     const warningCount = await this.db.getFirstAsync(`SELECT COUNT(*) as count FROM warnings`) as {count: number};
