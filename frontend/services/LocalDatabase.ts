@@ -58,6 +58,11 @@ class LocalDatabaseManager {
   private syncInProgress = false;
 
   async initialize() {
+    if (!SQLite) {
+      console.warn('⚠️ SQLite not available on this platform - database features disabled');
+      return;
+    }
+    
     try {
       this.db = await SQLite.openDatabaseAsync('good_road.db');
       await this.createTables();
