@@ -17,187 +17,270 @@ load_dotenv('/app/frontend/.env')
 BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
 
-def print_test_header(test_name):
-    print(f"\n{'='*60}")
-    print(f"🧪 {test_name}")
-    print(f"{'='*60}")
-
-def print_result(success, message):
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status}: {message}")
-
-def test_zero_coordinates_cleanup():
+def test_database_activity_analysis():
     """
-    Test the zero coordinates cleanup endpoint as requested:
-    1. Show current state with zero coordinates
-    2. Execute cleanup
-    3. Verify zero coordinates are removed
-    4. Check updated analytics
+    Comprehensive analysis of database activity patterns
+    Focus: When was the database last populated with data points
     """
+    print("🔍 GOOD ROAD DATABASE ACTIVITY ANALYSIS")
+    print("=" * 60)
+    print(f"Backend URL: {API_BASE}")
+    print()
     
-    print_test_header("ZERO COORDINATES CLEANUP TEST")
+    results = {
+        "last_record_analysis": None,
+        "recent_activity": None,
+        "activity_patterns": None,
+        "summary": None
+    }
     
     try:
-        # Step 1: Show current state - GET /api/admin/sensor-data?limit=10
-        print("\n📊 STEP 1: Checking current state - looking for records with (0.0, 0.0) coordinates")
+        # 1. GET /api/admin/sensor-data?limit=10 - Get last 10 records
+        print("📊 STEP 1: Analyzing Last 10 Database Records")
+        print("-" * 50)
         
-        response = requests.get(f"{BACKEND_URL}/admin/sensor-data?limit=10")
-        if response.status_code != 200:
-            print_result(False, f"Failed to get sensor data: {response.status_code}")
-            return False
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10")
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            sensor_data = response.json()
+            records = sensor_data.get('data', [])
+            total_records = sensor_data.get('total', 0)
             
-        data = response.json()
-        total_records_before = data.get('total', 0)
-        records = data.get('data', [])
-        
-        print(f"📈 Total records in database: {total_records_before}")
-        print(f"📋 Retrieved {len(records)} records for analysis")
-        
-        # Count records with zero coordinates
-        zero_coord_count = 0
-        valid_coord_count = 0
-        
-        print("\n🔍 Analyzing GPS coordinates:")
-        for i, record in enumerate(records):
-            lat = record.get('latitude', 0)
-            lng = record.get('longitude', 0)
+            print(f"✅ Successfully retrieved {len(records)} records out of {total_records} total")
             
-            if lat == 0.0 and lng == 0.0:
-                zero_coord_count += 1
-                print(f"  Record {i+1}: (0.0, 0.0) ❌ ZERO COORDINATES")
-            else:
-                valid_coord_count += 1
-                print(f"  Record {i+1}: ({lat}, {lng}) ✅ VALID COORDINATES")
-        
-        print(f"\n📊 Summary before cleanup:")
-        print(f"  • Records with zero coordinates: {zero_coord_count}")
-        print(f"  • Records with valid coordinates: {valid_coord_count}")
-        
-        # Step 2: Execute cleanup - DELETE /api/admin/cleanup-zero-coords
-        print("\n🧹 STEP 2: Executing zero coordinates cleanup")
-        
-        cleanup_response = requests.delete(f"{BACKEND_URL}/admin/cleanup-zero-coords")
-        if cleanup_response.status_code != 200:
-            print_result(False, f"Cleanup failed: {cleanup_response.status_code} - {cleanup_response.text}")
-            return False
-            
-        cleanup_result = cleanup_response.json()
-        deleted_count = cleanup_result.get('deleted_records', 0)
-        remaining_count = cleanup_result.get('remaining_records', 0)
-        
-        print(f"🗑️  Cleanup completed:")
-        print(f"  • Records deleted: {deleted_count}")
-        print(f"  • Records remaining: {remaining_count}")
-        print(f"  • Cleanup message: {cleanup_result.get('message', 'N/A')}")
-        
-        # Step 3: Verify results - GET /api/admin/sensor-data?limit=10 again
-        print("\n🔍 STEP 3: Verifying cleanup results")
-        
-        verify_response = requests.get(f"{BACKEND_URL}/admin/sensor-data?limit=10")
-        if verify_response.status_code != 200:
-            print_result(False, f"Failed to verify results: {verify_response.status_code}")
-            return False
-            
-        verify_data = verify_response.json()
-        total_records_after = verify_data.get('total', 0)
-        verify_records = verify_data.get('data', [])
-        
-        print(f"📈 Total records after cleanup: {total_records_after}")
-        print(f"📋 Retrieved {len(verify_records)} records for verification")
-        
-        # Check if any zero coordinates remain
-        remaining_zero_coords = 0
-        remaining_valid_coords = 0
-        
-        print("\n🔍 Analyzing GPS coordinates after cleanup:")
-        for i, record in enumerate(verify_records):
-            lat = record.get('latitude', 0)
-            lng = record.get('longitude', 0)
-            
-            if lat == 0.0 and lng == 0.0:
-                remaining_zero_coords += 1
-                print(f"  Record {i+1}: (0.0, 0.0) ❌ STILL HAS ZERO COORDINATES")
-            else:
-                remaining_valid_coords += 1
-                location_name = ""
-                # Identify known locations
-                if 55.7 <= lat <= 55.8 and 37.6 <= lng <= 37.7:
-                    location_name = " (Moscow area)"
-                elif 40.7 <= lat <= 40.8 and -74.1 <= lng <= -74.0:
-                    location_name = " (New York area)"
+            if records:
+                # Analyze timestamps of each record
+                print("\n📅 TIMESTAMP ANALYSIS OF LAST 10 RECORDS:")
+                timestamps = []
+                
+                for i, record in enumerate(records, 1):
+                    timestamp_str = record.get('timestamp', '')
+                    try:
+                        # Parse ISO timestamp
+                        timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        timestamps.append(timestamp)
+                        
+                        # Show GPS coordinates to verify data quality
+                        lat = record.get('latitude', 0)
+                        lng = record.get('longitude', 0)
+                        gps_status = "✅ Valid GPS" if (lat != 0 and lng != 0) else "❌ Zero GPS"
+                        
+                        print(f"  {i:2d}. {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')} | {gps_status} | ({lat:.4f}, {lng:.4f})")
+                        
+                    except Exception as e:
+                        print(f"  {i:2d}. Invalid timestamp: {timestamp_str} | Error: {e}")
+                
+                # Find the most recent record
+                if timestamps:
+                    most_recent = max(timestamps)
+                    oldest_in_sample = min(timestamps)
                     
-                print(f"  Record {i+1}: ({lat}, {lng}){location_name} ✅ VALID COORDINATES")
-        
-        print(f"\n📊 Summary after cleanup:")
-        print(f"  • Records with zero coordinates: {remaining_zero_coords}")
-        print(f"  • Records with valid coordinates: {remaining_valid_coords}")
-        print(f"  • Total records reduced by: {total_records_before - total_records_after}")
-        
-        # Step 4: Check updated analytics - GET /api/admin/analytics
-        print("\n📈 STEP 4: Checking updated analytics")
-        
-        analytics_response = requests.get(f"{BACKEND_URL}/admin/analytics")
-        if analytics_response.status_code != 200:
-            print_result(False, f"Failed to get analytics: {analytics_response.status_code}")
-            return False
-            
-        analytics = analytics_response.json()
-        
-        print(f"📊 Updated Analytics:")
-        print(f"  • Total points: {analytics.get('total_points', 0)}")
-        print(f"  • Verified points: {analytics.get('verified_points', 0)}")
-        print(f"  • Hazard points: {analytics.get('hazard_points', 0)}")
-        print(f"  • Average road quality: {analytics.get('avg_road_quality', 0)}")
-        print(f"  • Recent points (7d): {analytics.get('recent_points_7d', 0)}")
-        
-        # Verify success criteria
-        success = True
-        success_messages = []
-        failure_messages = []
-        
-        if deleted_count > 0:
-            success_messages.append(f"Successfully deleted {deleted_count} records with zero coordinates")
-        else:
-            if zero_coord_count > 0:
-                failure_messages.append("No records were deleted despite having zero coordinates in the data")
+                    print(f"\n🕐 MOST RECENT RECORD: {most_recent.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+                    print(f"🕐 OLDEST IN SAMPLE: {oldest_in_sample.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+                    
+                    # Calculate time since last update
+                    now = datetime.now(most_recent.tzinfo) if most_recent.tzinfo else datetime.utcnow()
+                    time_since_last = now - most_recent
+                    
+                    print(f"⏰ TIME SINCE LAST UPDATE: {time_since_last}")
+                    
+                    results["last_record_analysis"] = {
+                        "most_recent_timestamp": most_recent.isoformat(),
+                        "time_since_last_update": str(time_since_last),
+                        "total_records_in_db": total_records,
+                        "sample_size": len(records)
+                    }
+                else:
+                    print("❌ No valid timestamps found in records")
             else:
-                success_messages.append("No zero coordinate records found to delete (database already clean)")
-        
-        if remaining_zero_coords == 0:
-            success_messages.append("No zero coordinates remain in the database")
+                print("❌ No records found in database")
+                
         else:
-            failure_messages.append(f"{remaining_zero_coords} records with zero coordinates still remain")
-            success = False
+            print(f"❌ Failed to get sensor data: {response.status_code}")
+            print(f"Response: {response.text}")
         
-        if total_records_after <= total_records_before:
-            success_messages.append(f"Total record count properly reduced from {total_records_before} to {total_records_after}")
-        else:
-            failure_messages.append("Total record count unexpectedly increased")
-            success = False
+        print("\n" + "=" * 60)
         
-        if remaining_valid_coords > 0:
-            success_messages.append(f"Valid GPS coordinates preserved ({remaining_valid_coords} records with real locations)")
+        # 2. GET /api/admin/analytics - Check general statistics
+        print("📈 STEP 2: Analyzing Database Statistics & Recent Activity")
+        print("-" * 50)
         
-        # Print results
-        print(f"\n🎯 TEST RESULTS:")
-        for msg in success_messages:
-            print(f"  ✅ {msg}")
-        for msg in failure_messages:
-            print(f"  ❌ {msg}")
+        response = requests.get(f"{API_BASE}/admin/analytics")
+        print(f"Status: {response.status_code}")
         
-        if success:
-            print_result(True, "Zero coordinates cleanup test completed successfully")
-        else:
-            print_result(False, "Zero coordinates cleanup test failed")
+        if response.status_code == 200:
+            analytics = response.json()
             
-        return success
+            total_points = analytics.get('total_points', 0)
+            recent_points_7d = analytics.get('recent_points_7d', 0)
+            verified_points = analytics.get('verified_points', 0)
+            hazard_points = analytics.get('hazard_points', 0)
+            avg_road_quality = analytics.get('avg_road_quality', 0)
+            
+            print(f"✅ Successfully retrieved analytics data")
+            print(f"\n📊 DATABASE STATISTICS:")
+            print(f"  • Total Points: {total_points}")
+            print(f"  • Recent Points (7 days): {recent_points_7d}")
+            print(f"  • Verified Points: {verified_points}")
+            print(f"  • Hazard Points: {hazard_points}")
+            print(f"  • Average Road Quality: {avg_road_quality}/100")
+            
+            # Calculate activity rate
+            if total_points > 0:
+                recent_percentage = (recent_points_7d / total_points) * 100
+                print(f"  • Recent Activity Rate: {recent_percentage:.1f}% of total data")
+            
+            # Analyze hazard distribution
+            hazard_dist = analytics.get('hazard_distribution', [])
+            if hazard_dist:
+                print(f"\n🚨 HAZARD DISTRIBUTION:")
+                for hazard in hazard_dist:
+                    hazard_type = hazard.get('hazard_type', 'Unknown')
+                    count = hazard.get('count', 0)
+                    print(f"  • {hazard_type}: {count} incidents")
+            
+            # Analyze quality distribution
+            quality_dist = analytics.get('quality_distribution', [])
+            if quality_dist:
+                print(f"\n🛣️  ROAD QUALITY DISTRIBUTION:")
+                for quality in quality_dist:
+                    range_name = quality.get('range', 'Unknown')
+                    count = quality.get('count', 0)
+                    min_val = quality.get('min', 0)
+                    max_val = quality.get('max', 0)
+                    print(f"  • {range_name} ({min_val}-{max_val}): {count} records")
+            
+            results["recent_activity"] = {
+                "total_points": total_points,
+                "recent_points_7d": recent_points_7d,
+                "recent_activity_percentage": (recent_points_7d / total_points * 100) if total_points > 0 else 0,
+                "verified_points": verified_points,
+                "hazard_points": hazard_points,
+                "avg_road_quality": avg_road_quality
+            }
+            
+        else:
+            print(f"❌ Failed to get analytics: {response.status_code}")
+            print(f"Response: {response.text}")
         
-    except requests.exceptions.RequestException as e:
-        print_result(False, f"Network error during zero coordinates cleanup test: {str(e)}")
-        return False
+        print("\n" + "=" * 60)
+        
+        # 3. Analyze activity patterns by getting more historical data
+        print("📋 STEP 3: Analyzing Activity Patterns & Time Gaps")
+        print("-" * 50)
+        
+        # Get larger sample to analyze patterns
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=50")
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            sensor_data = response.json()
+            records = sensor_data.get('data', [])
+            
+            print(f"✅ Retrieved {len(records)} records for pattern analysis")
+            
+            if len(records) > 1:
+                # Parse all timestamps
+                valid_timestamps = []
+                for record in records:
+                    timestamp_str = record.get('timestamp', '')
+                    try:
+                        timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        valid_timestamps.append(timestamp)
+                    except:
+                        continue
+                
+                if len(valid_timestamps) > 1:
+                    # Sort timestamps (should already be sorted, but ensure)
+                    valid_timestamps.sort(reverse=True)  # Most recent first
+                    
+                    # Calculate time gaps between consecutive records
+                    time_gaps = []
+                    for i in range(len(valid_timestamps) - 1):
+                        gap = valid_timestamps[i] - valid_timestamps[i + 1]
+                        time_gaps.append(gap)
+                    
+                    # Analyze patterns
+                    if time_gaps:
+                        avg_gap = sum(time_gaps, timedelta()) / len(time_gaps)
+                        min_gap = min(time_gaps)
+                        max_gap = max(time_gaps)
+                        
+                        print(f"\n⏱️  TIME GAP ANALYSIS (between consecutive records):")
+                        print(f"  • Average Gap: {avg_gap}")
+                        print(f"  • Minimum Gap: {min_gap}")
+                        print(f"  • Maximum Gap: {max_gap}")
+                        
+                        # Identify active periods (gaps < 1 hour) vs inactive periods (gaps > 24 hours)
+                        active_gaps = [gap for gap in time_gaps if gap < timedelta(hours=1)]
+                        inactive_gaps = [gap for gap in time_gaps if gap > timedelta(hours=24)]
+                        
+                        print(f"  • Active Periods (< 1 hour gaps): {len(active_gaps)}")
+                        print(f"  • Inactive Periods (> 24 hour gaps): {len(inactive_gaps)}")
+                        
+                        # Show recent activity timeline
+                        print(f"\n📅 RECENT ACTIVITY TIMELINE (Last 10 records):")
+                        for i, timestamp in enumerate(valid_timestamps[:10]):
+                            age = datetime.utcnow() - timestamp.replace(tzinfo=None)
+                            print(f"  {i+1:2d}. {timestamp.strftime('%Y-%m-%d %H:%M:%S')} ({age} ago)")
+                        
+                        results["activity_patterns"] = {
+                            "total_analyzed": len(valid_timestamps),
+                            "average_gap": str(avg_gap),
+                            "min_gap": str(min_gap),
+                            "max_gap": str(max_gap),
+                            "active_periods": len(active_gaps),
+                            "inactive_periods": len(inactive_gaps)
+                        }
+                    
+                else:
+                    print("❌ Not enough valid timestamps for pattern analysis")
+            else:
+                print("❌ Not enough records for pattern analysis")
+        else:
+            print(f"❌ Failed to get extended sensor data: {response.status_code}")
+        
+        print("\n" + "=" * 60)
+        
+        # 4. Generate comprehensive summary
+        print("📋 STEP 4: Database Population Summary")
+        print("-" * 50)
+        
+        if results["last_record_analysis"] and results["recent_activity"]:
+            last_update = results["last_record_analysis"]["most_recent_timestamp"]
+            time_since = results["last_record_analysis"]["time_since_last_update"]
+            total_points = results["recent_activity"]["total_points"]
+            recent_7d = results["recent_activity"]["recent_points_7d"]
+            
+            print(f"🎯 ОТВЕТ НА ВОПРОС: Когда последний раз пополнялась база данных точек?")
+            print(f"")
+            print(f"📅 ПОСЛЕДНЕЕ ОБНОВЛЕНИЕ: {datetime.fromisoformat(last_update).strftime('%d.%m.%Y в %H:%M:%S UTC')}")
+            print(f"⏰ ВРЕМЯ С ПОСЛЕДНЕГО ОБНОВЛЕНИЯ: {time_since}")
+            print(f"📊 ВСЕГО ТОЧЕК В БАЗЕ: {total_points}")
+            print(f"📈 ДОБАВЛЕНО ЗА ПОСЛЕДНИЕ 7 ДНЕЙ: {recent_7d} точек")
+            
+            if recent_7d > 0:
+                print(f"✅ СТАТУС: База данных активно пополняется")
+            else:
+                print(f"⚠️  СТАТУС: Нет новых данных за последние 7 дней")
+            
+            results["summary"] = {
+                "last_update_date": last_update,
+                "time_since_last_update": time_since,
+                "total_points": total_points,
+                "recent_points_7d": recent_7d,
+                "database_status": "active" if recent_7d > 0 else "inactive"
+            }
+        
+        print("\n" + "=" * 60)
+        print("✅ DATABASE ACTIVITY ANALYSIS COMPLETE")
+        
+        return results
+        
     except Exception as e:
-        print_result(False, f"Unexpected error during zero coordinates cleanup test: {str(e)}")
-        return False
+        print(f"❌ Error during database analysis: {e}")
+        return {"error": str(e)}
 
 def main():
     """Run the zero coordinates cleanup test"""
