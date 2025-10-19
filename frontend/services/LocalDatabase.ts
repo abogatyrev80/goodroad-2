@@ -140,7 +140,10 @@ class LocalDatabaseManager {
 
   // === SENSOR DATA MANAGEMENT ===
   async saveSensorData(data: Omit<LocalSensorData, 'id' | 'createdAt'>): Promise<number> {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db || !SQLite) {
+      console.warn('Database not available - sensor data not stored locally');
+      return -1;
+    }
 
     const result = await this.db.runAsync(`
       INSERT INTO sensor_data (
