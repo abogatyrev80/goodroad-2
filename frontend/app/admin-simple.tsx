@@ -94,6 +94,7 @@ export default function AdminPanelSimple() {
       if (sensorResponse.ok) {
         const sensorData = await sensorResponse.json();
         console.log('✅ Sensor data loaded:', sensorData.data?.length || 0, 'points');
+        console.log('Raw sensor data:', JSON.stringify(sensorData, null, 2));
         
         if (sensorData.data && Array.isArray(sensorData.data)) {
           const formattedData: SensorDataPoint[] = sensorData.data.map((item: any) => ({
