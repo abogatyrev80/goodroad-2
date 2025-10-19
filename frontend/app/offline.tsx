@@ -43,13 +43,13 @@ export default function OfflineSettings() {
             Для полного доступа к этим функциям используйте Expo Go на своем смартфоне.
           </Text>
           
-          <TouchableOpacity 
+          <Pressable 
             style={styles.backButton}
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={20} color="white" />
             <Text style={styles.backButtonText}>Назад</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
