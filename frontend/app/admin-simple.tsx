@@ -126,7 +126,6 @@ export default function AdminPanelSimple() {
         setIsLoading(false);
         setIsRefreshing(false);
         console.log('✅ Demo data loaded successfully');
-        return;
       }
 
       // Загружаем данные и статистику параллельно с таймаутом
