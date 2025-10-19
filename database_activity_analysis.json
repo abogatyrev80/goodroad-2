@@ -1,0 +1,31 @@
+{
+  "last_record_analysis": {
+    "most_recent_timestamp": "2025-10-07T21:06:59.208000",
+    "time_since_last_update": "11 days, 20:23:07.338979",
+    "total_records_in_db": 20,
+    "sample_size": 10
+  },
+  "recent_activity": {
+    "total_points": 20,
+    "recent_points_7d": 0,
+    "recent_activity_percentage": 0.0,
+    "verified_points": 4,
+    "hazard_points": 4,
+    "avg_road_quality": 0
+  },
+  "activity_patterns": {
+    "total_analyzed": 20,
+    "average_gap": "23:35:09.059526",
+    "min_gap": "0:00:00.052000",
+    "max_gap": "13 days, 14:55:06.910000",
+    "active_periods": 16,
+    "inactive_periods": 3
+  },
+  "summary": {
+    "last_update_date": "2025-10-07T21:06:59.208000",
+    "time_since_last_update": "11 days, 20:23:07.338979",
+    "total_points": 20,
+    "recent_points_7d": 0,
+    "database_status": "inactive"
+  }
+}
