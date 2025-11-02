@@ -449,12 +449,12 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <Pressable 
           onPress={() => router.back()}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.title}>Настройки предупреждений</Text>
         <TouchableOpacity 
           onPress={saveSettings}
