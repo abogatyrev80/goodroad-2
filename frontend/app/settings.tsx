@@ -513,13 +513,21 @@ export default function SettingsScreen() {
         <View style={styles.sectionCard}>
           <View style={styles.soundHeader}>
             <Text style={styles.sectionTitle}>🎵 Выбор звукового сигнала</Text>
-            <TouchableOpacity 
+            <Pressable 
               style={styles.addSoundButton}
               onPress={addCustomSound}
             >
               <Ionicons name="add-circle" size={24} color="#4CAF50" />
               <Text style={styles.addSoundText}>Добавить</Text>
-            </TouchableOpacity>
+            </Pressable>
+          </View>
+          
+          {/* Sound Format Information */}
+          <View style={styles.formatInfo}>
+            <Ionicons name="information-circle" size={16} color="#FF9800" />
+            <Text style={styles.formatText}>
+              Поддерживаемые форматы: MP3, WAV, M4A, AAC
+            </Text>
           </View>
           
           {getAllSoundOptions().map((soundOption) => (
