@@ -616,4 +616,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  versionInfo: {
+    backgroundColor: '#2a2a2a',
+    padding: 12,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    marginTop: 16,
+  },
+  versionText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  versionSubtext: {
+    color: '#888',
+    fontSize: 11,
+    textAlign: 'center',
+  },
 });
