@@ -76,7 +76,7 @@ export default function OfflineSettings() {
       // Попытка динамической загрузки сервисов только для мобильных устройств
       if (Platform.OS !== 'web') {
         try {
-          const syncModule = await import('../services.temp.disabled/SyncService');
+          const syncModule = await import('../services/SyncService');
           syncService = syncModule.syncService;
           
           await syncService.initialize();
