@@ -947,4 +947,18 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 8,
   },
+  formatInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 16,
+  },
+  formatText: {
+    color: '#FF9800',
+    fontSize: 12,
+    marginLeft: 6,
+    flex: 1,
+  },
 });
