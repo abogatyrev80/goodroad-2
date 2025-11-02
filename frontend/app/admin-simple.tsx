@@ -346,6 +346,15 @@ export default function AdminPanelSimple() {
           )}
         </View>
       </ScrollView>
+      
+      {/* Version Info Footer */}
+      <View style={styles.versionInfo}>
+        <Text style={styles.versionText}>Good Road v1.0.0</Text>
+        <Text style={styles.versionSubtext}>
+          Build: {new Date().toLocaleDateString('ru-RU')} | 
+          Platform: {Platform.OS === 'web' ? 'Web' : 'Mobile'}
+        </Text>
+      </View>
 
       {/* Details Modal */}
       {selectedPoint && (
