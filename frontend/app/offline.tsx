@@ -70,16 +70,49 @@ export default function OfflineSettings() {
   }, []);
 
   const initializeOfflineSettings = async () => {
-    if (!syncService) return;
-    
     try {
       setIsLoading(true);
-      await syncService.initialize();
-      const status = await syncService.getSyncStatus();
-      setSyncStatus(status);
+      
+      // Попытка динамической загрузки сервисов только для мобильных устройств
+      if (Platform.OS !== 'web') {
+        try {
+          const syncModule = await import('../services.temp.disabled/SyncService');
+          syncService = syncModule.syncService;
+          
+          await syncService.initialize();
+          const status = await syncService.getSyncStatus();
+          setSyncStatus(status);
+          
+          console.log('✅ Offline services initialized successfully');
+        } catch (importError) {
+          console.warn('⚠️ Offline services not available:', importError.message);
+          
+          // Установить fallback статус для веб-версии
+          setSyncStatus({
+            isOnline: true,
+            lastSyncTime: 'Недоступно в веб-версии',
+            pendingUploads: 0,
+            totalStoredRecords: 0
+          });
+        }
+      } else {
+        console.log('🌐 Web platform - offline services disabled');
+        
+        // Установить демо-статус для веб-версии
+        setSyncStatus({
+          isOnline: true,
+          lastSyncTime: 'Недоступно в веб-версии',
+          pendingUploads: 0,
+          totalStoredRecords: 0
+        });
+      }
     } catch (error) {
-      console.error('Offline settings initialization error:', error);
-      Alert.alert('Ошибка', 'Не удалось инициализировать offline настройки');
+      console.error('❌ Offline settings initialization error:', error);
+      
+      // Не показывать Alert для веб-версии
+      if (Platform.OS !== 'web') {
+        Alert.alert('Ошибка', 'Не удалось инициализировать offline настройки');
+      }
     } finally {
       setIsLoading(false);
     }
