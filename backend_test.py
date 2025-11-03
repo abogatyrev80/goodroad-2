@@ -300,7 +300,7 @@ def test_map_data_format():
     """Test if data is properly formatted for map display"""
     print("\n🗺️  TEST 6: Map Data Format Validation")
     try:
-        url = urljoin(API_BASE, 'admin/sensor-data')
+        url = f"{API_BASE}/admin/sensor-data"
         params = {'limit': 5}
         response = requests.get(url, params=params, timeout=10)
         
