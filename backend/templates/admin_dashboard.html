@@ -960,6 +960,39 @@
             }
         }
 
+        // Удаление тестовых данных
+        async function clearTestData() {
+            if (!confirm('⚠️ ВНИМАНИЕ!\n\nВы уверены, что хотите удалить ВСЕ тестовые данные?\n\nБудут удалены все записи от устройств содержащих "test" в названии.\n\nЭто действие НЕОБРАТИМО!')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/admin/cleanup-test-data`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка удаления тестовых данных');
+                }
+                
+                const result = await response.json();
+                alert(`✅ Тестовые данные удалены!\n\n` +
+                      `Найдено тестовых записей: ${result.found_test_records}\n` +
+                      `Удалено: ${result.deleted_records}\n` +
+                      `Осталось в базе: ${result.remaining_records}\n\n` +
+                      `Критерий: ${result.test_pattern}`);
+                
+                // Перезагружаем данные
+                await loadData();
+            } catch (error) {
+                console.error('Ошибка удаления:', error);
+                alert('❌ Ошибка при удалении тестовых данных: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
         // Показать/скрыть индикатор загрузки
         function showLoading(show) {
             document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
