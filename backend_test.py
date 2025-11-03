@@ -28,6 +28,350 @@ print(f"📡 NEW Backend URL: {API_BASE}")
 print(f"🎯 ЦЕЛЬ: Проверить подключение после изменения URL на https://smoothroad.emergent.host")
 print("=" * 100)
 
+def check_backend_logs_last_5_minutes():
+    """КРИТИЧЕСКАЯ ПРОВЕРКА: Backend логи за последние 5 минут - есть ли новые POST запросы от внешних IP?"""
+    print("\n" + "="*100)
+    print("1. КРИТИЧЕСКАЯ ПРОВЕРКА: BACKEND ЛОГИ ЗА ПОСЛЕДНИЕ 5 МИНУТ")
+    print("="*100)
+    
+    try:
+        # Получаем логи backend
+        result = subprocess.run(
+            ["tail", "-n", "200", "/var/log/supervisor/backend.out.log"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            log_lines = result.stdout.split('\n')
+            
+            # Анализируем POST запросы за последние 5 минут
+            now = datetime.now()
+            five_minutes_ago = now - timedelta(minutes=5)
+            
+            recent_posts = []
+            external_posts = []
+            internal_posts = []
+            
+            print(f"📋 Анализ логов backend за последние 5 минут...")
+            print(f"⏰ Текущее время: {now.strftime('%H:%M:%S')}")
+            print(f"🔍 Ищем POST запросы после: {five_minutes_ago.strftime('%H:%M:%S')}")
+            
+            for line in log_lines:
+                if 'POST /api/sensor-data' in line:
+                    recent_posts.append(line.strip())
+                    
+                    # Проверяем источник запроса
+                    if any(ip in line for ip in ['10.64.', '127.0.0.1', 'localhost']):
+                        internal_posts.append(line.strip())
+                    else:
+                        external_posts.append(line.strip())
+                        print(f"🎉 ВНЕШНИЙ ЗАПРОС НАЙДЕН: {line.strip()}")
+            
+            print(f"\n📊 РЕЗУЛЬТАТЫ АНАЛИЗА ЛОГОВ ЗА ПОСЛЕДНИЕ 5 МИНУТ:")
+            print(f"📡 Всего POST запросов к /api/sensor-data: {len(recent_posts)}")
+            print(f"🏢 Внутренние запросы (10.64.x.x, localhost): {len(internal_posts)}")
+            print(f"📱 ВНЕШНИЕ МОБИЛЬНЫЕ ЗАПРОСЫ: {len(external_posts)}")
+            
+            if external_posts:
+                print(f"\n🎉 НАЙДЕНЫ ВНЕШНИЕ МОБИЛЬНЫЕ ЗАПРОСЫ!")
+                for req in external_posts:
+                    print(f"   ✅ {req}")
+                return True, f"Внешних запросов: {len(external_posts)}"
+            else:
+                print(f"\n❌ НЕТ ВНЕШНИХ МОБИЛЬНЫХ ЗАПРОСОВ ЗА ПОСЛЕДНИЕ 5 МИНУТ")
+                if internal_posts:
+                    print(f"   Найдено только {len(internal_posts)} внутренних запросов (тестирование)")
+                    print("   Последние внутренние запросы:")
+                    for req in internal_posts[-3:]:
+                        print(f"     {req}")
+                else:
+                    print(f"   НЕТ ВООБЩЕ НИКАКИХ POST запросов к /api/sensor-data")
+                return False, f"Только внутренних: {len(internal_posts)}"
+            
+        else:
+            print(f"❌ Ошибка чтения логов: {result.stderr}")
+            return False, f"Ошибка логов: {result.stderr}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа логов: {str(e)}")
+        return False, str(e)
+
+def check_new_sensor_data_last_minutes():
+    """КРИТИЧЕСКАЯ ПРОВЕРКА: GET /api/admin/sensor-data?limit=3 - появились ли новые записи за последние минуты?"""
+    print("\n" + "="*100)
+    print("2. КРИТИЧЕСКАЯ ПРОВЕРКА: НОВЫЕ ЗАПИСИ ЗА ПОСЛЕДНИЕ МИНУТЫ")
+    print("="*100)
+    
+    try:
+        response = requests.get(
+            f"{API_BASE}/admin/sensor-data",
+            params={"limit": 3},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get('data', [])
+            total = data.get('total', 0)
+            
+            print(f"📊 Общее количество записей в базе: {total}")
+            print(f"📊 Последние 3 записи для анализа:")
+            
+            if not records:
+                print("❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: База данных пуста!")
+                return False, "База данных пуста"
+            
+            now = datetime.now()
+            recent_records = []
+            
+            print(f"\n📋 АНАЛИЗ ПОСЛЕДНИХ 3 ЗАПИСЕЙ:")
+            print("-" * 100)
+            print(f"{'№':<3} {'Timestamp':<20} {'Минут назад':<12} {'GPS Координаты':<25} {'Источник':<15}")
+            print("-" * 100)
+            
+            for i, record in enumerate(records, 1):
+                timestamp_str = record.get('timestamp', 'N/A')
+                lat = record.get('latitude', 0)
+                lng = record.get('longitude', 0)
+                
+                # Вычисляем время с момента записи
+                minutes_ago = "N/A"
+                if timestamp_str and timestamp_str != 'N/A':
+                    try:
+                        if 'T' in timestamp_str:
+                            record_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        else:
+                            record_time = datetime.fromisoformat(timestamp_str)
+                        
+                        time_diff = now - record_time.replace(tzinfo=None)
+                        minutes_ago = round(time_diff.total_seconds() / 60, 1)
+                        
+                        # Если запись свежая (менее 10 минут)
+                        if minutes_ago <= 10:
+                            recent_records.append({
+                                'timestamp': timestamp_str,
+                                'minutes_ago': minutes_ago,
+                                'gps': f"({lat}, {lng})",
+                                'is_real': lat != 0.0 and lng != 0.0
+                            })
+                    except Exception as e:
+                        minutes_ago = f"Ошибка: {str(e)}"
+                
+                # Определяем источник
+                is_real_mobile = lat != 0.0 and lng != 0.0
+                source = "Мобильное" if is_real_mobile else "Тестовое"
+                gps_coords = f"({lat:.4f}, {lng:.4f})" if is_real_mobile else "(0.0000, 0.0000)"
+                
+                print(f"{i:<3} {timestamp_str[:19]:<20} {minutes_ago:<12} {gps_coords:<25} {source:<15}")
+            
+            print("-" * 100)
+            
+            if recent_records:
+                print(f"\n🎉 НАЙДЕНЫ СВЕЖИЕ ЗАПИСИ! {len(recent_records)} записей за последние 10 минут:")
+                for record in recent_records:
+                    source_type = "📱 МОБИЛЬНОЕ" if record['is_real'] else "🧪 ТЕСТОВОЕ"
+                    print(f"   {source_type} - {record['minutes_ago']} мин назад: GPS {record['gps']}")
+                
+                # Проверяем есть ли реальные мобильные данные
+                real_mobile_recent = [r for r in recent_records if r['is_real']]
+                if real_mobile_recent:
+                    print(f"\n✅ УСПЕХ! Найдено {len(real_mobile_recent)} свежих записей от МОБИЛЬНОГО ПРИЛОЖЕНИЯ!")
+                    return True, f"Мобильных записей: {len(real_mobile_recent)}"
+                else:
+                    print(f"\n⚠️  Найдены только тестовые записи, НЕТ данных от мобильного приложения")
+                    return False, f"Только тестовых: {len(recent_records)}"
+            else:
+                # Показываем когда была последняя запись
+                latest_record = records[0] if records else None
+                if latest_record:
+                    latest_timestamp = latest_record.get('timestamp', 'unknown')
+                    print(f"\n❌ НЕТ СВЕЖИХ ЗАПИСЕЙ за последние 10 минут")
+                    print(f"   Последняя запись: {latest_timestamp}")
+                return False, "Нет свежих записей"
+                
+        else:
+            print(f"❌ Ошибка получения данных: HTTP {response.status_code}")
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа данных: {str(e)}")
+        return False, str(e)
+
+def analyze_data_flow_changes():
+    """КРИТИЧЕСКАЯ ПРОВЕРКА: Анализ активности - изменилось ли что-то в поступлении данных"""
+    print("\n" + "="*100)
+    print("3. АНАЛИЗ АКТИВНОСТИ: ИЗМЕНЕНИЯ В ПОСТУПЛЕНИИ ДАННЫХ")
+    print("="*100)
+    
+    try:
+        # Получаем аналитику
+        response = requests.get(f"{API_BASE}/admin/analytics", timeout=30)
+        
+        if response.status_code == 200:
+            analytics = response.json()
+            
+            total_points = analytics.get('total_points', 0)
+            recent_points = analytics.get('recent_points_7d', 0)
+            verified_points = analytics.get('verified_points', 0)
+            hazard_points = analytics.get('hazard_points', 0)
+            
+            print(f"📊 ТЕКУЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ:")
+            print(f"   Всего записей: {total_points}")
+            print(f"   За последние 7 дней: {recent_points}")
+            print(f"   Проверенных: {verified_points}")
+            print(f"   С опасностями: {hazard_points}")
+            
+            # Анализируем изменения
+            print(f"\n🔍 АНАЛИЗ АКТИВНОСТИ:")
+            
+            if recent_points > 0:
+                print(f"✅ АКТИВНОСТЬ ОБНАРУЖЕНА: {recent_points} записей за последние 7 дней")
+                
+                # Проверяем последние записи для определения источника активности
+                response2 = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=30)
+                if response2.status_code == 200:
+                    recent_data = response2.json().get('data', [])
+                    
+                    # Считаем реальные vs тестовые записи
+                    real_mobile_count = sum(1 for r in recent_data if r.get('latitude', 0) != 0.0 and r.get('longitude', 0) != 0.0)
+                    test_count = len(recent_data) - real_mobile_count
+                    
+                    if real_mobile_count > 0:
+                        print(f"📱 МОБИЛЬНАЯ АКТИВНОСТЬ: {real_mobile_count} записей от мобильного приложения")
+                        print(f"🧪 Тестовая активность: {test_count} записей")
+                        return True, f"Мобильных: {real_mobile_count}, тестовых: {test_count}"
+                    else:
+                        print(f"⚠️  ТОЛЬКО ТЕСТОВАЯ АКТИВНОСТЬ: {test_count} записей")
+                        print(f"❌ НЕТ АКТИВНОСТИ ОТ МОБИЛЬНОГО ПРИЛОЖЕНИЯ")
+                        return False, f"Только тестовых: {test_count}"
+                else:
+                    return True, f"Активность: {recent_points} записей"
+            else:
+                print(f"❌ НЕТ АКТИВНОСТИ за последние 7 дней")
+                print(f"🚨 База данных не получает новых данных от мобильного приложения")
+                return False, "Нет активности"
+                
+        else:
+            print(f"❌ Ошибка получения аналитики: HTTP {response.status_code}")
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа активности: {str(e)}")
+        return False, str(e)
+
+def test_connectivity_to_new_url():
+    """КРИТИЧЕСКАЯ ПРОВЕРКА: Тест connectivity - проверить доступность https://smoothroad.emergent.host/api/sensor-data"""
+    print("\n" + "="*100)
+    print("4. ТЕСТ CONNECTIVITY: ДОСТУПНОСТЬ НОВОГО URL")
+    print("="*100)
+    
+    try:
+        print(f"🔍 Проверка доступности: {BACKEND_URL}")
+        print(f"🎯 Endpoint для мобильного приложения: {API_BASE}/sensor-data")
+        
+        # Тест 1: Health check
+        print(f"\n📡 Тест 1: Health check...")
+        response = requests.get(f"{BACKEND_URL}/health", timeout=10)
+        if response.status_code == 200:
+            health_data = response.json()
+            print(f"✅ Health check: {health_data.get('status', 'unknown')}")
+            print(f"   Database: {health_data.get('database', 'unknown')}")
+        else:
+            print(f"❌ Health check failed: HTTP {response.status_code}")
+            return False, f"Health check failed: {response.status_code}"
+        
+        # Тест 2: API root
+        print(f"\n📡 Тест 2: API root...")
+        response = requests.get(f"{API_BASE}/", timeout=10)
+        if response.status_code == 200:
+            print(f"✅ API root доступен")
+        else:
+            print(f"❌ API root недоступен: HTTP {response.status_code}")
+            return False, f"API root failed: {response.status_code}"
+        
+        # Тест 3: OPTIONS preflight для мобильного приложения
+        print(f"\n📡 Тест 3: CORS preflight для мобильного приложения...")
+        response = requests.options(
+            f"{API_BASE}/sensor-data",
+            headers={
+                "Origin": "capacitor://localhost",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Content-Type"
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            print(f"✅ CORS preflight успешен")
+            cors_origin = response.headers.get('Access-Control-Allow-Origin', 'Not set')
+            cors_methods = response.headers.get('Access-Control-Allow-Methods', 'Not set')
+            print(f"   Allow-Origin: {cors_origin}")
+            print(f"   Allow-Methods: {cors_methods}")
+        else:
+            print(f"⚠️  CORS preflight: HTTP {response.status_code}")
+        
+        # Тест 4: POST test с мобильными данными
+        print(f"\n📡 Тест 4: POST test с мобильными данными...")
+        test_data = {
+            "deviceId": "connectivity-test-device",
+            "sensorData": [
+                {
+                    "type": "location",
+                    "timestamp": int(time.time() * 1000),
+                    "data": {
+                        "latitude": 55.7558,
+                        "longitude": 37.6176,
+                        "speed": 25.0,
+                        "accuracy": 5.0
+                    }
+                },
+                {
+                    "type": "accelerometer",
+                    "timestamp": int(time.time() * 1000),
+                    "data": {
+                        "x": 0.2,
+                        "y": 0.4,
+                        "z": 9.8
+                    }
+                }
+            ]
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/sensor-data",
+            json=test_data,
+            headers={
+                "Content-Type": "application/json",
+                "Origin": "capacitor://localhost"
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"✅ POST test успешен")
+            print(f"   Обработано точек: {result.get('rawDataPoints', 0)}")
+            print(f"   Создано условий: {result.get('conditionsProcessed', 0)}")
+            print(f"   Создано предупреждений: {result.get('warningsGenerated', 0)}")
+        else:
+            print(f"❌ POST test failed: HTTP {response.status_code}")
+            print(f"   Error: {response.text}")
+            return False, f"POST test failed: {response.status_code}"
+        
+        print(f"\n🎉 ВСЕ ТЕСТЫ CONNECTIVITY ПРОЙДЕНЫ!")
+        print(f"✅ Новый URL {BACKEND_URL} полностью доступен для мобильного приложения")
+        
+        return True, "Все тесты connectivity пройдены"
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Ошибка подключения: {str(e)}")
+        return False, f"Connection error: {str(e)}"
+    except Exception as e:
+        print(f"❌ Ошибка тестирования: {str(e)}")
+        return False, str(e)
+
 def analyze_latest_20_records():
     """ДЕТАЛЬНАЯ ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ: GET /api/admin/sensor-data?limit=20"""
     print("\n" + "="*100)
