@@ -33,6 +33,9 @@ db = client[db_name]
 print(f"Connecting to MongoDB database: {db_name}")
 print(f"MongoDB URL pattern: {mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost'}")
 
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
+
 # Create the main app without a prefix
 app = FastAPI(title="Good Road API", description="Smart Road Monitoring System")
 
