@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Административная панель</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2196F3, #4CAF50);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .header .subtitle {
+            color: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            margin-top: 0.25rem;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: calc(100vh - 80px);
+        }
+        
+        .sidebar {
+            background: #2a2a2a;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-right: 1px solid #444;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .stat-card.warning {
+            border-left-color: #FF9800;
+        }
+        
+        .stat-card.error {
+            border-left-color: #F44336;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+        
+        .filters {
+            margin-bottom: 2rem;
+        }
+        
+        .filter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #ccc;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #fff;
+        }
+        
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #2196F3;
+        }
+        
+        .btn-secondary:hover {
+            background: #1976D2;
+        }
+        
+        .map-container {
+            position: relative;
+            height: 100%;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(42, 42, 42, 0.95);
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 1000;
+            min-width: 200px;
+        }
+        
+        .legend {
+            margin-top: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .data-points-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+        
+        .data-point-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #444;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .data-point-item:hover {
+            background: #333;
+        }
+        
+        .data-point-item:last-child {
+            border-bottom: none;
+        }
+        
+        .point-info {
+            font-size: 0.875rem;
+        }
+        
+        .point-coords {
+            color: #4CAF50;
+            font-weight: 500;
+        }
+        
+        .point-time {
+            color: #999;
+        }
+        
+        .point-quality {
+            color: #FF9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            🚗 Good Road - Панель Администратора
+        </h1>
+        <div class="subtitle">Визуальный анализ данных мобильных устройств</div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <!-- Статистика -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPoints">-</div>
+                    <div class="stat-label">Всего точек</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-number" id="hazardPoints">-</div>
+                    <div class="stat-label">Препятствия</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="verifiedPoints">-</div>
+                    <div class="stat-label">Проверено</div>
+                </div>
+                <div class="stat-card error">
+                    <div class="stat-number" id="avgQuality">-</div>
+                    <div class="stat-label">Ср. качество</div>
+                </div>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="filters">
+                <h3>🔍 Фильтры данных</h3>
+                
+                <div class="filter-group">
+                    <label>Период времени:</label>
+                    <select id="timeFilter">
+                        <option value="all">Все время</option>
+                        <option value="today">Сегодня</option>
+                        <option value="week">Последняя неделя</option>
+                        <option value="month">Последний месяц</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Качество дороги:</label>
+                    <select id="qualityFilter">
+                        <option value="all">Все</option>
+                        <option value="excellent">Отличное (80-100)</option>
+                        <option value="good">Хорошее (60-79)</option>
+                        <option value="poor">Плохое (40-59)</option>
+                        <option value="bad">Ужасное (0-39)</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Тип препятствий:</label>
+                    <select id="hazardFilter">
+                        <option value="all">Все</option>
+                        <option value="pothole">Ямы</option>
+                        <option value="speed_bump">Лежачие полицейские</option>
+                        <option value="road_defect">Дефекты покрытия</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="applyFilters()">Применить фильтры</button>
+                <button class="btn btn-secondary" onclick="refreshData()">Обновить данные</button>
+            </div>
+
+            <!-- Легенда -->
+            <div class="legend">
+                <h4>🎨 Легенда карты</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4CAF50;"></div>
+                    <span>Отличная дорога (80-100)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF9800;"></div>
+                    <span>Удовлетворительная (60-79)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF5722;"></div>
+                    <span>Плохая дорога (40-59)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F44336;"></div>
+                    <span>Критическое состояние (0-39)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9C27B0;"></div>
+                    <span>Препятствия</span>
+                </div>
+            </div>
+
+            <!-- Список точек данных -->
+            <div style="margin-top: 1.5rem;">
+                <h4>📊 Последние данные</h4>
+                <div class="data-points-list" id="dataPointsList">
+                    <!-- Динамически заполняется JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <div class="map-controls">
+                <h4>🗺️ Управление картой</h4>
+                <button class="btn btn-secondary" onclick="centerMap()">Центр карты</button>
+                <button class="btn" onclick="toggleHeatmap()">Тепловая карта</button>
+                <div style="margin-top: 1rem; font-size: 0.875rem;">
+                    <div>Активных точек: <span id="activePointsCount">0</span></div>
+                    <div>Загружено: <span id="loadedPointsCount">0</span></div>
+                </div>
+            </div>
+
+            <div class="loading" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <div>Загрузка данных...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение карт -->
+    <script async defer 
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+    </script>
+
+    <script>
+        // Глобальные переменные
+        let map;
+        let markers = [];
+        let heatmapLayer;
+        let allDataPoints = [];
+        let filteredDataPoints = [];
+
+        // Инициализация карты
+        function initMap() {
+            // Центр карты - Москва
+            const center = { lat: 55.7558, lng: 37.6176 };
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 11,
+                center: center,
+                styles: [
+                    {
+                        "featureType": "all",
+                        "elementType": "geometry.fill",
+                        "stylers": [{"color": "#242424"}]
+                    },
+                    {
+                        "featureType": "all",
+                        "elementType": "labels.text.fill",
+                        "stylers": [{"color": "#ffffff"}]
+                    },
+                    {
+                        "featureType": "road",
+                        "elementType": "geometry",
+                        "stylers": [{"color": "#484848"}]
+                    },
+                    {
+                        "featureType": "water",
+                        "elementType": "geometry",
+                        "stylers": [{"color": "#17263c"}]
+                    }
+                ]
+            });
+
+            // Загрузка данных
+            loadSensorData();
+            loadStatistics();
+        }
+
+        // Загрузка данных датчиков
+        async function loadSensorData() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/admin/sensor-data?limit=1000');
+                const data = await response.json();
+                
+                allDataPoints = data.data || [];
+                filteredDataPoints = [...allDataPoints];
+                
+                updateMap();
+                updateDataPointsList();
+                updateStatistics();
+                
+                console.log(`Загружено ${allDataPoints.length} точек данных`);
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                alert('Ошибка загрузки данных с сервера');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Загрузка статистики
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/admin/analytics');
+                const stats = await response.json();
+                
+                document.getElementById('totalPoints').textContent = stats.total_points || 0;
+                document.getElementById('hazardPoints').textContent = stats.hazard_points || 0;
+                document.getElementById('verifiedPoints').textContent = stats.verified_points || 0;
+                document.getElementById('avgQuality').textContent = 
+                    stats.avg_road_quality ? stats.avg_road_quality.toFixed(1) : '0';
+                    
+            } catch (error) {
+                console.error('Ошибка загрузки статистики:', error);
+            }
+        }
+
+        // Обновление карты
+        function updateMap() {
+            // Очистка существующих маркеров
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+
+            // Добавление новых маркеров
+            filteredDataPoints.forEach(point => {
+                if (point.latitude && point.longitude && 
+                    point.latitude !== 0 && point.longitude !== 0) {
+                    
+                    const position = { 
+                        lat: parseFloat(point.latitude), 
+                        lng: parseFloat(point.longitude) 
+                    };
+
+                    // Определение цвета маркера по качеству дороги
+                    const quality = point.road_quality_score || 0;
+                    let color = '#4CAF50'; // Зеленый для хорошего качества
+                    
+                    if (quality < 40) color = '#F44336';      // Красный
+                    else if (quality < 60) color = '#FF5722'; // Оранжево-красный
+                    else if (quality < 80) color = '#FF9800'; // Оранжевый
+                    
+                    // Если есть препятствие - фиолетовый
+                    if (point.hazard_type) {
+                        color = '#9C27B0';
+                    }
+
+                    const marker = new google.maps.Marker({
+                        position: position,
+                        map: map,
+                        title: `Качество: ${quality}% | Время: ${new Date(point.timestamp).toLocaleString()}`,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: color,
+                            fillOpacity: 0.8,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2
+                        }
+                    });
+
+                    // Информационное окно
+                    const infoContent = `
+                        <div style="color: #333;">
+                            <h4>Данные GPS</h4>
+                            <p><strong>Координаты:</strong> ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</p>
+                            <p><strong>Качество дороги:</strong> ${quality}%</p>
+                            <p><strong>Скорость:</strong> ${point.speed || 0} км/ч</p>
+                            <p><strong>Точность GPS:</strong> ±${point.accuracy || 0}м</p>
+                            <p><strong>Время:</strong> ${new Date(point.timestamp).toLocaleString()}</p>
+                            ${point.hazard_type ? `<p><strong>Препятствие:</strong> ${getHazardName(point.hazard_type)}</p>` : ''}
+                            <p><strong>Проверено:</strong> ${point.is_verified ? 'Да' : 'Нет'}</p>
+                        </div>
+                    `;
+
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: infoContent
+                    });
+
+                    marker.addListener('click', () => {
+                        infoWindow.open(map, marker);
+                    });
+
+                    markers.push(marker);
+                }
+            });
+
+            // Обновление счетчиков
+            document.getElementById('activePointsCount').textContent = markers.length;
+            document.getElementById('loadedPointsCount').textContent = allDataPoints.length;
+        }
+
+        // Обновление списка точек данных
+        function updateDataPointsList() {
+            const listContainer = document.getElementById('dataPointsList');
+            listContainer.innerHTML = '';
+
+            // Берем последние 20 точек
+            const recentPoints = filteredDataPoints
+                .filter(p => p.latitude && p.longitude)
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .slice(0, 20);
+
+            recentPoints.forEach(point => {
+                const item = document.createElement('div');
+                item.className = 'data-point-item';
+                item.onclick = () => centerMapOnPoint(point);
+                
+                item.innerHTML = `
+                    <div class="point-info">
+                        <div class="point-coords">${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}</div>
+                        <div class="point-quality">Качество: ${point.road_quality_score || 0}%</div>
+                        <div class="point-time">${new Date(point.timestamp).toLocaleString()}</div>
+                    </div>
+                `;
+                
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Применение фильтров
+        function applyFilters() {
+            const timeFilter = document.getElementById('timeFilter').value;
+            const qualityFilter = document.getElementById('qualityFilter').value;
+            const hazardFilter = document.getElementById('hazardFilter').value;
+
+            filteredDataPoints = allDataPoints.filter(point => {
+                // Фильтр по времени
+                if (timeFilter !== 'all') {
+                    const pointDate = new Date(point.timestamp);
+                    const now = new Date();
+                    
+                    switch (timeFilter) {
+                        case 'today':
+                            if (pointDate.toDateString() !== now.toDateString()) return false;
+                            break;
+                        case 'week':
+                            if (now - pointDate > 7 * 24 * 60 * 60 * 1000) return false;
+                            break;
+                        case 'month':
+                            if (now - pointDate > 30 * 24 * 60 * 60 * 1000) return false;
+                            break;
+                    }
+                }
+
+                // Фильтр по качеству
+                if (qualityFilter !== 'all') {
+                    const quality = point.road_quality_score || 0;
+                    switch (qualityFilter) {
+                        case 'excellent':
+                            if (quality < 80) return false;
+                            break;
+                        case 'good':
+                            if (quality < 60 || quality >= 80) return false;
+                            break;
+                        case 'poor':
+                            if (quality < 40 || quality >= 60) return false;
+                            break;
+                        case 'bad':
+                            if (quality >= 40) return false;
+                            break;
+                    }
+                }
+
+                // Фильтр по препятствиям
+                if (hazardFilter !== 'all') {
+                    if (!point.hazard_type || point.hazard_type !== hazardFilter) return false;
+                }
+
+                return true;
+            });
+
+            updateMap();
+            updateDataPointsList();
+        }
+
+        // Обновление данных
+        function refreshData() {
+            loadSensorData();
+            loadStatistics();
+        }
+
+        // Центрирование карты
+        function centerMap() {
+            if (filteredDataPoints.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                filteredDataPoints.forEach(point => {
+                    if (point.latitude && point.longitude) {
+                        bounds.extend(new google.maps.LatLng(
+                            parseFloat(point.latitude), 
+                            parseFloat(point.longitude)
+                        ));
+                    }
+                });
+                map.fitBounds(bounds);
+            }
+        }
+
+        // Центрирование на точке
+        function centerMapOnPoint(point) {
+            const position = { 
+                lat: parseFloat(point.latitude), 
+                lng: parseFloat(point.longitude) 
+            };
+            map.setCenter(position);
+            map.setZoom(15);
+        }
+
+        // Переключение тепловой карты
+        function toggleHeatmap() {
+            // Реализация тепловой карты (требует дополнительные библиотеки)
+            alert('Функция тепловой карты будет добавлена в следующем обновлении');
+        }
+
+        // Показать/скрыть индикатор загрузки
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+        }
+
+        // Получение названия препятствия
+        function getHazardName(type) {
+            const names = {
+                'pothole': 'Яма',
+                'speed_bump': 'Лежачий полицейский',
+                'road_defect': 'Дефект покрытия',
+                'pedestrian_crossing': 'Пешеходный переход',
+                'railway_crossing': 'Железнодорожный переезд',
+                'construction': 'Дорожные работы',
+                'unpaved_road': 'Грунтовая дорога'
+            };
+            return names[type] || type;
+        }
+
+        // Обновление статистики на основе отфильтрованных данных
+        function updateStatistics() {
+            const totalPoints = filteredDataPoints.length;
+            const hazardPoints = filteredDataPoints.filter(p => p.hazard_type).length;
+            const verifiedPoints = filteredDataPoints.filter(p => p.is_verified).length;
+            const avgQuality = filteredDataPoints.length > 0 ? 
+                filteredDataPoints.reduce((sum, p) => sum + (p.road_quality_score || 0), 0) / totalPoints : 0;
+
+            // Обновляем только если применены фильтры
+            if (filteredDataPoints.length !== allDataPoints.length) {
+                document.getElementById('totalPoints').textContent = totalPoints;
+                document.getElementById('hazardPoints').textContent = hazardPoints;
+                document.getElementById('verifiedPoints').textContent = verifiedPoints;
+                document.getElementById('avgQuality').textContent = avgQuality.toFixed(1);
+            }
+        }
+
+        // Автообновление каждые 30 секунд
+        setInterval(() => {
+            refreshData();
+        }, 30000);
+    </script>
+</body>
+</html>
