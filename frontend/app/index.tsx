@@ -133,13 +133,7 @@ export default function GoodRoadApp() {
 
   const setupAudio = async () => {
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        allowsRecordingIOS: false,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
+      // expo-audio автоматически настраивает режим аудио
       console.log('🔊 Audio system initialized');
     } catch (error) {
       console.error('Audio setup error:', error);
