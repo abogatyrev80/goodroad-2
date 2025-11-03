@@ -94,7 +94,7 @@ def test_admin_analytics_api():
     """Test GET /api/admin/analytics - dashboard statistics"""
     print("\n📊 TEST 2: Admin Analytics API")
     try:
-        url = urljoin(API_BASE, 'admin/analytics')
+        url = f"{API_BASE}/admin/analytics"
         response = requests.get(url, timeout=10)
         
         print(f"URL: {url}")
