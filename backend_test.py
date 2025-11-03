@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-ДЕТАЛЬНЫЙ АНАЛИЗ: Good Road Mobile App Data Reception Analysis
-Показать точные последние данные которые попали на сервер и проанализировать механизм обмена
+КРИТИЧЕСКАЯ ПРОВЕРКА: Мониторинг запросов от мобильного приложения
+после обновления URL с https://smoothroad.preview.emergentagent.com 
+на https://smoothroad.emergent.host
+
+СИТУАЦИЯ: Обновлен backend URL в мобильном приложении
+ЦЕЛЬ: Убедиться что после обновления URL мобильное приложение может подключиться и отправить данные
 """
 
 import requests
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import subprocess
 from dotenv import load_dotenv
@@ -15,13 +19,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv('/app/frontend/.env')
 
-# Get backend URL from frontend environment
-BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
+# Get backend URL from frontend environment - UPDATED URL
+BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.emergent.host')
 API_BASE = f"{BACKEND_URL}/api"
 
-print(f"🔍 ДЕТАЛЬНЫЙ АНАЛИЗ: Good Road Server Data Analysis")
-print(f"📡 Backend URL: {API_BASE}")
-print(f"🎯 ЦЕЛЬ: Найти точную проблему почему мобильное приложение не может отправить данные на сервер")
+print(f"🚨 КРИТИЧЕСКАЯ ПРОВЕРКА: Мониторинг мобильного приложения после обновления URL")
+print(f"📡 NEW Backend URL: {API_BASE}")
+print(f"🎯 ЦЕЛЬ: Проверить подключение после изменения URL на https://smoothroad.emergent.host")
 print("=" * 100)
 
 def analyze_latest_20_records():
