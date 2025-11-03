@@ -389,15 +389,6 @@ def run_all_tests():
 if __name__ == "__main__":
     success = run_all_tests()
     exit(0 if success else 1)
-            timeout=10
-        )
-        
-        if result.returncode == 0:
-            log_lines = result.stdout.split('\n')
-            
-            # Анализируем POST запросы за последние 5 минут
-            now = datetime.now()
-            five_minutes_ago = now - timedelta(minutes=5)
             
             recent_posts = []
             external_posts = []
