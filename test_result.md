@@ -255,6 +255,18 @@
         - agent: "testing"
         - comment: "✅ TESTED: Zero coordinates cleanup endpoint working perfectly! Successfully executed complete cleanup operation: 1) Initial state: Found 3 records with (0.0, 0.0) coordinates out of 28 total records. 2) Cleanup execution: Successfully deleted 8 records with zero coordinates. 3) Verification: No zero coordinates remain in database, only valid GPS coordinates preserved (Moscow area: 55.7568, 37.6186 and New York area: 40.713, -74.0062). 4) Analytics updated: Total records reduced from 28 to 20, maintaining 4 verified points and 4 hazard points. Database cleanup operation completed successfully with all invalid GPS data removed."
 
+  - task: "Admin Dashboard Web Interface"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py, /app/backend/templates/admin_dashboard.html"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Implemented separate web-based admin dashboard accessible through browser at /admin/dashboard. Created interactive map visualization using Leaflet + OpenStreetMap (free, no API key required). Features: real-time statistics display, interactive map with color-coded markers (road quality), detailed popups for each data point, filters (hazard type, date range), list of recent data points, legend for road quality levels, cleanup functionality for zero coordinates, auto-refresh every 30 seconds. Installed jinja2 for template rendering. Backend endpoint GET /admin/dashboard serves the HTML interface."
+
 ## frontend:
   - task: "Location Tracking with Background Processing"
     implemented: true
