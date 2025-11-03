@@ -112,20 +112,23 @@ export class SyncService {
       for (let i = 0; i < unsyncedData.length; i += batchSize) {
         const batch = unsyncedData.slice(i, i + batchSize);
         
-        const response = await fetch(`${this.backendUrl}api/sensor-data/batch`, {
+        // Правильный формат для backend API /api/sensor-data
+        const response = await fetch(`${this.backendUrl}api/sensor-data`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            data: batch.map(item => ({
-              latitude: item.latitude,
-              longitude: item.longitude,
-              timestamp: item.timestamp,
-              speed: item.speed,
-              accuracy: item.accuracy,
-              accelerometer: item.accelerometer,
-              road_quality_score: item.roadQuality
+            deviceId: 'mobile-app-' + Date.now(), // Уникальный ID устройства
+            sensorData: batch.map(item => ({
+              type: 'location',
+              timestamp: new Date(item.timestamp).getTime(),
+              data: {
+                latitude: item.latitude,
+                longitude: item.longitude,
+                speed: item.speed,
+                accuracy: item.accuracy
+              }
             }))
           }),
         });
@@ -133,14 +136,15 @@ export class SyncService {
         if (response.ok) {
           const result = await response.json();
           const localIds = batch.map(item => item.id!);
-          const serverIds = result.inserted_ids || [];
           
           // Отмечаем как синхронизированные
-          await localDB.markSensorDataSynced(localIds, serverIds);
+          await localDB.markSensorDataSynced(localIds, []);
           
           console.log(`✅ Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(unsyncedData.length/batchSize)}`);
+          console.log(`📊 Server response:`, result);
         } else {
-          console.error(`❌ Failed to upload batch: ${response.status}`);
+          const errorText = await response.text();
+          console.error(`❌ Failed to upload batch: ${response.status} - ${errorText}`);
         }
       }
     } catch (error) {
