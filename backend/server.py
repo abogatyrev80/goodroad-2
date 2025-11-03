@@ -736,6 +736,38 @@ async def delete_sensor_data_point(point_id: str):
         logging.error(f"Error deleting sensor data point {point_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting data point: {str(e)}")
 
+@api_router.delete("/admin/cleanup-test-data")
+async def cleanup_test_data():
+    """
+    Delete all test sensor data records (devices with 'test' in deviceId)
+    """
+    try:
+        # Find all records with 'test' in deviceId (case insensitive)
+        query = {
+            "deviceId": {"$regex": "test", "$options": "i"}
+        }
+        
+        # Count before deletion
+        count_before = await db.sensor_data.count_documents(query)
+        
+        # Delete test records
+        result = await db.sensor_data.delete_many(query)
+        
+        # Get remaining count
+        remaining_count = await db.sensor_data.count_documents({})
+        
+        return {
+            "message": "Test data cleanup completed",
+            "deleted_records": result.deleted_count,
+            "found_test_records": count_before,
+            "remaining_records": remaining_count,
+            "test_pattern": "deviceId containing 'test' (case insensitive)"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error during test data cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during test data cleanup: {str(e)}")
+
 @api_router.delete("/admin/cleanup-zero-coords")
 async def cleanup_zero_coordinates():
     """
