@@ -1095,6 +1095,46 @@
             }
         }
 
+        // Показать статистику калибровки
+        async function showCalibrationStats() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/calibration/stats`);
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки статистики');
+                }
+                
+                const stats = await response.json();
+                
+                let message = `🎯 Статистика адаптивной калибровки\n\n`;
+                message += `📱 Всего откалиброванных устройств: ${stats.total_calibrated_devices}\n\n`;
+                
+                if (stats.top_calibrated_devices.length > 0) {
+                    message += `🏆 Топ устройств по количеству данных:\n\n`;
+                    stats.top_calibrated_devices.forEach((device, index) => {
+                        const deviceName = device.deviceId.substring(0, 12);
+                        const date = new Date(device.last_updated).toLocaleDateString('ru-RU');
+                        message += `${index + 1}. ${deviceName}...\n`;
+                        message += `   📊 Образцов: ${device.sample_count}\n`;
+                        message += `   🛣️  Тип дороги: ${device.road_type}\n`;
+                        message += `   📅 Обновлено: ${date}\n\n`;
+                    });
+                } else {
+                    message += `\nПока нет откалиброванных устройств.\n`;
+                    message += `Калибровка начнется автоматически при первой поездке.`;
+                }
+                
+                alert(message);
+                
+            } catch (error) {
+                console.error('Ошибка получения статистики:', error);
+                alert('❌ Ошибка при получении статистики калибровки: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
         // Закрыть модальное окно при клике вне его
         window.onclick = function(event) {
             const modal = document.getElementById('editModal');
