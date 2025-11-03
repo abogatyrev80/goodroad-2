@@ -611,100 +611,99 @@ def test_full_data_cycle():
     return True
 
 def main():
-    """Main diagnostic function"""
-    print("🚨 STARTING URGENT DIAGNOSTIC FOR GOOD ROAD MOBILE APP")
-    print("🎯 Goal: Find why mobile data stopped reaching database after Oct 7th")
+    """ДЕТАЛЬНЫЙ АНАЛИЗ по запросу пользователя"""
+    print("🚨 ЗАПУСК ДЕТАЛЬНОГО АНАЛИЗА ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ")
+    print("🎯 ЦЕЛЬ: Показать точные последние данные и найти проблему с мобильным приложением")
     print()
     
-    # Test results tracking
-    results = {
-        'sensor_upload': False,
-        'data_storage': False,
-        'cors_mobile': False,
-        'recent_activity': False,
-        'backend_logs': False,
-        'full_cycle': False
-    }
+    # Результаты анализа
+    analysis_results = {}
     
-    # 1. Check current database activity
-    results['recent_activity'] = check_analytics_for_recent_activity()
+    # 1. ДЕТАЛЬНАЯ ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ
+    success, details = analyze_latest_20_records()
+    analysis_results['latest_data_analysis'] = (success, details)
     
-    # 2. Check backend logs for POST requests
-    results['backend_logs'] = check_backend_logs()
+    # 2. Показать структуру endpoint
+    success, details = show_sensor_data_endpoint_structure()
+    analysis_results['endpoint_structure'] = (success, details)
     
-    # 3. Test CORS for mobile compatibility
-    results['cors_mobile'] = test_cors_mobile_compatibility()
+    # 3. Анализ Device ID patterns
+    success, details = analyze_device_ids()
+    analysis_results['device_id_analysis'] = (success, details)
     
-    # 4. Test sensor data upload
-    results['sensor_upload'], _ = test_sensor_data_upload()
+    # 4. АНАЛИЗ BACKEND ЛОГОВ ЗА ПОСЛЕДНИЕ 2 ЧАСА
+    success, details = analyze_backend_logs_2_hours()
+    analysis_results['backend_logs_analysis'] = (success, details)
     
-    # 5. Verify data storage
-    if results['sensor_upload']:
-        results['data_storage'], _ = verify_data_storage()
+    # 5. Тест функциональности API
+    print(f"\n🧪 ТЕСТИРОВАНИЕ ФУНКЦИОНАЛЬНОСТИ /api/sensor-data ENDPOINT:")
+    success, details = test_sensor_data_upload()
+    analysis_results['api_functionality_test'] = (success, details)
     
-    # 6. Test full cycle
-    results['full_cycle'] = test_full_data_cycle()
+    # 6. Проверка аналитики
+    success = check_analytics_for_recent_activity()
+    analysis_results['analytics_check'] = (success, "Проверка активности")
     
-    # Summary
-    print("\n" + "=" * 80)
-    print("🔍 URGENT DIAGNOSTIC SUMMARY")
-    print("=" * 80)
+    # ИТОГОВЫЙ ОТЧЕТ
+    print("\n" + "="*100)
+    print("ИТОГОВЫЙ ОТЧЕТ ДЕТАЛЬНОГО АНАЛИЗА")
+    print("="*100)
     
-    for test_name, passed in results.items():
-        status = "✅ PASS" if passed else "❌ FAIL"
-        print(f"{status} {test_name.replace('_', ' ').title()}")
+    passed_tests = sum(1 for success, _ in analysis_results.values() if success)
+    total_tests = len(analysis_results)
     
-    # Critical analysis
-    print("\n🚨 CRITICAL ANALYSIS:")
+    print(f"📊 Выполнено анализов: {total_tests}")
+    print(f"✅ Успешных: {passed_tests}")
+    print(f"❌ С проблемами: {total_tests - passed_tests}")
     
-    if not results['recent_activity']:
-        print("❌ CONFIRMED ISSUE: No database activity in last 7 days")
-        print("   This confirms user's report about missing data since Oct 7th")
+    print(f"\n📋 ДЕТАЛЬНЫЕ РЕЗУЛЬТАТЫ:")
+    for test_name, (success, details) in analysis_results.items():
+        status = "✅" if success else "❌"
+        print(f"{status} {test_name.replace('_', ' ').title()}: {details}")
     
-    if not results['backend_logs']:
-        print("❌ CRITICAL FINDING: No POST /api/sensor-data requests in backend logs")
-        print("   This indicates mobile app is NOT making API calls to backend")
+    # КРИТИЧЕСКИЙ АНАЛИЗ
+    print(f"\n🚨 КРИТИЧЕСКИЙ АНАЛИЗ ПРОБЛЕМЫ:")
     
-    if results['sensor_upload'] and results['data_storage']:
-        print("✅ API WORKING: Sensor data upload and storage functional")
-        print("🔍 CONCLUSION: Backend APIs work, but mobile app may not be calling them")
-    elif not results['sensor_upload']:
-        print("❌ API BROKEN: Sensor data upload endpoint not working")
-        print("🔍 CONCLUSION: Backend API failure preventing data reception")
+    latest_success, latest_details = analysis_results['latest_data_analysis']
+    logs_success, logs_details = analysis_results['backend_logs_analysis']
+    api_success, api_details = analysis_results['api_functionality_test']
     
-    if not results['cors_mobile']:
-        print("⚠️  CORS ISSUE: Mobile app origins may be blocked")
-        print("🔍 POTENTIAL CAUSE: CORS configuration preventing mobile requests")
+    if not logs_success:
+        print("❌ ПОДТВЕРЖДЕНО: НЕТ POST запросов от мобильного приложения в логах backend")
+        print("   Это означает, что мобильное приложение НЕ отправляет данные на сервер")
     
-    # Recommendations
-    print("\n💡 URGENT RECOMMENDATIONS:")
-    
-    if results['sensor_upload'] and results['data_storage'] and not results['backend_logs']:
-        print("1. 🚨 MOBILE APP ISSUE: Backend APIs functional but mobile app not calling them")
-        print("2. 🔍 Check mobile app network configuration and API endpoint URLs")
-        print("3. 🔍 Verify mobile app authentication and request headers")
-        print("4. 🔍 Check mobile app error logs for network failures")
-        print("5. 🔍 Verify mobile app background processing is working")
-    elif not results['sensor_upload']:
-        print("1. 🚨 Fix backend API issues first")
-        print("2. 🔍 Check backend server configuration")
-        print("3. 🔍 Verify database connectivity")
-    
-    if not results['cors_mobile']:
-        print("4. 🌐 Review CORS settings for mobile compatibility")
-    
-    total_passed = sum(results.values())
-    total_tests = len(results)
-    
-    print(f"\n📊 DIAGNOSTIC COMPLETE: {total_passed}/{total_tests} tests passed")
-    
-    if results['sensor_upload'] and results['data_storage'] and not results['backend_logs']:
-        print("🎯 ROOT CAUSE IDENTIFIED: Mobile app not sending data to backend")
-        print("🚨 IMMEDIATE ACTION: Check mobile app configuration and network requests")
-    elif not results['sensor_upload']:
-        print("🚨 Backend API issues detected - requires immediate backend fixes")
+    if api_success:
+        print("✅ ПОДТВЕРЖДЕНО: Backend API /api/sensor-data работает корректно")
+        print("   Сервер может принимать и обрабатывать данные от мобильных устройств")
     else:
-        print("🔍 Mixed results - requires detailed investigation")
+        print("❌ ПРОБЛЕМА: Backend API не работает корректно")
+    
+    if "Реальных: 0" in latest_details or "Сегодня: 0" in latest_details:
+        print("❌ ПОДТВЕРЖДЕНО: Нет новых реальных данных от мобильного приложения")
+        print("   Последние реальные данные датированы 07.10.2025 (27+ дней назад)")
+    
+    # ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ
+    print(f"\n💡 ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ:")
+    
+    if api_success and not logs_success:
+        print("🎯 КОРНЕВАЯ ПРИЧИНА НАЙДЕНА:")
+        print("   1. ✅ Backend APIs полностью функциональны")
+        print("   2. ❌ Мобильное приложение НЕ отправляет данные на сервер")
+        print("   3. ❌ В логах backend нет внешних POST запросов от мобильных устройств")
+        print()
+        print("🚨 НЕМЕДЛЕННЫЕ ДЕЙСТВИЯ:")
+        print("   1. Проверить конфигурацию сети в мобильном приложении")
+        print("   2. Убедиться, что мобильное приложение использует правильный URL сервера")
+        print("   3. Проверить работу фоновых задач в мобильном приложении")
+        print("   4. Проверить логи мобильного приложения на наличие ошибок сети")
+        print("   5. Убедиться, что GPS и акселерометр работают в мобильном приложении")
+    elif not api_success:
+        print("🚨 ПРОБЛЕМА В BACKEND:")
+        print("   1. Сначала необходимо исправить проблемы с backend API")
+        print("   2. Проверить подключение к базе данных MongoDB")
+        print("   3. Проверить конфигурацию сервера")
+    
+    print(f"\n📊 АНАЛИЗ ЗАВЕРШЕН: {passed_tests}/{total_tests} компонентов работают корректно")
 
 if __name__ == "__main__":
     main()
