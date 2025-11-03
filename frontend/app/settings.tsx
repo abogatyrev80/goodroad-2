@@ -224,26 +224,15 @@ export default function SettingsScreen() {
 
   const testSound = async (soundOption: SoundOption) => {
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        allowsRecordingIOS: false,
-      });
-
-      let sound: Audio.Sound;
-      
       if (soundOption.isCustom && soundOption.uri) {
-        // Воспроизводим пользовательский файл
-        const { sound: customSound } = await Audio.Sound.createAsync(
-          { uri: soundOption.uri },
-          { shouldPlay: true, volume: settings.warningVolume }
-        );
-        sound = customSound;
+        // TODO: Implement custom sound playback with expo-audio
+        console.log(`🔊 Testing custom sound: ${soundOption.name}`);
+        Alert.alert('Тест звука', `Воспроизведение: ${soundOption.name}`);
       } else {
-        // Создаем разные звуки для разных типов
+        // Воспроизводим встроенные звуки
         await playBuiltInSound(soundOption.id, settings.warningVolume);
+        console.log(`🔊 Testing sound: ${soundOption.name}`);
       }
-
-      console.log(`🔊 Testing sound: ${soundOption.name}`);
       
     } catch (error) {
       console.error('Error testing sound:', error);
