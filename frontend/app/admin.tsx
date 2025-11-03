@@ -193,8 +193,21 @@ export default function AdminPanel() {
 
   const updatePointClassification = async (pointId: string, updates: Partial<SensorDataPoint>) => {
     try {
+      console.log('🔄 Updating point classification:', pointId);
+      console.log('📝 Updates:', updates);
+      
+      // Преобразуем camelCase в snake_case для backend
+      const backendUpdates: any = {};
+      if ('isVerified' in updates) backendUpdates.is_verified = updates.isVerified;
+      if ('hazardType' in updates) backendUpdates.hazard_type = updates.hazardType;
+      if ('severity' in updates) backendUpdates.severity = updates.severity;
+      if ('adminNotes' in updates) backendUpdates.admin_notes = updates.adminNotes;
+      
+      console.log('📦 Backend payload:', backendUpdates);
+      
       // Используем прямой запрос к локальному backend
       const apiUrl = `/api/admin/sensor-data/${pointId}`;
+      console.log('🌐 API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'PATCH',
@@ -202,10 +215,15 @@ export default function AdminPanel() {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(backendUpdates),
       });
       
+      console.log('📡 Response status:', response.status);
+      
       if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Update successful:', result);
+        
         // Обновляем локальные данные
         setSensorData(prev => 
           prev.map(point => 
@@ -213,17 +231,15 @@ export default function AdminPanel() {
           )
         );
         
-        console.log(`✅ Updated point ${pointId}`);
-        Alert.alert('Успешно', 'Данные точки обновлены');
+        Alert.alert('Успешно', 'Данные обновлены');
       } else {
         const errorText = await response.text();
-        console.error(`❌ Failed to update point: ${response.status} ${response.statusText}`);
-        console.error('Error details:', errorText);
-        Alert.alert('Ошибка', `Не удалось обновить данные точки: ${response.status}`);
+        console.error('❌ Update failed:', errorText);
+        Alert.alert('Ошибка', `Не удалось обновить данные: ${response.status}`);
       }
-    } catch (error: any) {
-      console.error('❌ Error updating point:', error);
-      Alert.alert('Ошибка', `Произошла ошибка: ${error.message || error}`);
+    } catch (error) {
+      console.error('❌ Update error:', error);
+      Alert.alert('Ошибка', 'Ошибка соединения с сервером');
     }
   };
 
