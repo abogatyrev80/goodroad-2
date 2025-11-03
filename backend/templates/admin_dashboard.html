@@ -667,8 +667,11 @@
                     minute: '2-digit' 
                 });
                 
+                const deviceName = point.deviceId ? point.deviceId.substring(0, 8) : 'unknown';
+                
                 item.innerHTML = `
                     <div class="point-info">
+                        <div style="color: #2196F3; font-size: 0.75rem; margin-bottom: 2px;">📱 ${deviceName}</div>
                         <div class="point-coords">${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}</div>
                         <div class="point-time">${formattedDate}</div>
                         <div class="point-quality">Качество: ${point.road_quality_score.toFixed(1)}</div>
