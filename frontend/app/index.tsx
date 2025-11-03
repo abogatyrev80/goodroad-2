@@ -104,8 +104,7 @@ export default function GoodRoadApp() {
   const accelerometerSubscription = useRef<any>(null);
   const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Audio player для предупреждений
-  const audioPlayer = useAudioPlayer(require('../assets/sounds/warning.mp3'));
+  // Audio player будет инициализирован позже при необходимости
 
   useEffect(() => {
     setupAudio();
