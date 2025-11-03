@@ -258,7 +258,7 @@ def test_dashboard_integration():
         print("Testing API call sequence...")
         
         # 1. Get analytics
-        analytics_url = urljoin(API_BASE, '/admin/analytics')
+        analytics_url = urljoin(API_BASE, 'admin/analytics')
         analytics_response = requests.get(analytics_url, timeout=10)
         
         if analytics_response.status_code != 200:
@@ -266,7 +266,7 @@ def test_dashboard_integration():
             return False
         
         # 2. Get sensor data
-        sensor_url = urljoin(API_BASE, '/admin/sensor-data')
+        sensor_url = urljoin(API_BASE, 'admin/sensor-data')
         sensor_params = {'limit': 1000}
         sensor_response = requests.get(sensor_url, params=sensor_params, timeout=10)
         
