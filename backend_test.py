@@ -273,7 +273,10 @@ def test_connectivity_to_new_url():
         
         # Тест 1: Health check
         print(f"\n📡 Тест 1: Health check...")
-        response = requests.get(f"{BACKEND_URL}/health", timeout=10)
+        response = requests.get(f"{BACKEND_URL}/api/health", timeout=10)
+        if response.status_code == 404:
+            # Try root health endpoint
+            response = requests.get(f"{BACKEND_URL}/health", timeout=10)
         if response.status_code == 200:
             health_data = response.json()
             print(f"✅ Health check: {health_data.get('status', 'unknown')}")
