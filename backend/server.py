@@ -754,8 +754,11 @@ async def cleanup_zero_coordinates():
         raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
 
 
-# Setup Jinja2 templates
-templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
+# Admin Dashboard Route - accessible via /api/admin/dashboard
+@api_router.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard_api(request: Request):
+    """Serve the admin dashboard web interface via API route"""
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
 # Health check endpoint
 @app.get("/health")
@@ -776,10 +779,10 @@ async def health_check():
             "error": str(e)
         }
 
-# Admin Dashboard Route
+# Legacy route for local access
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    """Serve the admin dashboard web interface"""
+    """Serve the admin dashboard web interface (local access)"""
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
 # Include the router in the main app
