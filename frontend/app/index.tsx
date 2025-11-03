@@ -104,7 +104,6 @@ export default function GoodRoadApp() {
   const accelerometerSubscription = useRef<any>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const dataSendIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setupAudio();
