@@ -213,7 +213,7 @@ def test_cleanup_zero_coords_api():
     """Test DELETE /api/admin/cleanup-zero-coords - cleanup functionality"""
     print("\n🧹 TEST 4: Cleanup Zero Coordinates API")
     try:
-        url = urljoin(API_BASE, 'admin/cleanup-zero-coords')
+        url = f"{API_BASE}/admin/cleanup-zero-coords"
         response = requests.delete(url, timeout=10)
         
         print(f"URL: {url}")
