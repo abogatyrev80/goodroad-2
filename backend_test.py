@@ -24,6 +24,278 @@ print(f"📡 Backend URL: {API_BASE}")
 print(f"🎯 ЦЕЛЬ: Найти точную проблему почему мобильное приложение не может отправить данные на сервер")
 print("=" * 100)
 
+def analyze_latest_20_records():
+    """ДЕТАЛЬНАЯ ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ: GET /api/admin/sensor-data?limit=20"""
+    print("\n" + "="*100)
+    print("1. ДЕТАЛЬНАЯ ПРОВЕРКА ПОСЛЕДНИХ 20 ЗАПИСЕЙ С ТОЧНЫМИ TIMESTAMP")
+    print("="*100)
+    
+    try:
+        response = requests.get(
+            f"{API_BASE}/admin/sensor-data",
+            params={"limit": 20},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get('data', [])
+            total = data.get('total', 0)
+            
+            print(f"📊 Общее количество записей в базе: {total}")
+            print(f"📊 Получено записей для анализа: {len(records)}")
+            
+            if not records:
+                print("❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: База данных пуста!")
+                return False, "База данных пуста"
+            
+            print(f"\n📋 ПОСЛЕДНИЕ 20 ЗАПИСЕЙ С ТОЧНЫМИ ДАННЫМИ:")
+            print("-" * 140)
+            print(f"{'№':<3} {'Timestamp (UTC)':<20} {'GPS Координаты':<25} {'Скорость':<10} {'Точность':<10} {'Акселерометр (x,y,z)':<25}")
+            print("-" * 140)
+            
+            real_mobile_records = []
+            test_records = []
+            today_records = []
+            device_ids = set()
+            
+            for i, record in enumerate(records, 1):
+                timestamp_str = record.get('timestamp', 'N/A')
+                lat = record.get('latitude', 0)
+                lng = record.get('longitude', 0)
+                speed = record.get('speed', 0)
+                accuracy = record.get('accuracy', 0)
+                accel = record.get('accelerometer', {})
+                
+                # Классификация записей
+                is_real_mobile = lat != 0.0 and lng != 0.0
+                is_today = timestamp_str and '2025-11-03' in timestamp_str
+                
+                if is_real_mobile:
+                    real_mobile_records.append(record)
+                else:
+                    test_records.append(record)
+                
+                if is_today:
+                    today_records.append(record)
+                
+                # Форматирование для вывода
+                gps_coords = f"({lat:.4f}, {lng:.4f})" if is_real_mobile else "(0.0000, 0.0000)"
+                accel_str = f"{accel.get('x', 0):.1f},{accel.get('y', 0):.1f},{accel.get('z', 0):.1f}"
+                
+                print(f"{i:<3} {timestamp_str[:19]:<20} {gps_coords:<25} {speed:<10.1f} {accuracy:<10.1f} {accel_str:<25}")
+            
+            print("-" * 140)
+            
+            # Анализ по источникам
+            print(f"\n📊 РАЗДЕЛЕНИЕ ЗАПИСЕЙ ПО ИСТОЧНИКАМ:")
+            print(f"📱 Реальные мобильные данные (GPS ≠ 0,0): {len(real_mobile_records)} записей")
+            print(f"🧪 Тестовые данные (GPS = 0,0): {len(test_records)} записей")
+            print(f"📅 Записи за сегодня (3 ноября 2025): {len(today_records)} записей")
+            
+            # Самая последняя РЕАЛЬНАЯ запись
+            if real_mobile_records:
+                latest_real = real_mobile_records[0]  # Первая в списке = самая новая
+                print(f"\n🎯 САМАЯ ПОСЛЕДНЯЯ РЕАЛЬНАЯ ЗАПИСЬ (НЕ ТЕСТОВАЯ):")
+                print(f"   📅 Timestamp: {latest_real.get('timestamp', 'N/A')}")
+                print(f"   📍 GPS координаты: ({latest_real.get('latitude', 0):.6f}, {latest_real.get('longitude', 0):.6f})")
+                print(f"   🚗 Скорость: {latest_real.get('speed', 0)} км/ч")
+                print(f"   📡 Точность: {latest_real.get('accuracy', 0)} метров")
+                accel = latest_real.get('accelerometer', {})
+                print(f"   📊 Акселерометр: x={accel.get('x', 0):.2f}, y={accel.get('y', 0):.2f}, z={accel.get('z', 0):.2f}")
+            else:
+                print(f"\n❌ НЕТ РЕАЛЬНЫХ МОБИЛЬНЫХ ДАННЫХ в последних 20 записях!")
+            
+            # Записи за сегодня
+            if today_records:
+                print(f"\n📅 ЗАПИСИ ЗА СЕГОДНЯ (3 ноября 2025): {len(today_records)} записей")
+                for record in today_records:
+                    print(f"   - {record.get('timestamp', 'N/A')} | GPS: ({record.get('latitude', 0):.4f}, {record.get('longitude', 0):.4f})")
+            else:
+                print(f"\n❌ НЕТ ЗАПИСЕЙ ЗА СЕГОДНЯ (3 ноября 2025)!")
+            
+            return True, f"Реальных: {len(real_mobile_records)}, Тестовых: {len(test_records)}, Сегодня: {len(today_records)}"
+            
+        else:
+            print(f"❌ Ошибка получения данных: HTTP {response.status_code}")
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа данных: {str(e)}")
+        return False, str(e)
+
+def analyze_backend_logs_2_hours():
+    """Анализ backend логов за последние 2 часа - есть ли POST запросы от мобильного приложения"""
+    print("\n" + "="*100)
+    print("4. АНАЛИЗ BACKEND ЛОГОВ ЗА ПОСЛЕДНИЕ 2 ЧАСА")
+    print("="*100)
+    
+    try:
+        # Получаем логи backend
+        result = subprocess.run(
+            ["tail", "-n", "500", "/var/log/supervisor/backend.out.log"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            log_lines = result.stdout.split('\n')
+            
+            # Анализируем POST запросы
+            post_requests = []
+            mobile_requests = []
+            internal_requests = []
+            
+            print(f"📋 Анализ последних {len(log_lines)} строк логов backend...")
+            
+            for line in log_lines:
+                if 'POST /api/sensor-data' in line:
+                    post_requests.append(line.strip())
+                    
+                    # Проверяем источник запроса
+                    if any(ip in line for ip in ['10.64.', '127.0.0.1', 'localhost']):
+                        internal_requests.append(line.strip())
+                    else:
+                        mobile_requests.append(line.strip())
+            
+            print(f"\n📊 РЕЗУЛЬТАТЫ АНАЛИЗА ЛОГОВ:")
+            print(f"📡 Всего POST запросов к /api/sensor-data: {len(post_requests)}")
+            print(f"🏢 Внутренние запросы (10.64.x.x, localhost): {len(internal_requests)}")
+            print(f"📱 Внешние мобильные запросы: {len(mobile_requests)}")
+            
+            if post_requests:
+                print(f"\n📝 ПОСЛЕДНИЕ POST ЗАПРОСЫ К /api/sensor-data:")
+                for i, req in enumerate(post_requests[-10:], 1):  # Показываем последние 10
+                    print(f"   {i}. {req}")
+            else:
+                print(f"\n❌ НЕТ POST ЗАПРОСОВ К /api/sensor-data В ЛОГАХ!")
+            
+            if mobile_requests:
+                print(f"\n📱 ОБНАРУЖЕНЫ МОБИЛЬНЫЕ ЗАПРОСЫ:")
+                for req in mobile_requests:
+                    print(f"   ✅ {req}")
+            else:
+                print(f"\n🚨 КРИТИЧНО: НЕТ ВНЕШНИХ МОБИЛЬНЫХ ЗАПРОСОВ!")
+                print(f"   Все POST запросы идут только от внутренних IP адресов (тестирование)")
+                print(f"   Это подтверждает, что мобильное приложение НЕ отправляет данные на сервер")
+            
+            return len(mobile_requests) > 0, f"POST запросов: {len(post_requests)}, мобильных: {len(mobile_requests)}"
+            
+        else:
+            print(f"❌ Ошибка чтения логов: {result.stderr}")
+            return False, f"Ошибка логов: {result.stderr}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа логов: {str(e)}")
+        return False, str(e)
+
+def show_sensor_data_endpoint_structure():
+    """Показать структуру данных которые ожидает /api/sensor-data endpoint"""
+    print("\n" + "="*100)
+    print("5. СТРУКТУРА ДАННЫХ ДЛЯ /api/sensor-data ENDPOINT")
+    print("="*100)
+    
+    expected_structure = {
+        "deviceId": "string - уникальный идентификатор мобильного устройства",
+        "sensorData": [
+            {
+                "type": "location",
+                "timestamp": "number - Unix timestamp в миллисекундах",
+                "data": {
+                    "latitude": "number - широта GPS координат",
+                    "longitude": "number - долгота GPS координат",
+                    "speed": "number - скорость движения в км/ч",
+                    "accuracy": "number - точность GPS в метрах"
+                }
+            },
+            {
+                "type": "accelerometer",
+                "timestamp": "number - Unix timestamp в миллисекундах", 
+                "data": {
+                    "x": "number - ускорение по оси X (м/с²)",
+                    "y": "number - ускорение по оси Y (м/с²)",
+                    "z": "number - ускорение по оси Z (м/с²)"
+                }
+            }
+        ]
+    }
+    
+    print("📋 ОЖИДАЕМАЯ СТРУКТУРА JSON ДЛЯ POST /api/sensor-data:")
+    print(json.dumps(expected_structure, indent=2, ensure_ascii=False))
+    
+    # Пример реальных данных
+    example_data = {
+        "deviceId": "mobile_device_example_20251103",
+        "sensorData": [
+            {
+                "type": "location",
+                "timestamp": int(time.time() * 1000),
+                "data": {
+                    "latitude": 55.7558,
+                    "longitude": 37.6176,
+                    "speed": 45.0,
+                    "accuracy": 5.0
+                }
+            },
+            {
+                "type": "accelerometer",
+                "timestamp": int(time.time() * 1000),
+                "data": {
+                    "x": 0.2,
+                    "y": 0.4,
+                    "z": 9.8
+                }
+            }
+        ]
+    }
+    
+    print(f"\n📱 ПРИМЕР РЕАЛЬНЫХ ДАННЫХ ОТ МОБИЛЬНОГО ПРИЛОЖЕНИЯ:")
+    print(json.dumps(example_data, indent=2, ensure_ascii=False))
+    
+    return True, "Структура показана"
+
+def analyze_device_ids():
+    """Анализ deviceId используемых в записях"""
+    print("\n" + "="*100)
+    print("АНАЛИЗ DEVICE ID В ЗАПИСЯХ")
+    print("="*100)
+    
+    try:
+        # Получаем больше записей для анализа deviceId patterns
+        response = requests.get(
+            f"{API_BASE}/admin/sensor-data",
+            params={"limit": 50},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get('data', [])
+            
+            print(f"📊 Анализ deviceId patterns в {len(records)} записях...")
+            print(f"⚠️  ПРИМЕЧАНИЕ: deviceId хранится в rawData структуре, не в корне записи")
+            print(f"   Для полного анализа deviceId нужен доступ к полной rawData структуре")
+            
+            # Анализируем timestamp patterns для определения источников
+            timestamp_patterns = {}
+            for record in records:
+                timestamp = record.get('timestamp', '')
+                if timestamp:
+                    date_part = timestamp[:10]  # YYYY-MM-DD
+                    timestamp_patterns[date_part] = timestamp_patterns.get(date_part, 0) + 1
+            
+            print(f"\n📅 АКТИВНОСТЬ ПО ДАТАМ:")
+            for date, count in sorted(timestamp_patterns.items(), reverse=True):
+                print(f"   {date}: {count} записей")
+            
+            return True, f"Проанализировано {len(records)} записей"
+        else:
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        return False, str(e)
+
 def test_sensor_data_upload():
     """Test POST /api/sensor-data with realistic mobile app data"""
     print("\n🚨 CRITICAL TEST: POST /api/sensor-data - Mobile Data Upload")
