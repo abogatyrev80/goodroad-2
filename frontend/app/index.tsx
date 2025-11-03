@@ -147,13 +147,7 @@ export default function GoodRoadApp() {
     if (accelerometerSubscription.current) {
       accelerometerSubscription.current.remove();
     }
-    if (soundRef.current) {
-      try {
-        await soundRef.current.unloadAsync();
-      } catch (error) {
-        console.error('Sound cleanup error:', error);
-      }
-    }
+    // expo-audio автоматически управляет ресурсами
     if (warningIntervalRef.current) {
       clearInterval(warningIntervalRef.current);
     }
