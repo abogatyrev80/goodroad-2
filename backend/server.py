@@ -406,6 +406,7 @@ async def get_all_sensor_data(
             # Convert ObjectId to string and format data
             doc_dict = {
                 "_id": str(document["_id"]),
+                "deviceId": document.get("deviceId", "unknown"),
                 "latitude": latitude,
                 "longitude": longitude,
                 "timestamp": document.get("timestamp", datetime.now()).isoformat(),
