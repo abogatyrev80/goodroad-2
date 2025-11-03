@@ -340,19 +340,10 @@ export default function GoodRoadApp() {
     if (accelerometerSubscription.current) {
       accelerometerSubscription.current.remove();
       accelerometerSubscription.current = null;
-      console.log('🛑 Accelerometer stopped');
-    }
-    
-    // Останавливаем отправку данных
-    if (dataSendIntervalRef.current) {
-      clearInterval(dataSendIntervalRef.current);
-      dataSendIntervalRef.current = null;
-      console.log('🛑 Data sending stopped');
     }
     
     setIsTracking(false);
     setCurrentSpeed(0);
-    console.log('🛑 GPS tracking stopped');
   };
 
   const updateLocationData = (location: Location.LocationObject) => {
