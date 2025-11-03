@@ -173,25 +173,14 @@ export default function GoodRoadApp() {
       return;
     }
 
-    console.log('🔄 Запуск автоматической отправки данных (каждые 10 секунд)');
-
     const sendDataToServer = async () => {
       if (!currentLocation) {
-        console.log('⚠️ Нет данных GPS для отправки');
         return;
       }
 
       const deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://safepath-16.preview.emergentagent.com';
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
-
-      console.log('\n=== 📤 ОТПРАВКА ДАННЫХ НА СЕРВЕР ===');
-      console.log('⏰ Время:', new Date().toLocaleTimeString('ru-RU'));
-      console.log('📱 Device ID:', deviceId);
-      console.log('📍 GPS:', currentLocation.coords.latitude.toFixed(6), currentLocation.coords.longitude.toFixed(6));
-      console.log('🚗 Speed:', currentSpeed.toFixed(1), 'km/h');
-      console.log('🎯 Accuracy:', gpsAccuracy.toFixed(1), 'm');
-      console.log('📊 Accel: x=' + accelerometerData.x.toFixed(2) + ', y=' + accelerometerData.y.toFixed(2) + ', z=' + accelerometerData.z.toFixed(2));
 
       try {
         const payload = {
@@ -219,65 +208,34 @@ export default function GoodRoadApp() {
           ]
         };
 
-        console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes');
-        console.log('🌐 API URL:', apiUrl);
-
-        const startTime = Date.now();
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
-          timeout: 10000, // 10 second timeout
+          timeout: 10000,
         });
 
-        const responseTime = Date.now() - startTime;
-        console.log('⏱️  Response time:', responseTime, 'ms');
-        console.log('📡 HTTP Status:', response.status, response.statusText);
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ ДАННЫЕ УСПЕШНО ОТПРАВЛЕНЫ!');
-          console.log('📨 Server response:', JSON.stringify(result));
-          console.log('   - Raw data points:', result.rawDataPoints || 0);
-          console.log('   - Conditions processed:', result.conditionsProcessed || 0);
-          console.log('   - Warnings generated:', result.warningsGenerated || 0);
-        } else {
-          const errorText = await response.text();
-          console.error('❌ ОШИБКА СЕРВЕРА:', response.status);
-          console.error('Error details:', errorText);
+        if (!response.ok) {
+          console.error('❌ Ошибка отправки данных:', response.status);
         }
       } catch (error: any) {
-        console.error('❌ ОШИБКА ОТПРАВКИ ДАННЫХ:');
-        console.error('Error type:', error.name);
-        console.error('Error message:', error.message);
-        console.error('Stack trace:', error.stack);
-        
-        if (error.message.includes('Network request failed')) {
-          console.error('💡 Совет: Проверьте интернет-соединение');
-        } else if (error.message.includes('timeout')) {
-          console.error('💡 Совет: Сервер не отвечает, попробуйте позже');
-        }
+        console.error('❌ Ошибка сети:', error.message);
       }
-
-      console.log('=====================================\n');
     };
 
-    // Отправляем данные сразу при старте
-    sendDataToServer();
-
-    // Затем каждые 10 секунд
-    dataSendIntervalRef.current = setInterval(sendDataToServer, 10000);
+    // Отправляем данные каждые 10 секунд
+    const intervalId = setInterval(sendDataToServer, 10000);
+    
+    // Первая отправка через 5 секунд после старта
+    const timeoutId = setTimeout(sendDataToServer, 5000);
 
     return () => {
-      if (dataSendIntervalRef.current) {
-        clearInterval(dataSendIntervalRef.current);
-        dataSendIntervalRef.current = null;
-        console.log('🛑 Автоматическая отправка данных остановлена');
-      }
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
     };
-  }, [isTracking, currentLocation, accelerometerData, currentSpeed, gpsAccuracy]);
+  }, [isTracking]); // Зависимость только от isTracking, чтобы не пересоздавать интервал
 
   // Функции для системы предупреждений
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
