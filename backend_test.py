@@ -25,17 +25,17 @@ from dotenv import load_dotenv
 load_dotenv('/app/frontend/.env')
 
 # Get backend URL from frontend environment - Use CORRECT production URL
-BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
+BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://safepath-16.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
 
 # FINAL CHECK: User corrected URL back to the CORRECT production server
 print(f"📋 ФИНАЛЬНАЯ КОНФИГУРАЦИЯ URL:")
 print(f"   URL из .env: {BACKEND_URL}")
-print(f"   ПРАВИЛЬНЫЙ production URL: https://smoothroad.preview.emergentagent.com")
+print(f"   ПРАВИЛЬНЫЙ production URL: https://safepath-16.preview.emergentagent.com")
 if 'preview.emergentagent.com' not in BACKEND_URL:
     print(f"🔧 ИСПРАВЛЕНИЕ: Используем правильный production URL согласно env variables")
     # Use the CORRECT production URL according to env variables
-    BACKEND_URL = 'https://smoothroad.preview.emergentagent.com'
+    BACKEND_URL = 'https://safepath-16.preview.emergentagent.com'
     API_BASE = f"{BACKEND_URL}/api"
     print(f"   Исправленный URL для тестирования: {BACKEND_URL}")
 else:

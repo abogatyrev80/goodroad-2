@@ -9,7 +9,7 @@ import json
 import time
 
 # Backend URL
-BACKEND_URL = "https://smoothroad.preview.emergentagent.com/api"
+BACKEND_URL = "https://safepath-16.preview.emergentagent.com/api"
 
 def test_admin_sensor_data_gps_fix():
     """

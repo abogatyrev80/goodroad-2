@@ -1,72 +1,77 @@
 <analysis>
-The AI engineer developed the Good Road mobile app from scratch, implementing core features like sensor data collection, background processing, auto-start, and configurable audio-visual warnings. Development was iterative, involving extensive debugging of white screen and  errors. Key features like speed, GPS accuracy, and sound alerts faced persistent bugs. Recent efforts focused on fixing sound alerts, implementing a smart warning system, and developing an administrative panel with map visualization. A major re-architecture for offline functionality using SQLite was initiated. The most recent issue involves an HTTP 500 error in the web-based admin panel, traced to SQLite module loading errors in the browser environment, leading to the creation of  to mitigate this. Navigation between screens also remains an intermittent problem, particularly in the web preview.
+The previous AI engineer successfully brought the Good Road mobile application from initial concept to a functional state, addressing numerous critical bugs and implementing new features. Key challenges involved resolving persistent  module loading errors in the web environment, ensuring cross-platform compatibility by replacing  with , and rectifying incorrect API URL configurations that prevented data synchronization. A significant portion of the work focused on enabling data collection from mobile devices, implementing a direction indicator to hazards, and debugging the administrative panel's data display and interactive elements. The trajectory shows an iterative process of identifying, fixing, and re-testing, particularly regarding frontend-backend communication and environment-specific issues like MongoDB configuration for deployment. The current work is initiating the development of a dedicated web-based backend administrative interface with map visualization.
 </analysis>
 
 <product_requirements>
-The Good Road application is a mobile tool enhancing driver safety by monitoring road quality. It operates in the background, collecting accelerometer and multi-system GPS data for server-side analysis to identify road hazards (potholes, bumps). Key features include real-time road quality display, audio-visual hazard warnings, automatic service start (car connection/motion), and UI showing speed, satellite count, and GPS accuracy. Users can configure warnings via settings, setting speed thresholds and hazard types, and customize audio warnings, including uploading their own sounds. An intelligent warning system classifies obstacles based on approach speed and driver action, escalating alerts. An administrative panel for visualizing sensor data on a map is required for analysis. Future requirements include offline data storage using SQLite, regional data download, local data accumulation when offline, and a direction indicator to hazards. The admin panel is to be a separate web application.
+The Good Road application aims to enhance driver safety by monitoring road quality, identifying hazards (potholes, bumps) through accelerometer and GPS data, and providing real-time audio-visual warnings. It operates in the background, auto-starting based on car connection or motion. The UI displays speed, satellite count, and GPS accuracy. Users can customize warning thresholds and audio alerts, including uploading custom sounds. An intelligent warning system classifies obstacles and escalates alerts. An administrative panel is required for visualizing sensor data on a map, with future plans for offline data storage using SQLite, regional data downloads, local data accumulation, and a direction indicator to hazards. The admin panel is envisioned as a separate web application. Recent tasks included replacing the road quality score with a dynamic direction indicator to hazards and addressing issues with the admin panel.
 </product_requirements>
 
 <key_technical_concepts>
--   **Frontend:** React Native, Expo, Expo Router, TypeScript.
--   **Device APIs:** , , , , , , .
--   **Backend:** Python (FastAPI).
--   **Database:** MongoDB.
--   **Storage:** .
--   **Tunneling:** ngrok.
+- **Frontend:** React Native, Expo, Expo Router, TypeScript
+- **Device APIs:** , , , , , , 
+- **Backend:** Python (FastAPI), MongoDB
+- **State Management:** ,  (mentioned in guidelines)
+- **UI Components:** , , 
 </key_technical_concepts>
 
 <code_architecture>
-The application uses a full-stack architecture with an Expo/React Native frontend and a FastAPI/MongoDB backend.
+The application employs a full-stack architecture with an Expo/React Native frontend and a FastAPI/MongoDB backend.
 
 **Directory Structure:**
 
 
--   ****
-    -   **Importance:** This is the main screen and the core of the application, containing the UI for road quality, status displays, control buttons, and primary logic for sensors, permissions, tracking, and warnings.
-    -   **Changes:** Extensively modified for sensor logic, auto-start, a complex warning system, and detailed status indicators. It was updated to integrate new sound settings, the smart warning system, offline system initialization, and a direction indicator UI.
+- ****
+    - **Importance:** Main screen, handles sensor data, GPS, UI, warnings. This file has been dynamically switched between a web-optimized version and a full mobile version.
+    - **Changes:** Originally modified for sensor logic, auto-start, warnings. Later extensively refactored to conditionally load offline modules due to  errors on web. All  instances were replaced with . The Road Quality display was replaced with a Direction Indicator to Nearest Hazard. Currently, it uses the content of .
 
--   ****
-    -   **Importance:** Defines the settings screen, allowing users to configure warning behavior, including hazard types and speed thresholds.
-    -   **Changes:** Extended to include custom audio selection and upload functionality using , along with several predefined sound options.
+- ****
+    - **Importance:** User configuration for warnings, hazard types, speed, and custom audio.
+    - **Changes:** Updated to include  import to resolve a . All  instances were replaced with . Information about supported audio formats was added.
 
--   ****
-    -   **Importance:** Serves as the administrative dashboard for visualizing sensor data, statistics, and integrating map data.
-    -   **Changes:** Created to display road condition statistics and a placeholder map. It integrates backend administrative APIs but has faced persistent issues with network requests and SQLite imports in web environments. Modifications were made to handle  and  errors.
+- ****
+    - **Importance:** A simplified administrative panel to display statistics and data points, created to circumvent  issues.
+    - **Changes:** Faced HTTP 500 errors due to . API URLs were corrected to use . Error handling, fallback logic, and timeout for data loading were implemented. All  instances were replaced with  to fix unresponsive buttons. A  was fixed in the  hook for data loading. App version information was added to the footer.
 
--   ****
-    -   **Importance:** A simplified administrative panel designed to circumvent issues present in , specifically those related to SQLite module loading errors in the web environment.
-    -   **Changes:** Newly created to provide basic administrative functionality and data display by avoiding problematic imports that caused crashes.
+- ****
+    - **Importance:** Manages region-based data downloads and offline mode features.
+    - **Changes:**  instances were replaced with . Logic was added to conditionally load services and display a Mobile only message for web.
 
--   ****
-    -   **Importance:** Manages region-based data downloads for offline use and other offline mode configurations.
-    -   **Changes:** Newly created to handle offline capabilities, incorporating  with platform-specific loading checks to prevent web issues.
+- ****
+    - **Importance:** Core component for local SQLite data storage.
+    - **Changes:** Modified to conditionally import  only for mobile platforms to prevent  errors on web builds. Null checks were added for database operations.
 
--   ****
-    -   **Importance:** Provides an interface for local data storage and management using SQLite on the device.
-    -   **Changes:** Newly created as a core component of the offline re-architecture.
+- ****
+    - **Importance:** Manages synchronization of local data with the backend.
+    - **Changes:** Moved out of  back to . Updated to use  for API calls, and its initialization was made robust to handle unavailable SQLite. The fallback URL was corrected multiple times to ensure data reached the correct production server.
 
--   ****
-    -   **Importance:** Manages the synchronization of locally stored data with the backend server.
-    -   **Changes:** Newly created to enable data exchange between the device and the server when connectivity is available.
+- ****
+    - **Importance:** FastAPI backend, handles API endpoints for sensor data, analytics, and admin functions.
+    - **Changes:** Extended with  and . The  endpoint was fixed to correctly extract GPS coordinates from the  array. A  endpoint was added to remove invalid data. MongoDB connection was updated to use environment variables for Atlas production compatibility. A  check endpoint was added.
 
--   ****
-    -   **Importance:** The FastAPI backend application, defining API endpoints for receiving sensor data, analyzing road hazards, and providing hazard information.
-    -   **Changes:** Extended to include new administrative endpoints (e.g., , ) to support the data visualization and management requirements of the admin panel.
+- ****
+    - **Importance:** Newly created file to serve as a dedicated web-based administrative dashboard with map visualization.
+    - **Changes:** Initial creation as an empty HTML file.
 </code_architecture>
 
 <pending_tasks>
--   **Fix Navigation:** Address unstable  behavior for consistent screen transitions, especially in web preview.
--   **Frontend Tests:** Implement automated tests for critical frontend functionalities.
+-   **Fix Navigation:** Address unstable  behavior.
+-   **Frontend Tests:** Implement automated tests for critical functionalities.
 -   **Performance Optimization:** Optimize UI updates and overall frontend performance.
--   **Offline Mode:** Fully implement and test offline data caching, synchronization, and regional data downloads on mobile.
--   **Admin Panel Web Access:** Ensure the administrative panel functions correctly in a web browser, resolving all loading and display issues.
+-   **Offline Mode:** Fully implement and test offline data caching, synchronization, and regional data downloads on mobile (though web preview currently shows mobile only).
 -   **Map Integration:** Integrate a functional, interactive map (Yandex/Google) into the admin panel for visual data analysis.
+-   **Backend Admin Dashboard:** Implement the full functionality for the newly created .
 </pending_tasks>
 
 <current_work>
-Immediately prior to this summary, the AI engineer was addressing a critical HTTP 500 error in the administrative panel when accessed via the web browser. Diagnostics confirmed backend API endpoints () were operational, pointing the issue to the frontend. The root cause was identified as  or its related  module attempting to load in the web environment, causing a server error during bundling. The AI had previously fixed incorrect API URLs and  errors in . To resolve the persistent 500 error and make the admin panel accessible in the web preview, the AI is currently creating a new, simplified  file. This new file aims to provide basic administrative functionality by avoiding the problematic imports that lead to web-specific crashes. The work has progressed to the point of creating this file, with the next step being to integrate it.
+Immediately prior to this summary, the AI engineer was addressing a critical issue where the mobile application was not sending sensor data to the backend. This was traced to multiple misconfigurations: the  folder (containing  and ) was temporarily disabled (renamed to ) to resolve web-based SQLite errors, and the main  file was using a web-optimized version that lacked data synchronization logic. Furthermore, the  and  fallback URLs were incorrectly configured, preventing the mobile app from reaching the correct production backend server.
+
+The AI engineer restored the  folder, replaced the web  with the full mobile version (), and meticulously corrected the  in the  file and the fallback URL in  to , as confirmed by the user. These changes allowed the mobile app to start sending data, with new POST requests being observed in the backend logs.
+
+However, during this process, the recurring  module loading error resurfaced in the web preview, impacting development on web-specific screens like  and . The  and  files were updated to conditionally import  and handle its absence gracefully on web, ensuring the overall build process for deployment succeeded, while acknowledging that web preview for offline-related features would be limited.
+
+The very last user request was to create a *separate backend interface* accessible via browser for visual data analysis on maps. The AI engineer has just initiated this by creating .
 </current_work>
 
 <optional_next_step>
-Finalize the implementation of  to resolve the HTTP 500 error and make the web admin panel accessible.
+Add a FastAPI endpoint to  to serve the newly created  template.
 </optional_next_step>
