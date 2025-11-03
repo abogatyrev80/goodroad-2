@@ -24,20 +24,22 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv('/app/frontend/.env')
 
-# Get backend URL from frontend environment - Check current configuration
-BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.emergent.host')
+# Get backend URL from frontend environment - Use CORRECT production URL
+BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
 
-# Note: User reported updating to https://smoothroad.emergent.host but env still shows old URL
-print(f"📋 КОНФИГУРАЦИЯ URL:")
-print(f"   Текущий URL в .env: {BACKEND_URL}")
-print(f"   Ожидаемый новый URL: https://smoothroad.emergent.host")
-if 'emergent.host' not in BACKEND_URL:
-    print(f"⚠️  ВНИМАНИЕ: .env файл еще не обновлен с новым URL!")
-    # Use the new URL that user reported updating to
-    BACKEND_URL = 'https://smoothroad.emergent.host'
+# FINAL CHECK: User corrected URL back to the CORRECT production server
+print(f"📋 ФИНАЛЬНАЯ КОНФИГУРАЦИЯ URL:")
+print(f"   URL из .env: {BACKEND_URL}")
+print(f"   ПРАВИЛЬНЫЙ production URL: https://smoothroad.preview.emergentagent.com")
+if 'preview.emergentagent.com' not in BACKEND_URL:
+    print(f"🔧 ИСПРАВЛЕНИЕ: Используем правильный production URL согласно env variables")
+    # Use the CORRECT production URL according to env variables
+    BACKEND_URL = 'https://smoothroad.preview.emergentagent.com'
     API_BASE = f"{BACKEND_URL}/api"
-    print(f"   Используем новый URL для тестирования: {BACKEND_URL}")
+    print(f"   Исправленный URL для тестирования: {BACKEND_URL}")
+else:
+    print(f"✅ URL корректный - используем правильный production сервер")
 
 print(f"🚨 КРИТИЧЕСКАЯ ПРОВЕРКА: Мониторинг мобильного приложения после обновления URL")
 print(f"📡 NEW Backend URL: {API_BASE}")
