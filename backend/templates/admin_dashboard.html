@@ -774,18 +774,24 @@
             
             const deviceId = point.deviceId || 'unknown';
             const deviceName = deviceId.substring(0, 8); // Первые 8 символов для краткости
+            const coords = `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
             
             return `
                 <div class="popup-content">
                     <h4>Данные точки</h4>
                     <div class="popup-info"><strong>Устройство:</strong> <span style="color: #2196F3; font-family: monospace;">${deviceName}</span></div>
-                    <div class="popup-info"><strong>Координаты:</strong> ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
+                    <div class="popup-info"><strong>Координаты:</strong> ${coords}</div>
                     <div class="popup-info"><strong>Дата:</strong> ${formattedDate}</div>
                     <div class="popup-info"><strong>Качество дороги:</strong> <span class="${statusClass}">${point.road_quality_score.toFixed(1)}</span></div>
                     <div class="popup-info"><strong>Скорость:</strong> ${point.speed.toFixed(1)} км/ч</div>
                     <div class="popup-info"><strong>Точность GPS:</strong> ${point.accuracy.toFixed(1)} м</div>
                     ${hazardInfo}
-                    <div class="popup-info"><strong>Проверено:</strong> ${point.is_verified ? 'Да' : 'Нет'}</div>
+                    <div class="popup-info"><strong>Проверено:</strong> ${point.is_verified ? 'Да ✓' : 'Нет'}</div>
+                    ${point.admin_notes ? `<div class="popup-info"><strong>Заметки:</strong> ${point.admin_notes}</div>` : ''}
+                    <div class="action-buttons">
+                        <button class="btn-small btn-edit" onclick='openEditModal(${JSON.stringify(point)})'>✏️ Редактировать</button>
+                        <button class="btn-small btn-delete" onclick='deletePoint("${point._id}", "${coords}")'>🗑️ Удалить</button>
+                    </div>
                 </div>
             `;
         }
