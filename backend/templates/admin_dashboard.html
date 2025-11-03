@@ -543,6 +543,64 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактирование точки</h2>
+                <span class="close-btn" onclick="closeEditModal()">&times;</span>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="edit_point_id">
+                
+                <div class="form-group">
+                    <label>Координаты (только для просмотра):</label>
+                    <input type="text" id="edit_coords" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_hazard_type">Тип опасности:</label>
+                    <select id="edit_hazard_type">
+                        <option value="">Нет опасности</option>
+                        <option value="pothole">Яма</option>
+                        <option value="speed_bump">Лежачий полицейский</option>
+                        <option value="road_defect">Дефект покрытия</option>
+                        <option value="pedestrian_crossing">Пешеходный переход</option>
+                        <option value="railway_crossing">Железнодорожный переезд</option>
+                        <option value="construction">Дорожные работы</option>
+                        <option value="unpaved_road">Грунтовая дорога</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_severity">Серьезность:</label>
+                    <select id="edit_severity">
+                        <option value="low">Низкая</option>
+                        <option value="medium">Средняя</option>
+                        <option value="high">Высокая</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_verified">
+                        <input type="checkbox" id="edit_verified" style="width: auto; margin-right: 0.5rem;">
+                        Проверено администратором
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_notes">Заметки администратора:</label>
+                    <textarea id="edit_notes" placeholder="Дополнительная информация..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-save" onclick="saveEdit()">Сохранить</button>
+                    <button type="button" class="btn btn-cancel" onclick="closeEditModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
