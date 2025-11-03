@@ -497,6 +497,19 @@
                 <button class="btn btn-danger" onclick="clearTestData()">Удалить тестовые данные</button>
             </div>
 
+            <!-- Тестирование обмена данными -->
+            <div style="margin-top: 2rem; padding: 1rem; background: #333; border-radius: 8px;">
+                <h4 style="margin-bottom: 1rem; color: #4CAF50;">🧪 Тестирование обмена данными:</h4>
+                <p style="font-size: 0.75rem; color: #999; margin-bottom: 1rem;">
+                    Эта кнопка генерирует и отправляет тестовые данные, имитируя мобильное приложение.
+                    Используйте для проверки работы API и отображения данных на карте.
+                </p>
+                <button class="btn" onclick="sendTestData()" style="background: #FF9800;">
+                    📡 Отправить тестовые данные
+                </button>
+                <div id="testDataLog" style="margin-top: 1rem; font-size: 0.75rem; color: #ccc; max-height: 200px; overflow-y: auto; font-family: monospace; background: #222; padding: 0.5rem; border-radius: 4px; display: none;"></div>
+            </div>
+
             <!-- Легенда -->
             <div class="legend">
                 <h4>Легенда:</h4>
