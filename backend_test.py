@@ -24,9 +24,20 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv('/app/frontend/.env')
 
-# Get backend URL from frontend environment - UPDATED URL
+# Get backend URL from frontend environment - Check current configuration
 BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.emergent.host')
 API_BASE = f"{BACKEND_URL}/api"
+
+# Note: User reported updating to https://smoothroad.emergent.host but env still shows old URL
+print(f"📋 КОНФИГУРАЦИЯ URL:")
+print(f"   Текущий URL в .env: {BACKEND_URL}")
+print(f"   Ожидаемый новый URL: https://smoothroad.emergent.host")
+if 'emergent.host' not in BACKEND_URL:
+    print(f"⚠️  ВНИМАНИЕ: .env файл еще не обновлен с новым URL!")
+    # Use the new URL that user reported updating to
+    BACKEND_URL = 'https://smoothroad.emergent.host'
+    API_BASE = f"{BACKEND_URL}/api"
+    print(f"   Используем новый URL для тестирования: {BACKEND_URL}")
 
 print(f"🚨 КРИТИЧЕСКАЯ ПРОВЕРКА: Мониторинг мобильного приложения после обновления URL")
 print(f"📡 NEW Backend URL: {API_BASE}")
