@@ -140,7 +140,7 @@ def test_admin_sensor_data_api():
     """Test GET /api/admin/sensor-data - data points for map"""
     print("\n🗺️  TEST 3: Admin Sensor Data API")
     try:
-        url = urljoin(API_BASE, 'admin/sensor-data')
+        url = f"{API_BASE}/admin/sensor-data"
         params = {'limit': 10}
         response = requests.get(url, params=params, timeout=10)
         
