@@ -704,6 +704,38 @@ async def cleanup_old_data():
         logging.error(f"Error during data cleanup: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during data cleanup: {str(e)}")
 
+@api_router.delete("/admin/sensor-data/{point_id}")
+async def delete_sensor_data_point(point_id: str):
+    """
+    Delete a specific sensor data point by ID
+    """
+    try:
+        from bson import ObjectId
+        
+        # Convert string ID to ObjectId
+        try:
+            object_id = ObjectId(point_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid point ID format")
+        
+        # Delete the document
+        result = await db.sensor_data.delete_one({"_id": object_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Sensor data point not found")
+        
+        return {
+            "message": "Sensor data point deleted successfully",
+            "point_id": point_id,
+            "deleted": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting sensor data point {point_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting data point: {str(e)}")
+
 @api_router.delete("/admin/cleanup-zero-coords")
 async def cleanup_zero_coordinates():
     """
