@@ -1,50 +1,24 @@
 #!/usr/bin/env python3
 """
-🚨 СРОЧНАЯ ПРОВЕРКА: Обмен данными после исправления URL - поступили ли данные от мобильного приложения пользователя
-
-СИТУАЦИЯ: Пользователь обновил мобильное приложение с новым URL https://smoothroad.emergent.host, 
-перезапустил приложение и начал мониторинг. Просит проверить обмен данными.
-
-КРИТИЧЕСКАЯ ПРОВЕРКА В РЕАЛЬНОМ ВРЕМЕНИ:
-1. GET /api/admin/sensor-data?limit=10 - проверить самые свежие записи за последние 10 минут
-2. Анализировать timestamp последних записей - есть ли данные от 3 декабря 2025?
-3. Backend логи за последние 15 минут - появились ли POST запросы от внешних IP (не 10.64.x.x)?
-4. GET /api/admin/analytics - изменилась ли статистика total_points, recent_points_7d?
-5. Анализ активности - сравнить с предыдущей проверкой
+Backend Testing Suite for Good Road Admin Dashboard
+Tests the admin dashboard web interface and underlying APIs
 """
 
 import requests
 import json
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import os
-import subprocess
-from dotenv import load_dotenv
+from urllib.parse import urljoin
 
-# Load environment variables
-load_dotenv('/app/frontend/.env')
+# Get backend URL from environment
+BACKEND_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://safepath-16.preview.emergentagent.com')
+API_BASE = urljoin(BACKEND_URL, '/api')
 
-# Get backend URL from frontend environment - Use CORRECT production URL
-BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://safepath-16.preview.emergentagent.com')
-API_BASE = f"{BACKEND_URL}/api"
-
-# FINAL CHECK: User corrected URL back to the CORRECT production server
-print(f"📋 ФИНАЛЬНАЯ КОНФИГУРАЦИЯ URL:")
-print(f"   URL из .env: {BACKEND_URL}")
-print(f"   ПРАВИЛЬНЫЙ production URL: https://safepath-16.preview.emergentagent.com")
-if 'preview.emergentagent.com' not in BACKEND_URL:
-    print(f"🔧 ИСПРАВЛЕНИЕ: Используем правильный production URL согласно env variables")
-    # Use the CORRECT production URL according to env variables
-    BACKEND_URL = 'https://safepath-16.preview.emergentagent.com'
-    API_BASE = f"{BACKEND_URL}/api"
-    print(f"   Исправленный URL для тестирования: {BACKEND_URL}")
-else:
-    print(f"✅ URL корректный - используем правильный production сервер")
-
-print(f"🚨 ФИНАЛЬНАЯ ПРОВЕРКА: Подключение к ПРАВИЛЬНОМУ production серверу")
-print(f"📡 CORRECT Backend URL: {API_BASE}")
-print(f"🎯 ЦЕЛЬ: Убедиться что мобильное приложение подключается к правильному серверу согласно env variables")
-print("=" * 100)
+print(f"🔍 TESTING ADMIN DASHBOARD WEB INTERFACE")
+print(f"Backend URL: {BACKEND_URL}")
+print(f"API Base: {API_BASE}")
+print("=" * 80)
 
 def check_backend_logs_last_5_minutes():
     """КРИТИЧЕСКАЯ ПРОВЕРКА: Backend логи за последние 5 минут - есть ли новые POST запросы от внешних IP?"""
