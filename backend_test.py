@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-URGENT DIAGNOSTIC: Good Road Mobile App Data Reception Test
-Testing why mobile app data is not reaching the database (last data from Oct 7th)
+ДЕТАЛЬНЫЙ АНАЛИЗ: Good Road Mobile App Data Reception Analysis
+Показать точные последние данные которые попали на сервер и проанализировать механизм обмена
 """
 
 import requests
@@ -9,6 +9,7 @@ import json
 import time
 from datetime import datetime, timezone
 import os
+import subprocess
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -18,10 +19,10 @@ load_dotenv('/app/frontend/.env')
 BACKEND_URL = os.getenv('EXPO_PUBLIC_BACKEND_URL', 'https://smoothroad.preview.emergentagent.com')
 API_BASE = f"{BACKEND_URL}/api"
 
-print(f"🔍 URGENT DIAGNOSTIC: Testing Good Road Mobile Data Reception")
+print(f"🔍 ДЕТАЛЬНЫЙ АНАЛИЗ: Good Road Server Data Analysis")
 print(f"📡 Backend URL: {API_BASE}")
-print(f"📅 Issue: No new data since October 7th despite mobile app usage today")
-print("=" * 80)
+print(f"🎯 ЦЕЛЬ: Найти точную проблему почему мобильное приложение не может отправить данные на сервер")
+print("=" * 100)
 
 def test_sensor_data_upload():
     """Test POST /api/sensor-data with realistic mobile app data"""
