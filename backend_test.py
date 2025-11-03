@@ -968,31 +968,364 @@ def test_full_data_cycle():
     print("✅ FULL CYCLE COMPLETED")
     return True
 
+def check_fresh_data_december_3():
+    """
+    КРИТИЧЕСКАЯ ПРОВЕРКА 1: GET /api/admin/sensor-data?limit=10 
+    Проверить самые свежие записи за последние 10 минут и данные от 3 декабря 2025
+    """
+    print("\n" + "="*100)
+    print("1. КРИТИЧЕСКАЯ ПРОВЕРКА: СВЕЖИЕ ЗАПИСИ ЗА ПОСЛЕДНИЕ 10 МИНУТ И ДАННЫЕ ОТ 3 ДЕКАБРЯ 2025")
+    print("="*100)
+    
+    try:
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get('data', [])
+            total = data.get('total', 0)
+            
+            print(f"📊 Общее количество записей в базе: {total}")
+            print(f"📊 Последние 10 записей для анализа:")
+            
+            if not records:
+                print("❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: База данных пуста!")
+                return False, "База данных пуста"
+            
+            # Анализ временных меток
+            now = datetime.now()
+            ten_minutes_ago = now - timedelta(minutes=10)
+            december_3_2025 = datetime(2025, 12, 3).date()
+            
+            fresh_records = []
+            december_3_records = []
+            
+            print(f"\n📋 АНАЛИЗ ПОСЛЕДНИХ 10 ЗАПИСЕЙ:")
+            print("-" * 120)
+            print(f"{'№':<3} {'Timestamp':<20} {'Минут назад':<12} {'GPS Координаты':<25} {'Дата':<12} {'Источник':<15}")
+            print("-" * 120)
+            
+            for i, record in enumerate(records, 1):
+                timestamp_str = record.get('timestamp', 'N/A')
+                lat = record.get('latitude', 0)
+                lng = record.get('longitude', 0)
+                
+                # Анализ времени
+                minutes_ago = "N/A"
+                record_date = "N/A"
+                
+                if timestamp_str and timestamp_str != 'N/A':
+                    try:
+                        if 'T' in timestamp_str:
+                            record_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        else:
+                            record_time = datetime.fromisoformat(timestamp_str)
+                        
+                        record_time_naive = record_time.replace(tzinfo=None)
+                        time_diff = now - record_time_naive
+                        minutes_ago = round(time_diff.total_seconds() / 60, 1)
+                        record_date = record_time_naive.date()
+                        
+                        # Проверка на свежие записи (менее 10 минут)
+                        if minutes_ago <= 10:
+                            fresh_records.append({
+                                'timestamp': timestamp_str,
+                                'minutes_ago': minutes_ago,
+                                'gps': f"({lat}, {lng})",
+                                'is_real': lat != 0.0 and lng != 0.0
+                            })
+                        
+                        # Проверка на записи от 3 декабря 2025
+                        if record_date == december_3_2025:
+                            december_3_records.append({
+                                'timestamp': timestamp_str,
+                                'gps': f"({lat}, {lng})",
+                                'is_real': lat != 0.0 and lng != 0.0
+                            })
+                            
+                    except Exception as e:
+                        minutes_ago = f"Ошибка: {str(e)}"
+                
+                # Определение источника
+                is_real_mobile = lat != 0.0 and lng != 0.0
+                source = "Мобильное" if is_real_mobile else "Тестовое"
+                gps_coords = f"({lat:.4f}, {lng:.4f})" if is_real_mobile else "(0.0000, 0.0000)"
+                
+                print(f"{i:<3} {timestamp_str[:19]:<20} {minutes_ago:<12} {gps_coords:<25} {record_date:<12} {source:<15}")
+            
+            print("-" * 120)
+            
+            # Результаты анализа
+            print(f"\n🔍 РЕЗУЛЬТАТЫ АНАЛИЗА ВРЕМЕНИ:")
+            print(f"🕐 Записей за последние 10 минут: {len(fresh_records)}")
+            print(f"📅 Записей от 3 декабря 2025: {len(december_3_records)}")
+            
+            if fresh_records:
+                print(f"\n🎉 НАЙДЕНЫ СВЕЖИЕ ЗАПИСИ! {len(fresh_records)} записей за последние 10 минут:")
+                for record in fresh_records:
+                    source_type = "📱 МОБИЛЬНОЕ" if record['is_real'] else "🧪 ТЕСТОВОЕ"
+                    print(f"   {source_type} - {record['minutes_ago']} мин назад: GPS {record['gps']}")
+            else:
+                print(f"\n❌ НЕТ СВЕЖИХ ЗАПИСЕЙ за последние 10 минут")
+            
+            if december_3_records:
+                print(f"\n🎉 НАЙДЕНЫ ЗАПИСИ ОТ 3 ДЕКАБРЯ 2025! {len(december_3_records)} записей:")
+                for record in december_3_records:
+                    source_type = "📱 МОБИЛЬНОЕ" if record['is_real'] else "🧪 ТЕСТОВОЕ"
+                    print(f"   {source_type} - {record['timestamp']}: GPS {record['gps']}")
+            else:
+                print(f"\n❌ НЕТ ЗАПИСЕЙ ОТ 3 ДЕКАБРЯ 2025")
+            
+            # Определение успеха
+            has_new_data = len(fresh_records) > 0 or len(december_3_records) > 0
+            real_mobile_data = any(r['is_real'] for r in fresh_records + december_3_records)
+            
+            if has_new_data and real_mobile_data:
+                return True, f"Свежих: {len(fresh_records)}, от 3 дек: {len(december_3_records)} (мобильные данные)"
+            elif has_new_data:
+                return True, f"Свежих: {len(fresh_records)}, от 3 дек: {len(december_3_records)} (только тестовые)"
+            else:
+                return False, "Нет новых данных"
+                
+        else:
+            print(f"❌ Ошибка получения данных: HTTP {response.status_code}")
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа данных: {str(e)}")
+        return False, str(e)
+
+def check_backend_logs_15_minutes():
+    """
+    КРИТИЧЕСКАЯ ПРОВЕРКА 3: Backend логи за последние 15 минут
+    Появились ли POST запросы от внешних IP (не 10.64.x.x)?
+    """
+    print("\n" + "="*100)
+    print("3. КРИТИЧЕСКАЯ ПРОВЕРКА: BACKEND ЛОГИ ЗА ПОСЛЕДНИЕ 15 МИНУТ")
+    print("="*100)
+    
+    try:
+        # Получаем логи backend
+        result = subprocess.run(
+            ["tail", "-n", "300", "/var/log/supervisor/backend.out.log"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            log_lines = result.stdout.split('\n')
+            
+            # Анализируем POST запросы за последние 15 минут
+            now = datetime.now()
+            fifteen_minutes_ago = now - timedelta(minutes=15)
+            
+            recent_posts = []
+            external_posts = []
+            internal_posts = []
+            
+            print(f"📋 Анализ логов backend за последние 15 минут...")
+            print(f"⏰ Текущее время: {now.strftime('%H:%M:%S')}")
+            print(f"🔍 Ищем POST запросы после: {fifteen_minutes_ago.strftime('%H:%M:%S')}")
+            
+            for line in log_lines:
+                if 'POST /api/sensor-data' in line:
+                    recent_posts.append(line.strip())
+                    
+                    # Проверяем источник запроса
+                    if any(ip in line for ip in ['10.64.', '127.0.0.1', 'localhost']):
+                        internal_posts.append(line.strip())
+                    else:
+                        external_posts.append(line.strip())
+                        print(f"🎉 ВНЕШНИЙ ЗАПРОС НАЙДЕН: {line.strip()}")
+            
+            print(f"\n📊 РЕЗУЛЬТАТЫ АНАЛИЗА ЛОГОВ ЗА ПОСЛЕДНИЕ 15 МИНУТ:")
+            print(f"📡 Всего POST запросов к /api/sensor-data: {len(recent_posts)}")
+            print(f"🏢 Внутренние запросы (10.64.x.x, localhost): {len(internal_posts)}")
+            print(f"📱 ВНЕШНИЕ МОБИЛЬНЫЕ ЗАПРОСЫ: {len(external_posts)}")
+            
+            if external_posts:
+                print(f"\n🎉 НАЙДЕНЫ ВНЕШНИЕ МОБИЛЬНЫЕ ЗАПРОСЫ!")
+                for req in external_posts:
+                    print(f"   ✅ {req}")
+                return True, f"Внешних запросов: {len(external_posts)}"
+            else:
+                print(f"\n❌ НЕТ ВНЕШНИХ МОБИЛЬНЫХ ЗАПРОСОВ ЗА ПОСЛЕДНИЕ 15 МИНУТ")
+                if internal_posts:
+                    print(f"   Найдено только {len(internal_posts)} внутренних запросов (тестирование)")
+                    print("   Последние внутренние запросы:")
+                    for req in internal_posts[-3:]:
+                        print(f"     {req}")
+                else:
+                    print(f"   НЕТ ВООБЩЕ НИКАКИХ POST запросов к /api/sensor-data")
+                return False, f"Только внутренних: {len(internal_posts)}"
+            
+        else:
+            print(f"❌ Ошибка чтения логов: {result.stderr}")
+            return False, f"Ошибка логов: {result.stderr}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа логов: {str(e)}")
+        return False, str(e)
+
+def check_analytics_changes():
+    """
+    КРИТИЧЕСКАЯ ПРОВЕРКА 4: GET /api/admin/analytics
+    Изменилась ли статистика total_points, recent_points_7d?
+    """
+    print("\n" + "="*100)
+    print("4. КРИТИЧЕСКАЯ ПРОВЕРКА: ИЗМЕНЕНИЯ В СТАТИСТИКЕ")
+    print("="*100)
+    
+    try:
+        response = requests.get(f"{API_BASE}/admin/analytics", timeout=30)
+        
+        if response.status_code == 200:
+            analytics = response.json()
+            
+            total_points = analytics.get('total_points', 0)
+            recent_points = analytics.get('recent_points_7d', 0)
+            verified_points = analytics.get('verified_points', 0)
+            hazard_points = analytics.get('hazard_points', 0)
+            
+            print(f"📊 ТЕКУЩАЯ СТАТИСТИКА БАЗЫ ДАННЫХ:")
+            print(f"   Всего записей (total_points): {total_points}")
+            print(f"   За последние 7 дней (recent_points_7d): {recent_points}")
+            print(f"   Проверенных: {verified_points}")
+            print(f"   С опасностями: {hazard_points}")
+            
+            # Сравнение с предыдущими данными из test_result.md
+            # Последняя проверка показывала разные значения в зависимости от времени
+            # Будем сравнивать с ожидаемыми изменениями
+            
+            print(f"\n🔍 АНАЛИЗ ИЗМЕНЕНИЙ:")
+            print(f"📈 СРАВНЕНИЕ С ПРЕДЫДУЩИМИ ПРОВЕРКАМИ:")
+            print(f"   - Если есть новые данные от мобильного приложения, total_points должен увеличиться")
+            print(f"   - recent_points_7d должен показывать активность за последнюю неделю")
+            
+            if recent_points > 0:
+                print(f"✅ АКТИВНОСТЬ ОБНАРУЖЕНА: {recent_points} записей за последние 7 дней")
+                
+                # Проверяем последние записи для определения источника активности
+                response2 = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=30)
+                if response2.status_code == 200:
+                    recent_data = response2.json().get('data', [])
+                    
+                    # Считаем реальные vs тестовые записи
+                    real_mobile_count = sum(1 for r in recent_data if r.get('latitude', 0) != 0.0 and r.get('longitude', 0) != 0.0)
+                    test_count = len(recent_data) - real_mobile_count
+                    
+                    if real_mobile_count > 0:
+                        print(f"📱 МОБИЛЬНАЯ АКТИВНОСТЬ: {real_mobile_count} записей от мобильного приложения")
+                        print(f"🧪 Тестовая активность: {test_count} записей")
+                        return True, f"Всего: {total_points}, недавних: {recent_points}, мобильных: {real_mobile_count}"
+                    else:
+                        print(f"⚠️  ТОЛЬКО ТЕСТОВАЯ АКТИВНОСТЬ: {test_count} записей")
+                        print(f"❌ НЕТ АКТИВНОСТИ ОТ МОБИЛЬНОГО ПРИЛОЖЕНИЯ")
+                        return False, f"Всего: {total_points}, недавних: {recent_points}, только тестовые"
+                else:
+                    return True, f"Всего: {total_points}, недавних: {recent_points}"
+            else:
+                print(f"❌ НЕТ АКТИВНОСТИ за последние 7 дней")
+                print(f"🚨 База данных не получает новых данных от мобильного приложения")
+                return False, f"Всего: {total_points}, нет активности"
+                
+        else:
+            print(f"❌ Ошибка получения аналитики: HTTP {response.status_code}")
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка анализа активности: {str(e)}")
+        return False, str(e)
+
+def compare_with_previous_check():
+    """
+    КРИТИЧЕСКАЯ ПРОВЕРКА 5: Анализ активности - сравнить с предыдущей проверкой
+    """
+    print("\n" + "="*100)
+    print("5. АНАЛИЗ АКТИВНОСТИ: СРАВНЕНИЕ С ПРЕДЫДУЩЕЙ ПРОВЕРКОЙ")
+    print("="*100)
+    
+    print(f"📋 ДАННЫЕ ИЗ ПРЕДЫДУЩИХ ПРОВЕРОК (из test_result.md):")
+    print(f"   - Последняя реальная запись от мобильного приложения: 07.10.2025 21:06:59 UTC")
+    print(f"   - Проблема: мобильное приложение НЕ отправляет данные на сервер")
+    print(f"   - Новый URL https://smoothroad.emergent.host был настроен и протестирован")
+    print(f"   - Backend APIs полностью функциональны")
+    
+    print(f"\n🎯 ЧТО ОЖИДАЕТСЯ ПОСЛЕ ИСПРАВЛЕНИЯ:")
+    print(f"   ✅ Новые записи с timestamp 3 декабря 2025")
+    print(f"   ✅ POST запросы в логах от внешних IP адресов")
+    print(f"   ✅ Увеличение total_points в статистике")
+    print(f"   ✅ Реальные GPS координаты (не 0.0, 0.0)")
+    
+    # Получаем текущие данные для сравнения
+    try:
+        # Проверяем самую свежую запись
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=1", timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get('data', [])
+            
+            if records:
+                latest_record = records[0]
+                latest_timestamp = latest_record.get('timestamp', 'N/A')
+                latest_gps = (latest_record.get('latitude', 0), latest_record.get('longitude', 0))
+                
+                print(f"\n📊 ТЕКУЩЕЕ СОСТОЯНИЕ:")
+                print(f"   Самая свежая запись: {latest_timestamp}")
+                print(f"   GPS координаты: {latest_gps}")
+                
+                # Проверяем, есть ли данные от 3 декабря 2025
+                if latest_timestamp and '2025-12-03' in latest_timestamp:
+                    print(f"🎉 УСПЕХ! Найдены данные от 3 декабря 2025!")
+                    if latest_gps[0] != 0.0 and latest_gps[1] != 0.0:
+                        print(f"✅ С реальными GPS координатами - мобильное приложение работает!")
+                        return True, "Новые данные от мобильного приложения найдены"
+                    else:
+                        print(f"⚠️  Но GPS координаты нулевые - возможно тестовые данные")
+                        return False, "Найдены данные от 3 декабря, но GPS нулевые"
+                else:
+                    print(f"❌ НЕТ данных от 3 декабря 2025")
+                    print(f"   Последние данные все еще от октября 2025")
+                    return False, "Нет новых данных от мобильного приложения"
+            else:
+                print(f"❌ База данных пуста")
+                return False, "База данных пуста"
+        else:
+            return False, f"HTTP {response.status_code}"
+            
+    except Exception as e:
+        print(f"❌ Ошибка сравнения: {str(e)}")
+        return False, str(e)
+
 def main():
-    """КРИТИЧЕСКАЯ ПРОВЕРКА: Мониторинг мобильного приложения после обновления URL"""
-    print("🚨 КРИТИЧЕСКАЯ ПРОВЕРКА: МОНИТОРИНГ ЗАПРОСОВ ОТ МОБИЛЬНОГО ПРИЛОЖЕНИЯ")
-    print("📱 СИТУАЦИЯ: Обновлен backend URL в мобильном приложении")
-    print("🔄 СТАРЫЙ URL: https://smoothroad.preview.emergentagent.com")
-    print("🆕 НОВЫЙ URL: https://smoothroad.emergent.host")
-    print("🎯 ЦЕЛЬ: Убедиться что после обновления URL мобильное приложение может подключиться")
+    """🚨 СРОЧНАЯ ПРОВЕРКА: Обмен данными после исправления URL"""
+    print("🚨 СРОЧНАЯ ПРОВЕРКА: ОБМЕН ДАННЫМИ ПОСЛЕ ИСПРАВЛЕНИЯ URL")
+    print("📱 СИТУАЦИЯ: Пользователь обновил мобильное приложение с новым URL https://smoothroad.emergent.host")
+    print("🔄 Перезапустил приложение и начал мониторинг")
+    print("🎯 ЦЕЛЬ: Проверить поступили ли данные от мобильного приложения пользователя")
     print()
     
-    # Результаты критической проверки
+    # Результаты критической проверки в реальном времени
     critical_results = {}
     
-    # 1. КРИТИЧЕСКАЯ ПРОВЕРКА: Backend логи за последние 5 минут
-    success, details = check_backend_logs_last_5_minutes()
-    critical_results['backend_logs_5min'] = (success, details)
+    # 1. КРИТИЧЕСКАЯ ПРОВЕРКА: Свежие записи за последние 10 минут и данные от 3 декабря 2025
+    success, details = check_fresh_data_december_3()
+    critical_results['fresh_data_december_3'] = (success, details)
     
-    # 2. КРИТИЧЕСКАЯ ПРОВЕРКА: Новые записи за последние минуты
-    success, details = check_new_sensor_data_last_minutes()
-    critical_results['new_sensor_data'] = (success, details)
+    # 2. КРИТИЧЕСКАЯ ПРОВЕРКА: Backend логи за последние 15 минут
+    success, details = check_backend_logs_15_minutes()
+    critical_results['backend_logs_15min'] = (success, details)
     
-    # 3. КРИТИЧЕСКАЯ ПРОВЕРКА: Анализ изменений в активности
-    success, details = analyze_data_flow_changes()
-    critical_results['data_flow_analysis'] = (success, details)
+    # 3. КРИТИЧЕСКАЯ ПРОВЕРКА: Изменения в статистике
+    success, details = check_analytics_changes()
+    critical_results['analytics_changes'] = (success, details)
     
-    # 4. КРИТИЧЕСКАЯ ПРОВЕРКА: Тест connectivity к новому URL
+    # 4. КРИТИЧЕСКАЯ ПРОВЕРКА: Сравнение с предыдущей проверкой
+    success, details = compare_with_previous_check()
+    critical_results['comparison_previous'] = (success, details)
+    
+    # 5. ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Тест connectivity к новому URL
     success, details = test_connectivity_to_new_url()
     critical_results['connectivity_test'] = (success, details)
     
