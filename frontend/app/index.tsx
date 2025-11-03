@@ -22,6 +22,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Импортируем типы из настроек (без offline зависимостей)
 import { AppSettings, SoundOption } from './settings';
 
+// IMPORTANT: Conditional imports for web compatibility
+// On web, we skip SQLite-dependent services to avoid WASM loading errors
+let syncService: any = null;
+if (Platform.OS !== 'web') {
+  // Only import sync service on mobile platforms
+  try {
+    const SyncModule = require('../services/SyncService');
+    syncService = SyncModule.syncService;
+  } catch (error) {
+    console.warn('⚠️ Sync service not available:', error);
+  }
+}
+
 // Типы препятствий и предупреждений
 export interface RoadHazard {
   id: string;
