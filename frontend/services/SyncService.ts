@@ -20,7 +20,7 @@ export class SyncService {
   private isInitialized = false;
 
   constructor() {
-    this.backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://smoothroad.emergent.host/';
+    this.backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://smoothroad.preview.emergentagent.com';
     console.log('🔗 SyncService backend URL:', this.backendUrl);
   }
 
