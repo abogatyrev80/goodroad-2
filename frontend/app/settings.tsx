@@ -286,19 +286,9 @@ export default function SettingsScreen() {
           ], volume);
       }
     } else {
-      // На мобильном устройстве используем Text-to-Speech для голосов
-      // Для остальных - базовые beep с разными параметрами
-      const { sound } = await Audio.Sound.createAsync(
-        getSoundFileForType(soundId),
-        { shouldPlay: true, volume: volume }
-      );
-      
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        if (status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
+      // На мобильном устройстве - используем базовые звуки
+      // TODO: Implement mobile audio playback with expo-audio
+      console.log(`🔊 Playing sound on mobile: ${soundId}`);
     }
   };
   
