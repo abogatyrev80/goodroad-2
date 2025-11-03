@@ -271,20 +271,21 @@ def test_connectivity_to_new_url():
         print(f"🔍 Проверка доступности: {BACKEND_URL}")
         print(f"🎯 Endpoint для мобильного приложения: {API_BASE}/sensor-data")
         
-        # Тест 1: Health check
-        print(f"\n📡 Тест 1: Health check...")
+        # Тест 1: Backend API availability check
+        print(f"\n📡 Тест 1: Backend API availability check...")
         try:
-            response = requests.get(f"{BACKEND_URL}/health", timeout=10)
+            response = requests.get(f"{API_BASE}/admin/sensor-data?limit=1", timeout=10)
             if response.status_code == 200:
-                health_data = response.json()
-                print(f"✅ Health check: {health_data.get('status', 'unknown')}")
-                print(f"   Database: {health_data.get('database', 'unknown')}")
+                data = response.json()
+                total_records = data.get('total', 0)
+                print(f"✅ Backend API доступен")
+                print(f"   Всего записей в базе: {total_records}")
             else:
-                print(f"❌ Health check failed: HTTP {response.status_code}")
-                return False, f"Health check failed: {response.status_code}"
+                print(f"❌ Backend API недоступен: HTTP {response.status_code}")
+                return False, f"Backend API failed: {response.status_code}"
         except requests.exceptions.RequestException as e:
-            print(f"❌ Health check connection error: {str(e)}")
-            return False, f"Health check connection error: {str(e)}"
+            print(f"❌ Backend API connection error: {str(e)}")
+            return False, f"Backend API connection error: {str(e)}"
         
         # Тест 2: API root
         print(f"\n📡 Тест 2: API root...")
