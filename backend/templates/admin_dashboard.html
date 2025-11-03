@@ -563,9 +563,13 @@
                 `<div class="popup-info"><strong>Опасность:</strong> ${getHazardName(point.hazard_type)} (${point.severity})</div>` : 
                 '';
             
+            const deviceId = point.deviceId || 'unknown';
+            const deviceName = deviceId.substring(0, 8); // Первые 8 символов для краткости
+            
             return `
                 <div class="popup-content">
                     <h4>Данные точки</h4>
+                    <div class="popup-info"><strong>Устройство:</strong> <span style="color: #2196F3; font-family: monospace;">${deviceName}</span></div>
                     <div class="popup-info"><strong>Координаты:</strong> ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</div>
                     <div class="popup-info"><strong>Дата:</strong> ${formattedDate}</div>
                     <div class="popup-info"><strong>Качество дороги:</strong> <span class="${statusClass}">${point.road_quality_score.toFixed(1)}</span></div>
