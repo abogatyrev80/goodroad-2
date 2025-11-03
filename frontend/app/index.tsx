@@ -161,9 +161,6 @@ export default function GoodRoadApp() {
     if (warningIntervalRef.current) {
       clearInterval(warningIntervalRef.current);
     }
-    if (dataSendIntervalRef.current) {
-      clearInterval(dataSendIntervalRef.current);
-    }
   };
 
   // Автоматическая отправка данных каждые 10 секунд
