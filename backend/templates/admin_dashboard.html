@@ -694,12 +694,18 @@
         // Применение фильтров
         function applyFilters() {
             const hazardType = document.getElementById('hazardType').value;
+            const deviceId = document.getElementById('deviceFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
             filteredDataPoints = allDataPoints.filter(point => {
                 // Фильтр по типу опасности
                 if (hazardType && point.hazard_type !== hazardType) {
+                    return false;
+                }
+
+                // Фильтр по устройству
+                if (deviceId && point.deviceId !== deviceId) {
                     return false;
                 }
 
@@ -720,7 +726,8 @@
             displayMarkersOnMap();
             updateDataPointsList();
             
-            alert(`Найдено точек: ${filteredDataPoints.length}`);
+            const deviceName = deviceId ? deviceId.substring(0, 8) : 'все';
+            alert(`Найдено точек: ${filteredDataPoints.length}\nУстройство: ${deviceName}`);
         }
 
         // Сброс фильтров
