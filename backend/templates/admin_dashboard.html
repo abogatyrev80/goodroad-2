@@ -477,6 +477,9 @@
                 allDataPoints = dataResult.data;
                 filteredDataPoints = allDataPoints;
                 
+                // Заполняем список устройств
+                populateDeviceFilter();
+                
                 displayMarkersOnMap();
                 updateDataPointsList();
             } catch (error) {
@@ -485,6 +488,30 @@
             } finally {
                 showLoading(false);
             }
+        }
+
+        // Заполнение фильтра устройств
+        function populateDeviceFilter() {
+            const deviceFilter = document.getElementById('deviceFilter');
+            const devices = new Set();
+            
+            allDataPoints.forEach(point => {
+                if (point.deviceId && point.deviceId !== 'unknown') {
+                    devices.add(point.deviceId);
+                }
+            });
+            
+            // Очищаем и добавляем опции
+            deviceFilter.innerHTML = '<option value="">Все устройства</option>';
+            
+            Array.from(devices).sort().forEach(deviceId => {
+                const option = document.createElement('option');
+                option.value = deviceId;
+                option.textContent = `${deviceId.substring(0, 8)}... (${allDataPoints.filter(p => p.deviceId === deviceId).length} точек)`;
+                deviceFilter.appendChild(option);
+            });
+            
+            console.log(`📱 Найдено устройств: ${devices.size}`);
         }
 
         // Обновление статистики
