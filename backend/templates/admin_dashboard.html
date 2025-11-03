@@ -1148,6 +1148,191 @@
             }
         }
 
+        // Генерация и отправка тестовых данных
+        async function sendTestData() {
+            const logDiv = document.getElementById('testDataLog');
+            logDiv.style.display = 'block';
+            logDiv.innerHTML = '';
+            
+            function log(message, isError = false) {
+                const color = isError ? '#F44336' : '#4CAF50';
+                logDiv.innerHTML += `<div style="color: ${color}; margin: 2px 0;">${message}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            log('🧪 === НАЧАЛО ТЕСТА ОБМЕНА ДАННЫМИ ===');
+            log('');
+            
+            showLoading(true);
+
+            try {
+                // Генерируем тестовое устройство
+                const deviceId = `test-admin-${Date.now()}`;
+                log(`📱 Device ID: ${deviceId}`);
+                
+                // Генерируем реалистичные GPS координаты (Москва, разные точки)
+                const baseCoords = [
+                    { lat: 55.7558, lng: 37.6176, name: 'Красная площадь' },
+                    { lat: 55.7539, lng: 37.6208, name: 'ГУМ' },
+                    { lat: 55.7520, lng: 37.6156, name: 'Театральная' },
+                    { lat: 55.7504, lng: 37.6174, name: 'Лубянка' },
+                    { lat: 55.7558, lng: 37.6300, name: 'Китай-город' }
+                ];
+                
+                const selectedCoord = baseCoords[Math.floor(Math.random() * baseCoords.length)];
+                log(`📍 Локация: ${selectedCoord.name}`);
+                log(`📍 GPS: ${selectedCoord.lat.toFixed(4)}, ${selectedCoord.lng.toFixed(4)}`);
+                
+                // Генерируем 5 точек данных
+                const sensorData = [];
+                const numPoints = 5;
+                log('');
+                log(`📊 Генерация ${numPoints} точек данных...`);
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const timestamp = Date.now() + (i * 1000);
+                    
+                    // Добавляем небольшое смещение для каждой точки (движение)
+                    const latOffset = (Math.random() - 0.5) * 0.001;
+                    const lngOffset = (Math.random() - 0.5) * 0.001;
+                    
+                    // Генерируем реалистичные данные акселерометра
+                    // Обычная езда: небольшие колебания вокруг гравитации
+                    const smoothRoad = Math.random() > 0.3; // 70% - ровная дорога
+                    
+                    let accelX, accelY, accelZ;
+                    if (smoothRoad) {
+                        // Ровная дорога - малые колебания
+                        accelX = (Math.random() - 0.5) * 0.4;
+                        accelY = (Math.random() - 0.5) * 0.4;
+                        accelZ = 9.8 + (Math.random() - 0.5) * 0.2;
+                    } else {
+                        // Яма или кочка - большие колебания
+                        accelX = (Math.random() - 0.5) * 3.0;
+                        accelY = (Math.random() - 0.5) * 3.0;
+                        accelZ = 9.8 + (Math.random() - 0.5) * 4.0;
+                    }
+                    
+                    // Location data
+                    sensorData.push({
+                        type: 'location',
+                        timestamp: timestamp,
+                        data: {
+                            latitude: selectedCoord.lat + latOffset,
+                            longitude: selectedCoord.lng + lngOffset,
+                            speed: 20 + Math.random() * 20, // 20-40 км/ч
+                            accuracy: 3 + Math.random() * 3  // 3-6 метров
+                        }
+                    });
+                    
+                    // Accelerometer data (идет сразу после location)
+                    sensorData.push({
+                        type: 'accelerometer',
+                        timestamp: timestamp,
+                        data: {
+                            x: accelX,
+                            y: accelY,
+                            z: accelZ
+                        }
+                    });
+                    
+                    const roadType = smoothRoad ? '✅ Ровная' : '⚠️  Яма/кочка';
+                    log(`  Точка ${i+1}: ${roadType} (accel: ${Math.abs(accelZ - 9.8).toFixed(2)})`);
+                }
+                
+                log('');
+                log(`📦 Всего сенсорных записей: ${sensorData.length}`);
+                
+                // Формируем payload
+                const payload = {
+                    deviceId: deviceId,
+                    sensorData: sensorData
+                };
+                
+                const payloadSize = JSON.stringify(payload).length;
+                log(`📦 Размер payload: ${payloadSize} bytes`);
+                log('');
+                log('🌐 Отправка на сервер...');
+                log(`🔗 URL: ${API_BASE}/sensor-data`);
+                
+                // Отправляем на сервер
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE}/sensor-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseTime = Date.now() - startTime;
+                log(`⏱️  Время ответа: ${responseTime}ms`);
+                log(`📡 HTTP Status: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('', true);
+                    log('❌ ОШИБКА СЕРВЕРА:', true);
+                    log(errorText, true);
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                log('');
+                log('✅ УСПЕШНО! Ответ сервера:');
+                log(`  📨 Message: ${result.message}`);
+                log(`  📊 Raw data points: ${result.rawDataPoints || 0}`);
+                log(`  🛣️  Conditions processed: ${result.conditionsProcessed || 0}`);
+                log(`  ⚠️  Warnings generated: ${result.warningsGenerated || 0}`);
+                
+                log('');
+                log('💾 Проверка данных в базе...');
+                
+                // Ждем немного чтобы данные точно попали в базу
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Проверяем что данные появились в базе
+                const checkResponse = await fetch(`${API_BASE}/admin/sensor-data?limit=1`);
+                if (checkResponse.ok) {
+                    const checkData = await checkResponse.json();
+                    const latestPoint = checkData.data[0];
+                    
+                    if (latestPoint && latestPoint.deviceId === deviceId) {
+                        log('✅ Данные НАЙДЕНЫ в базе!');
+                        log(`  🆔 Device ID: ${latestPoint.deviceId}`);
+                        log(`  📍 GPS: ${latestPoint.latitude}, ${latestPoint.longitude}`);
+                        log(`  ⏰ Timestamp: ${latestPoint.timestamp}`);
+                    } else {
+                        log('⚠️  Данные еще не появились в базе (проверьте позже)', true);
+                    }
+                } else {
+                    log('⚠️  Не удалось проверить базу данных', true);
+                }
+                
+                log('');
+                log('🎉 === ТЕСТ ЗАВЕРШЕН УСПЕШНО ===');
+                log('');
+                log('💡 Обновите карту (F5) чтобы увидеть новые точки');
+                
+                // Предлагаем перезагрузить данные
+                setTimeout(() => {
+                    if (confirm('✅ Тест успешно завершен!\n\nОбновить карту чтобы увидеть новые точки?')) {
+                        loadData();
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                log('', true);
+                log('❌ === ОШИБКА ТЕСТА ===', true);
+                log(`Ошибка: ${error.message}`, true);
+                log(`Stack: ${error.stack}`, true);
+                
+                alert('❌ Ошибка при отправке тестовых данных!\n\nСмотрите логи для деталей.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
         // Закрыть модальное окно при клике вне его
         window.onclick = function(event) {
             const modal = document.getElementById('editModal');
