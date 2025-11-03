@@ -388,16 +388,7 @@ def run_all_tests():
 
 if __name__ == "__main__":
     success = run_all_tests()
-    print("\n" + "="*100)
-    print("1. КРИТИЧЕСКАЯ ПРОВЕРКА: BACKEND ЛОГИ ЗА ПОСЛЕДНИЕ 5 МИНУТ")
-    print("="*100)
-    
-    try:
-        # Получаем логи backend
-        result = subprocess.run(
-            ["tail", "-n", "200", "/var/log/supervisor/backend.out.log"],
-            capture_output=True,
-            text=True,
+    exit(0 if success else 1)
             timeout=10
         )
         
