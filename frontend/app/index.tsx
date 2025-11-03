@@ -359,24 +359,17 @@ export default function GoodRoadApp() {
 
       // Запускаем акселерометр (только на мобильных)
       if (Platform.OS !== 'web') {
-        console.log('📊 Starting accelerometer...');
         Accelerometer.setUpdateInterval(500); // Обновления каждые 500ms
         accelerometerSubscription.current = Accelerometer.addListener(({ x, y, z }) => {
           setAccelerometerData({ x, y, z });
-          // Логируем каждую 10-ю запись
-          if (Math.random() < 0.1) {
-            console.log(`📊 [ACCEL] x=${x.toFixed(2)}, y=${y.toFixed(2)}, z=${z.toFixed(2)}`);
-          }
         });
-        console.log('✅ Accelerometer started');
+        console.log('✅ Мониторинг запущен');
       }
 
       setIsTracking(true);
-      console.log('🛰️ GPS tracking started');
-      console.log('📱 Device ID:', Constants.deviceId || 'unknown');
       
     } catch (error) {
-      console.error('GPS start error:', error);
+      console.error('❌ Ошибка запуска:', error);
       Alert.alert('Ошибка GPS', 'Не удалось запустить отслеживание GPS');
     } finally {
       setIsLoading(false);
