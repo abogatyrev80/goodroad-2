@@ -12,7 +12,7 @@ import os
 from urllib.parse import urljoin
 
 # Get backend URL from environment
-BACKEND_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://safepath-16.preview.emergentagent.com')
+BACKEND_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://roadquality.preview.emergentagent.com')
 API_BASE = urljoin(BACKEND_URL, '/api')
 
 print(f"🔍 TESTING ADMIN DASHBOARD WEB INTERFACE")

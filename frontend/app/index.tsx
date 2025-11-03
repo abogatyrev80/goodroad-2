@@ -164,7 +164,7 @@ export default function GoodRoadApp() {
       }
 
       const deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://safepath-16.preview.emergentagent.com';
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
 
       try {
