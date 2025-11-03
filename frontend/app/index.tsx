@@ -87,6 +87,9 @@ export default function GoodRoadApp() {
   const [satelliteCount, setSatelliteCount] = useState<number>(0);
   const [locationError, setLocationError] = useState<string | null>(null);
   
+  // Акселерометр
+  const [accelerometerData, setAccelerometerData] = useState({ x: 0, y: 0, z: 0 });
+  
   // Умная система предупреждений
   const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
   const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
@@ -98,8 +101,10 @@ export default function GoodRoadApp() {
   
   // Refs для управления ресурсами
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const accelerometerSubscription = useRef<any>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const dataSendIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setupAudio();
