@@ -343,6 +343,21 @@ class AdminSensorDataUpdate(BaseModel):
     is_verified: Optional[bool] = None
     admin_notes: Optional[str] = None
 
+class CalibrationData(BaseModel):
+    deviceId: str
+    accelerometerData: List[Dict[str, float]]  # [{x, y, z, timestamp}]
+    speed: float
+    roadType: Optional[str] = "unknown"  # urban, highway, unpaved
+
+class CalibrationProfile(BaseModel):
+    deviceId: str
+    baseline: Dict[str, float]  # mean values for x, y, z
+    thresholds: Dict[str, float]  # detection thresholds
+    std_dev: Dict[str, float]  # standard deviations
+    sample_count: int
+    last_updated: datetime
+    road_type: str
+
 class AdminAnalytics(BaseModel):
     total_points: int
     verified_points: int
