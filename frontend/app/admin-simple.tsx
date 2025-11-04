@@ -196,6 +196,19 @@ export default function AdminPanelSimple() {
     await loadData();
   };
 
+  const copyDashboardUrl = async () => {
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
+    const dashboardUrl = `${backendUrl}/admin/dashboard`;
+    
+    try {
+      await Clipboard.setStringAsync(dashboardUrl);
+      Alert.alert('Успешно!', 'URL скопирован в буфер обмена:\n' + dashboardUrl);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      Alert.alert('Ошибка', 'Не удалось скопировать URL');
+    }
+  };
+
   const updatePointVerification = async (pointId: string, verified: boolean) => {
     try {
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
