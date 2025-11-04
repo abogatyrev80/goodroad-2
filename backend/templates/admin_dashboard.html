@@ -933,11 +933,93 @@
         let sortColumn = 'timestamp';
         let sortDirection = 'desc';
         let selectedRows = new Set();
+        let map = null;
+        let markers = [];
+        let mapExpanded = false;
 
         // Load data on page load
         window.addEventListener('load', () => {
+            initMap();
             loadData();
         });
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([55.7558, 37.6173], 10); // Moscow center
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        // Update map with data points
+        function updateMap() {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            if (filteredData.length === 0) return;
+            
+            // Add markers for each point
+            filteredData.forEach(point => {
+                if (!point.latitude || !point.longitude) return;
+                
+                const lat = point.latitude;
+                const lng = point.longitude;
+                
+                // Determine marker color based on hazard type
+                let color = '#10b981'; // green for good
+                if (point.hazard_type) {
+                    color = '#ef4444'; // red for hazard
+                }
+                
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 6,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+                
+                // Add popup with details
+                const popupContent = `
+                    <div style="color: #1e293b;">
+                        <strong>${formatDate(point.timestamp)}</strong><br>
+                        <strong>Устройство:</strong> ${point.deviceId || 'N/A'}<br>
+                        <strong>Координаты:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+                        <strong>Скорость:</strong> ${point.speed?.toFixed(1) || '0.0'} км/ч<br>
+                        <strong>Качество дороги:</strong> ${point.road_quality_score || 0}<br>
+                        ${point.hazard_type ? `<strong>Препятствие:</strong> ${hazardTypeLabel(point.hazard_type)}<br>` : ''}
+                        <strong>Проверено:</strong> ${point.is_verified ? 'Да' : 'Нет'}
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent);
+                marker.addTo(map);
+                markers.push(marker);
+            });
+            
+            // Fit map to markers bounds if we have data
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Toggle map size
+        function toggleMapSize() {
+            const mapElement = document.getElementById('map');
+            if (mapExpanded) {
+                mapElement.style.height = '500px';
+                mapExpanded = false;
+            } else {
+                mapElement.style.height = '800px';
+                mapExpanded = true;
+            }
+            setTimeout(() => map.invalidateSize(), 100);
+        }
 
         // Load data from API
         async function loadData() {
