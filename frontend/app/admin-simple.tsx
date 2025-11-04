@@ -69,6 +69,8 @@ export default function AdminPanelSimple() {
       // Try to load real data from backend first
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
       console.log('🌐 Backend URL:', backendUrl);
+      console.log('🔗 Полный URL для запроса данных:', `${backendUrl}/api/admin/sensor-data`);
+      console.log('🔗 Полный URL для запроса статистики:', `${backendUrl}/api/admin/analytics`);
       
       // Загружаем данные и статистику параллельно
       const [sensorResponse, statsResponse] = await Promise.all([
