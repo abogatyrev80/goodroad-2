@@ -180,6 +180,10 @@ export default function GoodRoadApp() {
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
 
+      console.log('📡 Отправка на URL:', apiUrl);
+      console.log('📍 GPS:', currentLocation.coords.latitude, currentLocation.coords.longitude);
+      console.log('🏃 Скорость:', currentSpeed, 'км/ч');
+
       try {
         const payload = {
           deviceId: deviceId,
