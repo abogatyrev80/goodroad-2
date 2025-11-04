@@ -161,12 +161,13 @@ export default function GoodRoadApp() {
       hasLocation: !!currentLocation
     });
 
-    if (!isTracking || Platform.OS === 'web' || !syncService) {
-      console.log('⏸️ Отправка данных приостановлена');
+    // ИСПРАВЛЕНИЕ: Убрана зависимость от syncService - теперь отправляем данные напрямую
+    if (!isTracking || Platform.OS === 'web') {
+      console.log('⏸️ Отправка данных приостановлена. isTracking:', isTracking, 'Platform:', Platform.OS);
       return;
     }
 
-    console.log('✅ Отправка данных активирована!');
+    console.log('✅ Отправка данных активирована! Будем отправлять каждые 10 секунд.');
 
     const sendDataToServer = async () => {
       if (!currentLocation) {
