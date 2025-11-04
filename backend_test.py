@@ -22,330 +22,334 @@ print(f"Backend URL: {BACKEND_URL}")
 print(f"API Base: {API_BASE}")
 print("=" * 80)
 
+def print_section(title):
+    print(f"\n{'='*60}")
+    print(f"  {title}")
+    print(f"{'='*60}")
+
+def print_result(test_name, success, details=""):
+    status = "✅ PASS" if success else "❌ FAIL"
+    print(f"{status} {test_name}")
+    if details:
+        print(f"   {details}")
+
 def test_api_connectivity():
     """Test basic API connectivity"""
-    print("\n📋 TEST 1: ПРОВЕРКА ПОДКЛЮЧЕНИЯ К API")
+    print_section("1. ПРОВЕРКА ПОДКЛЮЧЕНИЯ К API")
+    
     try:
         response = requests.get(f"{API_BASE}/", timeout=10)
         if response.status_code == 200:
-            print(f"✅ SUCCESS: API Root Endpoint - Status: {response.status_code}")
+            print_result("API Root Endpoint", True, f"Status: {response.status_code}")
             return True
         else:
-            print(f"❌ FAIL: API Root Endpoint - Status: {response.status_code}")
+            print_result("API Root Endpoint", False, f"Status: {response.status_code}")
             return False
     except Exception as e:
-        print(f"❌ ERROR: API Root Endpoint - {str(e)}")
+        print_result("API Root Endpoint", False, f"Error: {str(e)}")
         return False
 
-def test_admin_analytics_api():
-    """Test GET /api/admin/analytics - dashboard statistics"""
-    print("\n📊 TEST 2: Admin Analytics API")
+def check_recent_sensor_data():
+    """Check for recent sensor data from today's trip"""
+    print_section("2. ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ В БАЗЕ")
+    
     try:
-        url = f"{API_BASE}/admin/analytics"
-        response = requests.get(url, timeout=10)
-        
-        print(f"URL: {url}")
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ SUCCESS: Analytics data retrieved")
-            
-            # Check required fields
-            required_fields = [
-                'total_points', 'verified_points', 'hazard_points', 
-                'avg_road_quality', 'recent_points_7d'
-            ]
-            
-            missing_fields = []
-            for field in required_fields:
-                if field not in data:
-                    missing_fields.append(field)
-            
-            if missing_fields:
-                print(f"⚠️  MISSING FIELDS: {missing_fields}")
-                return False
-            
-            print(f"📈 Statistics:")
-            print(f"   Total Points: {data['total_points']}")
-            print(f"   Verified Points: {data['verified_points']}")
-            print(f"   Hazard Points: {data['hazard_points']}")
-            print(f"   Avg Road Quality: {data['avg_road_quality']}")
-            print(f"   Recent Points (7d): {data['recent_points_7d']}")
-            
-            return True
-        else:
-            print(f"❌ FAIL: Expected status 200, got {response.status_code}")
-            print(f"Response: {response.text[:500]}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        return False
-
-def test_admin_sensor_data_api():
-    """Test GET /api/admin/sensor-data - data points for map"""
-    print("\n🗺️  TEST 3: Admin Sensor Data API")
-    try:
-        url = f"{API_BASE}/admin/sensor-data"
-        params = {'limit': 10}
-        response = requests.get(url, params=params, timeout=10)
-        
-        print(f"URL: {url}")
-        print(f"Params: {params}")
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ SUCCESS: Sensor data retrieved")
-            
-            # Check response structure
-            if 'data' not in data:
-                print("❌ FAIL: Missing 'data' field in response")
-                return False
-            
-            sensor_data = data['data']
-            print(f"📍 Data Points: {len(sensor_data)}")
-            print(f"   Total in DB: {data.get('total', 'N/A')}")
-            
-            if len(sensor_data) > 0:
-                # Check first data point structure
-                first_point = sensor_data[0]
-                required_fields = [
-                    '_id', 'latitude', 'longitude', 'timestamp', 
-                    'road_quality_score', 'speed', 'accuracy'
-                ]
-                
-                missing_fields = []
-                for field in required_fields:
-                    if field not in first_point:
-                        missing_fields.append(field)
-                
-                if missing_fields:
-                    print(f"⚠️  MISSING FIELDS in data point: {missing_fields}")
-                    return False
-                
-                # Check for valid GPS coordinates
-                valid_coords = 0
-                for point in sensor_data:
-                    lat, lng = point['latitude'], point['longitude']
-                    if lat != 0.0 and lng != 0.0:
-                        valid_coords += 1
-                
-                print(f"   Valid GPS Coordinates: {valid_coords}/{len(sensor_data)}")
-                
-                # Show sample data point
-                sample = sensor_data[0]
-                print(f"   Sample Point:")
-                print(f"     GPS: ({sample['latitude']}, {sample['longitude']})")
-                print(f"     Quality: {sample['road_quality_score']}")
-                print(f"     Speed: {sample['speed']} km/h")
-                print(f"     Timestamp: {sample['timestamp']}")
-                
-                return True
-            else:
-                print("⚠️  No data points found in database")
-                return True  # Not a failure, just empty database
-                
-        else:
-            print(f"❌ FAIL: Expected status 200, got {response.status_code}")
-            print(f"Response: {response.text[:500]}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        return False
-
-def test_cleanup_zero_coords_api():
-    """Test DELETE /api/admin/cleanup-zero-coords - cleanup functionality"""
-    print("\n🧹 TEST 4: Cleanup Zero Coordinates API")
-    try:
-        url = f"{API_BASE}/admin/cleanup-zero-coords"
-        response = requests.delete(url, timeout=10)
-        
-        print(f"URL: {url}")
-        print(f"Method: DELETE")
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ SUCCESS: Cleanup operation completed")
-            
-            # Check response structure
-            required_fields = ['message', 'deleted_records', 'remaining_records']
-            missing_fields = []
-            for field in required_fields:
-                if field not in data:
-                    missing_fields.append(field)
-            
-            if missing_fields:
-                print(f"⚠️  MISSING FIELDS: {missing_fields}")
-                return False
-            
-            print(f"🗑️  Cleanup Results:")
-            print(f"   Deleted Records: {data['deleted_records']}")
-            print(f"   Remaining Records: {data['remaining_records']}")
-            print(f"   Message: {data['message']}")
-            
-            return True
-        else:
-            print(f"❌ FAIL: Expected status 200, got {response.status_code}")
-            print(f"Response: {response.text[:500]}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        return False
-
-def test_dashboard_integration():
-    """Test dashboard integration by checking if all APIs work together"""
-    print("\n🔗 TEST 5: Dashboard Integration Test")
-    try:
-        # Test the sequence of API calls that the dashboard makes
-        print("Testing API call sequence...")
-        
-        # 1. Get analytics
-        analytics_url = f"{API_BASE}/admin/analytics"
-        analytics_response = requests.get(analytics_url, timeout=10)
-        
-        if analytics_response.status_code != 200:
-            print(f"❌ Analytics API failed: {analytics_response.status_code}")
-            return False
-        
-        # 2. Get sensor data
-        sensor_url = f"{API_BASE}/admin/sensor-data"
-        sensor_params = {'limit': 1000}
-        sensor_response = requests.get(sensor_url, params=sensor_params, timeout=10)
-        
-        if sensor_response.status_code != 200:
-            print(f"❌ Sensor Data API failed: {sensor_response.status_code}")
-            return False
-        
-        # Check data consistency
-        analytics_data = analytics_response.json()
-        sensor_data = sensor_response.json()
-        
-        total_from_analytics = analytics_data['total_points']
-        total_from_sensor = sensor_data['total']
-        
-        print(f"📊 Data Consistency Check:")
-        print(f"   Analytics Total: {total_from_analytics}")
-        print(f"   Sensor Data Total: {total_from_sensor}")
-        
-        if total_from_analytics == total_from_sensor:
-            print("✅ SUCCESS: Data consistency verified")
-            return True
-        else:
-            print("⚠️  Data inconsistency detected (may be normal due to timing)")
-            return True  # Not a critical failure
-            
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        return False
-
-def test_map_data_format():
-    """Test if data is properly formatted for map display"""
-    print("\n🗺️  TEST 6: Map Data Format Validation")
-    try:
-        url = f"{API_BASE}/admin/sensor-data"
-        params = {'limit': 5}
-        response = requests.get(url, params=params, timeout=10)
+        # Get recent sensor data
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=20", timeout=15)
         
         if response.status_code != 200:
-            print(f"❌ API call failed: {response.status_code}")
+            print_result("Admin Sensor Data API", False, f"Status: {response.status_code}")
             return False
         
         data = response.json()
-        sensor_data = data.get('data', [])
+        sensor_records = data.get('data', [])
         
-        if len(sensor_data) == 0:
-            print("⚠️  No data points to validate")
-            return True
+        print_result("Admin Sensor Data API", True, f"Retrieved {len(sensor_records)} records")
         
-        print(f"🔍 Validating {len(sensor_data)} data points for map compatibility...")
+        # Check for today's data (2025-01-19)
+        today_str = "2025-01-19"
+        trip_start = "20:50"
+        trip_end = "21:02"
         
-        valid_points = 0
-        moscow_area_points = 0
+        today_records = []
+        trip_records = []
         
-        for point in sensor_data:
-            lat = point.get('latitude', 0)
-            lng = point.get('longitude', 0)
-            quality = point.get('road_quality_score', 0)
-            
-            # Check if coordinates are valid for mapping
-            if lat != 0 and lng != 0 and -90 <= lat <= 90 and -180 <= lng <= 180:
-                valid_points += 1
+        for record in sensor_records:
+            timestamp = record.get('timestamp', '')
+            if today_str in timestamp:
+                today_records.append(record)
                 
-                # Check if in Moscow area (rough bounds)
-                if 55.0 <= lat <= 56.0 and 37.0 <= lng <= 38.0:
-                    moscow_area_points += 1
+                # Check if within trip time (20:50 - 21:02)
+                if 'T' in timestamp:
+                    time_part = timestamp.split('T')[1][:5]
+                    if trip_start <= time_part <= trip_end:
+                        trip_records.append(record)
         
-        print(f"📍 Map Data Validation:")
-        print(f"   Valid Coordinates: {valid_points}/{len(sensor_data)}")
-        print(f"   Moscow Area Points: {moscow_area_points}")
+        print(f"\n📊 АНАЛИЗ ДАННЫХ:")
+        print(f"   Всего записей: {len(sensor_records)}")
+        print(f"   Записей за сегодня ({today_str}): {len(today_records)}")
+        print(f"   Записей во время поездки ({trip_start}-{trip_end}): {len(trip_records)}")
         
-        if valid_points > 0:
-            print("✅ SUCCESS: Data is suitable for map display")
+        if sensor_records:
+            latest_record = sensor_records[0]  # Most recent first
+            print(f"   Последняя запись: {latest_record.get('timestamp', 'N/A')}")
+            print(f"   GPS координаты: ({latest_record.get('latitude', 0)}, {latest_record.get('longitude', 0)})")
+        
+        # Show trip records if any
+        if trip_records:
+            print(f"\n🎯 ЗАПИСИ ВО ВРЕМЯ ПОЕЗДКИ:")
+            for i, record in enumerate(trip_records[:5]):
+                print(f"   {i+1}. {record.get('timestamp', 'N/A')} - GPS: ({record.get('latitude', 0)}, {record.get('longitude', 0)})")
+        
+        return len(trip_records) > 0
+        
+    except Exception as e:
+        print_result("Recent Sensor Data Check", False, f"Error: {str(e)}")
+        return False
+
+def check_analytics_data():
+    """Check analytics for recent activity"""
+    print_section("3. ПРОВЕРКА АНАЛИТИКИ И АКТИВНОСТИ")
+    
+    try:
+        response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
+        
+        if response.status_code != 200:
+            print_result("Analytics API", False, f"Status: {response.status_code}")
+            return False
+        
+        analytics = response.json()
+        
+        print_result("Analytics API", True, "Successfully retrieved analytics")
+        
+        print(f"\n📈 СТАТИСТИКА БАЗЫ ДАННЫХ:")
+        print(f"   Всего точек данных: {analytics.get('total_points', 0)}")
+        print(f"   Проверенных точек: {analytics.get('verified_points', 0)}")
+        print(f"   Точек с препятствиями: {analytics.get('hazard_points', 0)}")
+        print(f"   Средняя оценка дороги: {analytics.get('avg_road_quality', 0)}")
+        print(f"   Активность за 7 дней: {analytics.get('recent_points_7d', 0)}")
+        
+        # Check hazard distribution
+        hazard_dist = analytics.get('hazard_distribution', [])
+        if hazard_dist:
+            print(f"\n🚧 РАСПРЕДЕЛЕНИЕ ПРЕПЯТСТВИЙ:")
+            for hazard in hazard_dist:
+                print(f"   {hazard.get('hazard_type', 'Unknown')}: {hazard.get('count', 0)}")
+        
+        return analytics.get('recent_points_7d', 0) > 0
+        
+    except Exception as e:
+        print_result("Analytics Check", False, f"Error: {str(e)}")
+        return False
+
+def test_sensor_data_endpoint():
+    """Test if sensor data endpoint is working"""
+    print_section("4. ТЕСТ API ENDPOINT /api/sensor-data")
+    
+    try:
+        # Create test sensor data similar to mobile app
+        test_data = {
+            "deviceId": "test-device-urgent-check-20250119",
+            "sensorData": [
+                {
+                    "type": "location",
+                    "timestamp": int(datetime.now().timestamp() * 1000),
+                    "data": {
+                        "latitude": 55.7558,
+                        "longitude": 37.6176,
+                        "speed": 25.0,
+                        "accuracy": 5.0,
+                        "heading": 180.0
+                    }
+                },
+                {
+                    "type": "accelerometer", 
+                    "timestamp": int(datetime.now().timestamp() * 1000),
+                    "data": {
+                        "x": 0.2,
+                        "y": 0.4,
+                        "z": 9.8,
+                        "totalAcceleration": 9.82
+                    }
+                }
+            ]
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/sensor-data",
+            json=test_data,
+            headers={"Content-Type": "application/json"},
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            print_result("POST /api/sensor-data", True, f"Processed {result.get('rawDataPoints', 0)} points")
+            print(f"   Условия дороги созданы: {result.get('conditionsProcessed', 0)}")
+            print(f"   Предупреждения созданы: {result.get('warningsGenerated', 0)}")
             return True
         else:
-            print("❌ FAIL: No valid coordinates for map display")
+            print_result("POST /api/sensor-data", False, f"Status: {response.status_code}, Response: {response.text}")
             return False
             
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
+        print_result("Sensor Data Endpoint Test", False, f"Error: {str(e)}")
         return False
 
-def run_all_tests():
-    """Run all admin dashboard tests"""
-    print("🚀 STARTING ADMIN DASHBOARD COMPREHENSIVE TEST SUITE")
-    print(f"Timestamp: {datetime.now().isoformat()}")
-    print("=" * 80)
+def check_backend_logs():
+    """Check backend logs for recent activity"""
+    print_section("5. ПРОВЕРКА ЛОГОВ BACKEND (последние 15 минут)")
     
-    tests = [
-        ("Admin Dashboard HTML Endpoint", test_admin_dashboard_endpoint),
-        ("Admin Analytics API", test_admin_analytics_api),
-        ("Admin Sensor Data API", test_admin_sensor_data_api),
-        ("Cleanup Zero Coordinates API", test_cleanup_zero_coords_api),
-        ("Dashboard Integration", test_dashboard_integration),
-        ("Map Data Format Validation", test_map_data_format)
-    ]
+    try:
+        # Check supervisor logs
+        log_files = [
+            "/var/log/supervisor/backend.out.log",
+            "/var/log/supervisor/backend.err.log"
+        ]
+        
+        found_requests = []
+        
+        for log_file in log_files:
+            try:
+                # Get last 100 lines and filter for recent POST requests
+                result = subprocess.run(
+                    ["tail", "-n", "100", log_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if result.returncode == 0:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if 'POST' in line and '/api/sensor-data' in line:
+                            found_requests.append(line.strip())
+                            
+            except Exception as e:
+                print(f"   Не удалось прочитать {log_file}: {str(e)}")
+        
+        print(f"\n📋 АНАЛИЗ ЛОГОВ:")
+        print(f"   Найдено POST запросов к /api/sensor-data: {len(found_requests)}")
+        
+        if found_requests:
+            print(f"\n🔍 ПОСЛЕДНИЕ ЗАПРОСЫ:")
+            for i, request in enumerate(found_requests[-5:]):  # Show last 5
+                print(f"   {i+1}. {request}")
+                
+                # Check for IP addresses
+                if '10.64.' in request:
+                    print(f"      ⚠️  Внутренний IP (10.64.x.x) - тестовый запрос")
+                elif any(ext_ip in request for ext_ip in ['192.168.', '172.', '10.0.']):
+                    print(f"      ⚠️  Локальный IP - возможно тестовый")
+                else:
+                    print(f"      ✅ Возможно внешний запрос от мобильного приложения")
+        else:
+            print(f"   ❌ НЕТ POST запросов к /api/sensor-data в логах")
+        
+        return len(found_requests) > 0
+        
+    except Exception as e:
+        print_result("Backend Logs Check", False, f"Error: {str(e)}")
+        return False
+
+def check_road_conditions_and_warnings():
+    """Check for road conditions and warnings near common locations"""
+    print_section("6. ПРОВЕРКА УСЛОВИЙ ДОРОГИ И ПРЕДУПРЕЖДЕНИЙ")
     
+    try:
+        # Test coordinates (Moscow area)
+        test_lat, test_lng = 55.7558, 37.6176
+        
+        # Check road conditions
+        conditions_response = requests.get(
+            f"{API_BASE}/road-conditions?latitude={test_lat}&longitude={test_lng}&radius=5000",
+            timeout=15
+        )
+        
+        warnings_response = requests.get(
+            f"{API_BASE}/warnings?latitude={test_lat}&longitude={test_lng}&radius=5000", 
+            timeout=15
+        )
+        
+        conditions_success = conditions_response.status_code == 200
+        warnings_success = warnings_response.status_code == 200
+        
+        print_result("Road Conditions API", conditions_success)
+        print_result("Road Warnings API", warnings_success)
+        
+        if conditions_success:
+            conditions_data = conditions_response.json()
+            conditions = conditions_data.get('conditions', [])
+            print(f"   Найдено условий дороги: {len(conditions)}")
+            
+            if conditions:
+                latest_condition = conditions[0]
+                print(f"   Последнее условие: оценка {latest_condition.get('condition_score', 0)}, уровень {latest_condition.get('severity_level', 'N/A')}")
+        
+        if warnings_success:
+            warnings_data = warnings_response.json()
+            warnings = warnings_data.get('warnings', [])
+            print(f"   Найдено предупреждений: {len(warnings)}")
+            
+            if warnings:
+                latest_warning = warnings[0]
+                print(f"   Последнее предупреждение: {latest_warning.get('warning_type', 'N/A')}, серьезность {latest_warning.get('severity', 'N/A')}")
+        
+        return conditions_success and warnings_success
+        
+    except Exception as e:
+        print_result("Road Conditions Check", False, f"Error: {str(e)}")
+        return False
+
+def main():
+    """Main test execution"""
     results = []
     
-    for test_name, test_func in tests:
-        try:
-            result = test_func()
-            results.append((test_name, result))
-        except Exception as e:
-            print(f"❌ CRITICAL ERROR in {test_name}: {str(e)}")
-            results.append((test_name, False))
+    # Run all tests
+    results.append(("API Connectivity", test_api_connectivity()))
+    results.append(("Recent Sensor Data", check_recent_sensor_data()))
+    results.append(("Analytics Data", check_analytics_data()))
+    results.append(("Sensor Data Endpoint", test_sensor_data_endpoint()))
+    results.append(("Backend Logs", check_backend_logs()))
+    results.append(("Road Conditions & Warnings", check_road_conditions_and_warnings()))
     
     # Summary
-    print("\n" + "=" * 80)
-    print("📋 ADMIN DASHBOARD TEST RESULTS SUMMARY")
-    print("=" * 80)
+    print_section("ИТОГОВЫЙ ОТЧЕТ")
     
-    passed = 0
-    failed = 0
+    passed = sum(1 for _, success in results if success)
+    total = len(results)
     
-    for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{status}: {test_name}")
-        if result:
-            passed += 1
-        else:
-            failed += 1
+    print(f"Тестов пройдено: {passed}/{total}")
+    print(f"Успешность: {(passed/total)*100:.1f}%")
     
-    print(f"\n📊 FINAL RESULTS: {passed}/{len(results)} tests passed")
+    print(f"\n📋 ДЕТАЛЬНЫЕ РЕЗУЛЬТАТЫ:")
+    for test_name, success in results:
+        status = "✅" if success else "❌"
+        print(f"   {status} {test_name}")
     
-    if failed == 0:
-        print("🎉 ALL ADMIN DASHBOARD TESTS PASSED!")
-        return True
-    else:
-        print(f"⚠️  {failed} test(s) failed - see details above")
-        return False
+    # Critical findings
+    print(f"\n🎯 КРИТИЧЕСКИЕ ВЫВОДЫ:")
+    
+    if not results[1][1]:  # Recent sensor data check failed
+        print("   ❌ НЕТ данных от поездки 19.01.2025 20:50-21:02")
+        print("   ❌ Мобильное приложение НЕ отправляет данные на сервер")
+    
+    if results[3][1]:  # Sensor endpoint works
+        print("   ✅ API endpoint /api/sensor-data работает корректно")
+        print("   ✅ Сервер может принимать и обрабатывать данные")
+    
+    if not results[4][1]:  # No backend logs
+        print("   ❌ НЕТ внешних запросов в логах backend")
+        print("   ❌ Проблема в мобильном приложении или сетевом подключении")
+    
+    print(f"\n🔧 РЕКОМЕНДАЦИИ:")
+    print("   1. Проверить настройки URL в мобильном приложении")
+    print("   2. Убедиться что приложение имеет разрешения на GPS и интернет")
+    print("   3. Перезапустить мобильное приложение")
+    print("   4. Проверить фоновые задачи в мобильном приложении")
+    print("   5. Начать новую поездку для тестирования")
+    
+    return results
 
 if __name__ == "__main__":
-    success = run_all_tests()
-    exit(0 if success else 1)
-            
+    main()
