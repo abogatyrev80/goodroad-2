@@ -220,10 +220,16 @@ export default function GoodRoadApp() {
         });
 
         if (!response.ok) {
-          console.error('❌ Ошибка отправки данных:', response.status);
+          console.error('❌ Ошибка отправки данных:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Детали ошибки:', errorText);
+        } else {
+          const result = await response.json();
+          console.log('✅ Данные успешно отправлены!', result);
         }
       } catch (error: any) {
-        console.error('❌ Ошибка сети:', error.message);
+        console.error('❌ Ошибка сети при отправке:', error.message);
+        console.error('❌ Полная ошибка:', error);
       }
     };
 
