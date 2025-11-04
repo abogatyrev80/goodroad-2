@@ -68,8 +68,11 @@ export default function AdminPanelSimple() {
       console.log('🔄 Loading admin data...');
 
       // Try to load real data from backend first
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
+                        Constants.expoConfig?.extra?.backendUrl || 
+                        'https://roadquality.preview.emergentagent.com';
       console.log('🌐 Backend URL:', backendUrl);
+      console.log('🔧 Backend URL source:', process.env.EXPO_PUBLIC_BACKEND_URL ? 'env' : 'app.json');
       console.log('🔗 Полный URL для запроса данных:', `${backendUrl}/api/admin/sensor-data`);
       console.log('🔗 Полный URL для запроса статистики:', `${backendUrl}/api/admin/analytics`);
       
