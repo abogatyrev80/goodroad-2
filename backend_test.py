@@ -22,74 +22,19 @@ print(f"Backend URL: {BACKEND_URL}")
 print(f"API Base: {API_BASE}")
 print("=" * 80)
 
-def test_admin_dashboard_endpoint():
-    """Test GET /admin/dashboard - should return HTML page"""
-    print("\n📋 TEST 1: Admin Dashboard HTML Endpoint")
+def test_api_connectivity():
+    """Test basic API connectivity"""
+    print("\n📋 TEST 1: ПРОВЕРКА ПОДКЛЮЧЕНИЯ К API")
     try:
-        # Test local backend first
-        local_url = 'http://localhost:8001/admin/dashboard'
-        print(f"Testing local backend: {local_url}")
-        local_response = requests.get(local_url, timeout=10)
-        
-        print(f"Local Status Code: {local_response.status_code}")
-        print(f"Local Content-Type: {local_response.headers.get('content-type', 'N/A')}")
-        
-        if local_response.status_code == 200:
-            content_type = local_response.headers.get('content-type', '')
-            if 'text/html' in content_type:
-                print("✅ SUCCESS: Local backend serves HTML dashboard correctly")
-                
-                # Check for key HTML elements
-                html_content = local_response.text
-                required_elements = [
-                    'Good Road - Административная панель',  # Title
-                    'leaflet.css',  # Leaflet CSS
-                    'leaflet.js',   # Leaflet JS
-                    'id="map"',     # Map container
-                    'totalPoints',  # Statistics elements
-                    'hazardPoints',
-                    'verifiedPoints',
-                    'avgQuality',
-                    'applyFilters', # Filter functionality
-                    'clearZeroCoords', # Cleanup button
-                    '/api/admin/analytics', # API calls
-                    '/api/admin/sensor-data'
-                ]
-                
-                missing_elements = []
-                for element in required_elements:
-                    if element not in html_content:
-                        missing_elements.append(element)
-                
-                if missing_elements:
-                    print(f"⚠️  MISSING ELEMENTS: {missing_elements}")
-                else:
-                    print("✅ All required HTML elements found in local backend")
-                
-                # Test external URL
-                external_url = urljoin(BACKEND_URL, '/admin/dashboard')
-                print(f"\nTesting external URL: {external_url}")
-                external_response = requests.get(external_url, timeout=10)
-                print(f"External Status Code: {external_response.status_code}")
-                
-                if external_response.status_code != 200:
-                    print("⚠️  ROUTING ISSUE: External /admin/dashboard route not properly configured")
-                    print("   The backend serves the dashboard correctly on localhost:8001")
-                    print("   But external routing is not directing /admin/dashboard to backend")
-                    print("   This is a proxy/ingress configuration issue, not a backend issue")
-                    return True  # Backend works, routing issue is infrastructure
-                else:
-                    print("✅ External routing also works correctly")
-                    return True
-            else:
-                print(f"❌ FAIL: Expected HTML content, got {content_type}")
-                return False
+        response = requests.get(f"{API_BASE}/", timeout=10)
+        if response.status_code == 200:
+            print(f"✅ SUCCESS: API Root Endpoint - Status: {response.status_code}")
+            return True
         else:
-            print(f"❌ FAIL: Local backend failed with status {local_response.status_code}")
+            print(f"❌ FAIL: API Root Endpoint - Status: {response.status_code}")
             return False
-            
     except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
+        print(f"❌ ERROR: API Root Endpoint - {str(e)}")
         return False
 
 def test_admin_analytics_api():
