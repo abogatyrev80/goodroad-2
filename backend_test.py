@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Good Road Admin Dashboard
-Tests the admin dashboard web interface and underlying APIs
+СРОЧНАЯ ПРОВЕРКА: Backend Testing for Good Road App
+Проверка поездки пользователя 19.01.2025 с 20:50 до 21:02
 """
 
 import requests
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import subprocess
 from urllib.parse import urljoin
 
 # Get backend URL from environment
 BACKEND_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://roadquality.preview.emergentagent.com')
 API_BASE = urljoin(BACKEND_URL, '/api')
 
-print(f"🔍 TESTING ADMIN DASHBOARD WEB INTERFACE")
+print(f"🚨 СРОЧНАЯ ПРОВЕРКА: Good Road Backend Analysis")
+print(f"Проверка поездки пользователя 19.01.2025 с 20:50 до 21:02")
 print(f"Backend URL: {BACKEND_URL}")
 print(f"API Base: {API_BASE}")
 print("=" * 80)
