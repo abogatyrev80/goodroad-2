@@ -197,8 +197,7 @@ export default function AdminPanelSimple() {
   };
 
   const copyDashboardUrl = async () => {
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
-    const dashboardUrl = `${backendUrl}/admin/dashboard`;
+    const dashboardUrl = 'https://roadquality.preview.emergentagent.com/api/admin/dashboard';
     
     try {
       await Clipboard.setStringAsync(dashboardUrl);
