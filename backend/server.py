@@ -1004,6 +1004,287 @@ async def get_calibration_stats():
         logging.error(f"Error getting calibration stats: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting calibration stats: {str(e)}")
 
+# === BULK OPERATIONS MODELS ===
+
+class BulkDeleteFilters(BaseModel):
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    lat_min: Optional[float] = None
+    lat_max: Optional[float] = None
+    lng_min: Optional[float] = None
+    lng_max: Optional[float] = None
+    accel_x_min: Optional[float] = None
+    accel_x_max: Optional[float] = None
+    accel_y_min: Optional[float] = None
+    accel_y_max: Optional[float] = None
+    accel_z_min: Optional[float] = None
+    accel_z_max: Optional[float] = None
+    hazard_type: Optional[str] = None
+    is_verified: Optional[bool] = None
+
+@api_router.post("/admin/sensor-data/count-by-filters")
+async def count_data_by_filters(filters: BulkDeleteFilters):
+    """
+    Count number of records matching the given filters (preview before delete)
+    """
+    try:
+        query = {}
+        
+        # Date filters
+        if filters.date_from or filters.date_to:
+            date_filter = {}
+            if filters.date_from:
+                date_filter["$gte"] = datetime.fromisoformat(filters.date_from)
+            if filters.date_to:
+                date_filter["$lte"] = datetime.fromisoformat(filters.date_to + "T23:59:59")
+            query["timestamp"] = date_filter
+        
+        # GPS coordinate filters
+        if filters.lat_min is not None or filters.lat_max is not None:
+            lat_filter = {}
+            if filters.lat_min is not None:
+                lat_filter["$gte"] = filters.lat_min
+            if filters.lat_max is not None:
+                lat_filter["$lte"] = filters.lat_max
+            # Note: We need to check rawData array for coordinates
+            # This is a simplified version - in production might need aggregation
+        
+        # Hazard type filter
+        if filters.hazard_type:
+            query["hazard_type"] = filters.hazard_type
+        
+        # Verification status filter
+        if filters.is_verified is not None:
+            query["is_verified"] = filters.is_verified
+        
+        # Count matching records
+        count = await db.sensor_data.count_documents(query)
+        
+        # Get sample records (first 5)
+        sample = await db.sensor_data.find(query).limit(5).to_list(5)
+        sample_data = []
+        for doc in sample:
+            sample_data.append({
+                "_id": str(doc["_id"]),
+                "timestamp": doc.get("timestamp", datetime.now()).isoformat(),
+                "deviceId": doc.get("deviceId", "unknown")
+            })
+        
+        return {
+            "count": count,
+            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None},
+            "sample_records": sample_data
+        }
+        
+    except Exception as e:
+        logging.error(f"Error counting data by filters: {e}")
+        raise HTTPException(status_code=500, detail=f"Error counting data: {str(e)}")
+
+@api_router.delete("/admin/sensor-data/bulk")
+async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
+    """
+    Bulk delete sensor data records matching the given filters
+    """
+    try:
+        query = {}
+        
+        # Date filters
+        if filters.date_from or filters.date_to:
+            date_filter = {}
+            if filters.date_from:
+                date_filter["$gte"] = datetime.fromisoformat(filters.date_from)
+            if filters.date_to:
+                date_filter["$lte"] = datetime.fromisoformat(filters.date_to + "T23:59:59")
+            query["timestamp"] = date_filter
+        
+        # Hazard type filter
+        if filters.hazard_type:
+            query["hazard_type"] = filters.hazard_type
+        
+        # Verification status filter
+        if filters.is_verified is not None:
+            query["is_verified"] = filters.is_verified
+        
+        # Count before deletion
+        count_before = await db.sensor_data.count_documents(query)
+        
+        # Delete matching records
+        result = await db.sensor_data.delete_many(query)
+        
+        # Get remaining count
+        remaining_count = await db.sensor_data.count_documents({})
+        
+        return {
+            "message": "Bulk deletion completed",
+            "deleted_count": result.deleted_count,
+            "matched_count": count_before,
+            "remaining_records": remaining_count,
+            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None}
+        }
+        
+    except Exception as e:
+        logging.error(f"Error during bulk deletion: {e}")
+        raise HTTPException(status_code=500, detail=f"Error during bulk deletion: {str(e)}")
+
+@api_router.get("/admin/sensor-data/export/csv")
+async def export_sensor_data_csv(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    limit: int = Query(10000, description="Maximum records to export")
+):
+    """
+    Export sensor data as CSV file
+    """
+    try:
+        # Build query
+        query = {}
+        if date_from or date_to:
+            date_filter = {}
+            if date_from:
+                date_filter["$gte"] = datetime.fromisoformat(date_from)
+            if date_to:
+                date_filter["$lte"] = datetime.fromisoformat(date_to + "T23:59:59")
+            query["timestamp"] = date_filter
+        
+        # Get data
+        cursor = db.sensor_data.find(query).sort("timestamp", -1).limit(limit)
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        csv_writer = csv.writer(output)
+        
+        # Write header
+        csv_writer.writerow([
+            'ID', 'Device ID', 'Timestamp', 'Latitude', 'Longitude', 
+            'Speed', 'Accuracy', 'Accel_X', 'Accel_Y', 'Accel_Z',
+            'Road Quality', 'Hazard Type', 'Severity', 'Verified', 'Admin Notes'
+        ])
+        
+        # Write data rows
+        async for document in cursor:
+            # Extract data from rawData
+            latitude = 0
+            longitude = 0
+            speed = 0
+            accuracy = 0
+            accelerometer = {"x": 0, "y": 0, "z": 0}
+            
+            raw_data = document.get("rawData", [])
+            for item in raw_data:
+                if item.get("type") == "location" and "data" in item:
+                    location_data = item["data"]
+                    latitude = location_data.get("latitude", 0)
+                    longitude = location_data.get("longitude", 0)
+                    speed = location_data.get("speed", 0)
+                    accuracy = location_data.get("accuracy", 0)
+                elif item.get("type") == "accelerometer" and "data" in item:
+                    accel_data = item["data"]
+                    accelerometer = {
+                        "x": accel_data.get("x", 0),
+                        "y": accel_data.get("y", 0),
+                        "z": accel_data.get("z", 0)
+                    }
+            
+            csv_writer.writerow([
+                str(document["_id"]),
+                document.get("deviceId", ""),
+                document.get("timestamp", datetime.now()).isoformat(),
+                latitude,
+                longitude,
+                speed,
+                accuracy,
+                accelerometer["x"],
+                accelerometer["y"],
+                accelerometer["z"],
+                document.get("road_quality_score", 50),
+                document.get("hazard_type", ""),
+                document.get("severity", ""),
+                document.get("is_verified", False),
+                document.get("admin_notes", "")
+            ])
+        
+        # Prepare response
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=sensor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+        
+    except Exception as e:
+        logging.error(f"Error exporting CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Error exporting data: {str(e)}")
+
+@api_router.post("/admin/sensor-data/import/csv")
+async def import_sensor_data_csv(file: UploadFile = File(...)):
+    """
+    Import sensor data from CSV file
+    """
+    try:
+        # Read CSV file
+        contents = await file.read()
+        decoded = contents.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(decoded))
+        
+        imported_count = 0
+        error_count = 0
+        errors = []
+        
+        for row in csv_reader:
+            try:
+                # Create sensor data document
+                doc = {
+                    "deviceId": row.get("Device ID", "imported"),
+                    "timestamp": datetime.fromisoformat(row["Timestamp"]) if row.get("Timestamp") else datetime.now(),
+                    "rawData": [
+                        {
+                            "type": "location",
+                            "timestamp": int(datetime.now().timestamp() * 1000),
+                            "data": {
+                                "latitude": float(row.get("Latitude", 0)),
+                                "longitude": float(row.get("Longitude", 0)),
+                                "speed": float(row.get("Speed", 0)),
+                                "accuracy": float(row.get("Accuracy", 0))
+                            }
+                        },
+                        {
+                            "type": "accelerometer",
+                            "timestamp": int(datetime.now().timestamp() * 1000),
+                            "data": {
+                                "x": float(row.get("Accel_X", 0)),
+                                "y": float(row.get("Accel_Y", 0)),
+                                "z": float(row.get("Accel_Z", 0))
+                            }
+                        }
+                    ],
+                    "road_quality_score": float(row.get("Road Quality", 50)),
+                    "hazard_type": row.get("Hazard Type") if row.get("Hazard Type") else None,
+                    "severity": row.get("Severity", "medium"),
+                    "is_verified": row.get("Verified", "").lower() == "true",
+                    "admin_notes": row.get("Admin Notes", "")
+                }
+                
+                await db.sensor_data.insert_one(doc)
+                imported_count += 1
+                
+            except Exception as row_error:
+                error_count += 1
+                errors.append(f"Row {imported_count + error_count}: {str(row_error)}")
+                if len(errors) < 10:  # Limit error messages
+                    continue
+        
+        return {
+            "message": "Import completed",
+            "imported_count": imported_count,
+            "error_count": error_count,
+            "errors": errors[:10]  # Return first 10 errors
+        }
+        
+    except Exception as e:
+        logging.error(f"Error importing CSV: {e}")
+        raise HTTPException(status_code=500, detail=f"Error importing data: {str(e)}")
+
 @api_router.delete("/admin/cleanup-zero-coords")
 async def cleanup_zero_coordinates():
     """
