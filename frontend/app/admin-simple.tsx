@@ -467,6 +467,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    marginLeft: 12,
+    padding: 4,
+  },
   content: {
     flex: 1,
     padding: 16,
