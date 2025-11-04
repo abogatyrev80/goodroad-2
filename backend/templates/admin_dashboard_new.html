@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Панель Администратора</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #059669;
+        }
+        
+        .btn-secondary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+        }
+        
+        .btn-outline:hover {
+            background: #1e293b;
+        }
+        
+        /* Main Container */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid #334155;
+        }
+        
+        .stat-card h3 {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #10b981;
+        }
+        
+        /* Toolbar */
+        .toolbar {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #334155;
+        }
+        
+        .toolbar-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .toolbar-left, .toolbar-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .search-box {
+            position: relative;
+        }
+        
+        .search-box input {
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+            width: 300px;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+        }
+        
+        select {
+            padding: 0.5rem 1rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        /* Table Container */
+        .table-container {
+            background: #1e293b;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #0f172a;
+        }
+        
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid #334155;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        
+        th:hover {
+            background: #1e293b;
+        }
+        
+        th.sortable::after {
+            content: '⇅';
+            position: absolute;
+            right: 0.5rem;
+            opacity: 0.3;
+        }
+        
+        th.sort-asc::after {
+            content: '↑';
+            opacity: 1;
+            color: #3b82f6;
+        }
+        
+        th.sort-desc::after {
+            content: '↓';
+            opacity: 1;
+            color: #3b82f6;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #334155;
+            transition: background 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: #0f172a;
+        }
+        
+        td {
+            padding: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        td.nowrap {
+            white-space: nowrap;
+        }
+        
+        /* Checkbox */
+        .checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            cursor: pointer;
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #065f46;
+            color: #10b981;
+        }
+        
+        .badge-warning {
+            background: #78350f;
+            color: #fbbf24;
+        }
+        
+        .badge-danger {
+            background: #7f1d1d;
+            color: #ef4444;
+        }
+        
+        .badge-info {
+            background: #1e3a8a;
+            color: #60a5fa;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-icon {
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            border: 1px solid #334155;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-icon:hover {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        
+        .btn-icon.edit:hover {
+            color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        .btn-icon.delete:hover {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: #0f172a;
+            border-top: 1px solid #334155;
+        }
+        
+        .pagination-info {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+        
+        .pagination-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .pagination-btn {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 0.375rem;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            background: #1e293b;
+            border-color: #3b82f6;
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            animation: fadeIn 0.2s;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: #1e293b;
+            border-radius: 0.75rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+        }
+        
+        .modal-close:hover {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #334155;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+        
+        /* Form */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #334155;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Filters Panel */
+        .filters-panel {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #334155;
+            display: none;
+        }
+        
+        .filters-panel.active {
+            display: block;
+        }
+        
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .filter-group label {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        
+        .filter-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+        
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            min-width: 300px;
+            animation: slideIn 0.3s;
+            display: none;
+        }
+        
+        .notification.active {
+            display: block;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .notification.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .notification.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .notification.info {
+            border-left: 4px solid #3b82f6;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .toolbar-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box input {
+                width: 100%;
+            }
+            
+            .table-wrapper {
+                overflow-x: scroll;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div>
+                <h1>🚗 Good Road - Панель Администратора</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="exportCSV()">
+                    📊 Экспорт CSV
+                </button>
+                <button class="btn btn-secondary" onclick="openImportModal()">
+                    📥 Импорт CSV
+                </button>
+                <button class="btn btn-primary" onclick="loadData()">
+                    🔄 Обновить
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Всего точек</h3>
+                <div class="value" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Проверено</h3>
+                <div class="value" id="stat-verified">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Препятствий</h3>
+                <div class="value" id="stat-hazards">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Средний балл</h3>
+                <div class="value" id="stat-avg">0</div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-row">
+                <div class="toolbar-left">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInput" placeholder="Поиск по таблице..." onkeyup="searchTable()">
+                    </div>
+                    <button class="btn btn-outline" onclick="toggleFilters()">
+                        🔧 Фильтры
+                    </button>
+                </div>
+                <div class="toolbar-right">
+                    <select id="rowsPerPage" onchange="changeRowsPerPage()">
+                        <option value="10">10 строк</option>
+                        <option value="25" selected>25 строк</option>
+                        <option value="50">50 строк</option>
+                        <option value="100">100 строк</option>
+                    </select>
+                    <button class="btn btn-danger" onclick="openBulkDeleteModal()" id="bulkDeleteBtn" disabled>
+                        🗑️ Удалить выбранные
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters Panel -->
+        <div class="filters-panel" id="filtersPanel">
+            <h3 style="margin-bottom: 1rem;">Фильтры для массового удаления</h3>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label>Дата от</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="filter-group">
+                    <label>Дата до</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <div class="filter-group">
+                    <label>Тип препятствия</label>
+                    <select id="filter-hazard-type">
+                        <option value="">Все</option>
+                        <option value="pothole">Яма</option>
+                        <option value="speed_bump">Лежачий полицейский</option>
+                        <option value="road_defect">Дефект покрытия</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Статус проверки</label>
+                    <select id="filter-verified">
+                        <option value="">Все</option>
+                        <option value="true">Проверено</option>
+                        <option value="false">Не проверено</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-outline" onclick="clearFilters()">Очистить</button>
+                <button class="btn btn-primary" onclick="previewBulkDelete()">Превью удаления</button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" class="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                            <th class="sortable" onclick="sortTable('timestamp')">Дата/Время</th>
+                            <th class="sortable" onclick="sortTable('deviceId')">Устройство</th>
+                            <th class="sortable" onclick="sortTable('latitude')">Широта</th>
+                            <th class="sortable" onclick="sortTable('longitude')">Долгота</th>
+                            <th class="sortable" onclick="sortTable('speed')">Скорость</th>
+                            <th class="sortable" onclick="sortTable('road_quality_score')">Качество</th>
+                            <th class="sortable" onclick="sortTable('hazard_type')">Препятствие</th>
+                            <th class="sortable" onclick="sortTable('severity')">Уровень</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTable">
+                        <tr>
+                            <td colspan="11" style="text-align: center; padding: 3rem;">
+                                <div class="loading active">
+                                    <div class="spinner"></div>
+                                    <p style="margin-top: 1rem; color: #94a3b8;">Загрузка данных...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <div class="pagination-info" id="paginationInfo">
+                    Показано 0 из 0
+                </div>
+                <div class="pagination-controls">
+                    <button class="pagination-btn" onclick="changePage(-1)" id="prevBtn" disabled>Назад</button>
+                    <span id="pageNumbers"></span>
+                    <button class="pagination-btn" onclick="changePage(1)" id="nextBtn" disabled>Вперёд</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактировать запись</h2>
+                <button class="modal-close" onclick="closeEditModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label>Тип препятствия</label>
+                        <select id="edit-hazard-type">
+                            <option value="">Нет</option>
+                            <option value="pothole">Яма</option>
+                            <option value="speed_bump">Лежачий полицейский</option>
+                            <option value="road_defect">Дефект покрытия</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Уровень опасности</label>
+                        <select id="edit-severity">
+                            <option value="low">Низкий</option>
+                            <option value="medium">Средний</option>
+                            <option value="high">Высокий</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Проверено</label>
+                        <select id="edit-verified">
+                            <option value="false">Нет</option>
+                            <option value="true">Да</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Заметки администратора</label>
+                        <textarea id="edit-notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeEditModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveEdit()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Импорт данных из CSV</h2>
+                <button class="modal-close" onclick="closeImportModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Выберите CSV файл</label>
+                    <input type="file" id="csvFile" accept=".csv">
+                </div>
+                <div style="margin-top: 1rem; padding: 1rem; background: #0f172a; border-radius: 0.5rem; font-size: 0.875rem;">
+                    <p style="color: #94a3b8; margin-bottom: 0.5rem;"><strong>Формат файла:</strong></p>
+                    <p style="color: #64748b;">CSV файл должен содержать заголовки колонок как при экспорте</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeImportModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="importCSV()">Импортировать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        <div id="notificationMessage"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Global state
+        let allData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        let rowsPerPage = 25;
+        let sortColumn = 'timestamp';
+        let sortDirection = 'desc';
+        let selectedRows = new Set();
+
+        // Load data on page load
+        window.addEventListener('load', () => {
+            loadData();
+        });
+
+        // Load data from API
+        async function loadData() {
+            try {
+                showNotification('Загрузка данных...', 'info');
+                
+                // Load analytics
+                const analyticsRes = await fetch('/api/admin/analytics');
+                const analytics = await analyticsRes.json();
+                
+                // Update stats
+                document.getElementById('stat-total').textContent = analytics.total_points || 0;
+                document.getElementById('stat-verified').textContent = analytics.verified_points || 0;
+                document.getElementById('stat-hazards').textContent = analytics.hazard_points || 0;
+                document.getElementById('stat-avg').textContent = analytics.avg_road_quality?.toFixed(1) || '0.0';
+                
+                // Load sensor data
+                const dataRes = await fetch('/api/admin/sensor-data?limit=10000');
+                const dataJson = await dataRes.json();
+                
+                allData = dataJson.data || [];
+                filteredData = [...allData];
+                
+                renderTable();
+                showNotification('Данные загружены успешно!', 'success');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showNotification('Ошибка загрузки данных: ' + error.message, 'error');
+            }
+        }
+
+        // Render table
+        function renderTable() {
+            const tbody = document.getElementById('dataTable');
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = filteredData.slice(start, end);
+            
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; padding: 3rem; color: #64748b;">Нет данных для отображения</td></tr>';
+                updatePagination();
+                return;
+            }
+            
+            tbody.innerHTML = pageData.map(row => `
+                <tr>
+                    <td><input type="checkbox" class="checkbox row-checkbox" data-id="${row._id}" onchange="updateSelectAll()"></td>
+                    <td class="nowrap">${formatDate(row.timestamp)}</td>
+                    <td>${row.deviceId || 'N/A'}</td>
+                    <td>${row.latitude?.toFixed(5) || '0.00000'}</td>
+                    <td>${row.longitude?.toFixed(5) || '0.00000'}</td>
+                    <td>${row.speed?.toFixed(1) || '0.0'} км/ч</td>
+                    <td>${row.road_quality_score || 0}</td>
+                    <td>${row.hazard_type ? hazardTypeLabel(row.hazard_type) : '-'}</td>
+                    <td>${severityBadge(row.severity)}</td>
+                    <td>${verifiedBadge(row.is_verified)}</td>
+                    <td class="nowrap">
+                        <div class="action-buttons">
+                            <button class="btn-icon edit" onclick="openEditModal('${row._id}')" title="Редактировать">
+                                ✏️
+                            </button>
+                            <button class="btn-icon delete" onclick="deleteRow('${row._id}')" title="Удалить">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            updatePagination();
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Hazard type label
+        function hazardTypeLabel(type) {
+            const labels = {
+                'pothole': 'Яма',
+                'speed_bump': 'Лежачий полицейский',
+                'road_defect': 'Дефект покрытия'
+            };
+            return labels[type] || type;
+        }
+
+        // Severity badge
+        function severityBadge(severity) {
+            const classes = {
+                'low': 'badge-info',
+                'medium': 'badge-warning',
+                'high': 'badge-danger'
+            };
+            const labels = {
+                'low': 'Низкий',
+                'medium': 'Средний',
+                'high': 'Высокий'
+            };
+            return `<span class="badge ${classes[severity] || 'badge-info'}">${labels[severity] || severity || 'N/A'}</span>`;
+        }
+
+        // Verified badge
+        function verifiedBadge(verified) {
+            return verified 
+                ? '<span class="badge badge-success">✓ Да</span>' 
+                : '<span class="badge badge-warning">○ Нет</span>';
+        }
+
+        // Sort table
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            filteredData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                if (aVal === null || aVal === undefined) aVal = '';
+                if (bVal === null || bVal === undefined) bVal = '';
+                
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            // Update sort indicators
+            document.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            event.target.classList.add(`sort-${sortDirection}`);
+            
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Search table
+        function searchTable() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!query) {
+                filteredData = [...allData];
+            } else {
+                filteredData = allData.filter(row => {
+                    return Object.values(row).some(val => 
+                        String(val).toLowerCase().includes(query)
+                    );
+                });
+            }
+            
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Change rows per page
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPage').value);
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Pagination
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            const start = (currentPage - 1) * rowsPerPage + 1;
+            const end = Math.min(currentPage * rowsPerPage, filteredData.length);
+            
+            document.getElementById('paginationInfo').textContent = 
+                `Показано ${start}-${end} из ${filteredData.length}`;
+            
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
+            
+            // Page numbers
+            const pageNumbers = document.getElementById('pageNumbers');
+            let pages = '';
+            for (let i = 1; i <= Math.min(totalPages, 5); i++) {
+                pages += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            if (totalPages > 5) {
+                pages += '<span style="padding: 0.5rem;">...</span>';
+                pages += `<button class="pagination-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+            }
+            pageNumbers.innerHTML = pages;
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderTable();
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+        }
+
+        // Select all checkbox
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.row-checkbox').forEach(cb => {
+                cb.checked = selectAll;
+                if (selectAll) {
+                    selectedRows.add(cb.dataset.id);
+                } else {
+                    selectedRows.delete(cb.dataset.id);
+                }
+            });
+            updateBulkDeleteButton();
+        }
+
+        function updateSelectAll() {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            const checked = document.querySelectorAll('.row-checkbox:checked');
+            document.getElementById('selectAll').checked = checkboxes.length === checked.length;
+            
+            // Update selected rows
+            selectedRows.clear();
+            checked.forEach(cb => selectedRows.add(cb.dataset.id));
+            updateBulkDeleteButton();
+        }
+
+        function updateBulkDeleteButton() {
+            document.getElementById('bulkDeleteBtn').disabled = selectedRows.size === 0;
+        }
+
+        // Open edit modal
+        function openEditModal(id) {
+            const row = allData.find(r => r._id === id);
+            if (!row) return;
+            
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-hazard-type').value = row.hazard_type || '';
+            document.getElementById('edit-severity').value = row.severity || 'medium';
+            document.getElementById('edit-verified').value = row.is_verified ? 'true' : 'false';
+            document.getElementById('edit-notes').value = row.admin_notes || '';
+            
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        // Save edit
+        async function saveEdit() {
+            const id = document.getElementById('edit-id').value;
+            const data = {
+                hazard_type: document.getElementById('edit-hazard-type').value || null,
+                severity: document.getElementById('edit-severity').value,
+                is_verified: document.getElementById('edit-verified').value === 'true',
+                admin_notes: document.getElementById('edit-notes').value
+            };
+            
+            try {
+                const res = await fetch(`/api/admin/sensor-data/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!res.ok) throw new Error('Ошибка сохранения');
+                
+                closeEditModal();
+                loadData();
+                showNotification('Запись успешно обновлена!', 'success');
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Delete row
+        async function deleteRow(id) {
+            if (!confirm('Вы уверены, что хотите удалить эту запись?')) return;
+            
+            try {
+                const res = await fetch(`/api/admin/sensor-data/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) throw new Error('Ошибка удаления');
+                
+                loadData();
+                showNotification('Запись успешно удалена!', 'success');
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Bulk delete
+        async function openBulkDeleteModal() {
+            if (selectedRows.size === 0) return;
+            
+            if (!confirm(`Вы уверены, что хотите удалить ${selectedRows.size} записей?`)) return;
+            
+            try {
+                for (const id of selectedRows) {
+                    await fetch(`/api/admin/sensor-data/${id}`, { method: 'DELETE' });
+                }
+                
+                selectedRows.clear();
+                loadData();
+                showNotification('Записи успешно удалены!', 'success');
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Filters
+        function toggleFilters() {
+            document.getElementById('filtersPanel').classList.toggle('active');
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-date-from').value = '';
+            document.getElementById('filter-date-to').value = '';
+            document.getElementById('filter-hazard-type').value = '';
+            document.getElementById('filter-verified').value = '';
+        }
+
+        async function previewBulkDelete() {
+            const filters = {
+                date_from: document.getElementById('filter-date-from').value || null,
+                date_to: document.getElementById('filter-date-to').value || null,
+                hazard_type: document.getElementById('filter-hazard-type').value || null,
+                is_verified: document.getElementById('filter-verified').value ? 
+                    document.getElementById('filter-verified').value === 'true' : null
+            };
+            
+            try {
+                const res = await fetch('/api/admin/sensor-data/count-by-filters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(filters)
+                });
+                
+                const result = await res.json();
+                
+                if (result.count === 0) {
+                    showNotification('Нет записей для удаления по заданным фильтрам', 'info');
+                    return;
+                }
+                
+                if (confirm(`Будет удалено ${result.count} записей. Продолжить?`)) {
+                    await bulkDeleteWithFilters(filters);
+                }
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        async function bulkDeleteWithFilters(filters) {
+            try {
+                const res = await fetch('/api/admin/sensor-data/bulk', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(filters)
+                });
+                
+                const result = await res.json();
+                
+                clearFilters();
+                toggleFilters();
+                loadData();
+                showNotification(`Успешно удалено ${result.deleted_count} записей!`, 'success');
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Export CSV
+        async function exportCSV() {
+            try {
+                showNotification('Экспорт данных...', 'info');
+                window.location.href = '/api/admin/sensor-data/export/csv';
+                setTimeout(() => {
+                    showNotification('CSV файл загружен!', 'success');
+                }, 1000);
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Import Modal
+        function openImportModal() {
+            document.getElementById('importModal').classList.add('active');
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.remove('active');
+        }
+
+        async function importCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showNotification('Пожалуйста, выберите файл', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                showNotification('Импорт данных...', 'info');
+                
+                const res = await fetch('/api/admin/sensor-data/import/csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await res.json();
+                
+                closeImportModal();
+                loadData();
+                showNotification(`Импортировано ${result.imported_count} записей!`, 'success');
+            } catch (error) {
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            notification.className = `notification ${type} active`;
+            document.getElementById('notificationMessage').textContent = message;
+            
+            setTimeout(() => {
+                notification.classList.remove('active');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
