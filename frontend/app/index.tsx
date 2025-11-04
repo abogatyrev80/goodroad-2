@@ -154,14 +154,27 @@ export default function GoodRoadApp() {
 
   // Автоматическая отправка данных каждые 10 секунд
   useEffect(() => {
+    console.log('🔍 Проверка условий отправки данных:', {
+      isTracking,
+      platform: Platform.OS,
+      hasSyncService: !!syncService,
+      hasLocation: !!currentLocation
+    });
+
     if (!isTracking || Platform.OS === 'web' || !syncService) {
+      console.log('⏸️ Отправка данных приостановлена');
       return;
     }
 
+    console.log('✅ Отправка данных активирована!');
+
     const sendDataToServer = async () => {
       if (!currentLocation) {
+        console.log('⚠️ Нет данных GPS для отправки');
         return;
       }
+      
+      console.log('📤 Начинаем отправку данных на сервер...');
 
       const deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
