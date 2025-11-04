@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Административная панель</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2196F3, #4CAF50);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .header .subtitle {
+            color: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            margin-top: 0.25rem;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: calc(100vh - 80px);
+        }
+        
+        .sidebar {
+            background: #2a2a2a;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-right: 1px solid #444;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .stat-card.warning {
+            border-left-color: #FF9800;
+        }
+        
+        .stat-card.error {
+            border-left-color: #F44336;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .stat-number.warning {
+            color: #FF9800;
+        }
+        
+        .stat-number.error {
+            color: #F44336;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+        
+        .filters {
+            margin-bottom: 2rem;
+        }
+        
+        .filter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #ccc;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #fff;
+        }
+        
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #2196F3;
+        }
+        
+        .btn-secondary:hover {
+            background: #1976D2;
+        }
+        
+        .btn-danger {
+            background: #F44336;
+        }
+        
+        .btn-danger:hover {
+            background: #D32F2F;
+        }
+        
+        .map-container {
+            position: relative;
+            height: 100%;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .data-points-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #444;
+            border-radius: 4px;
+        }
+        
+        .data-point-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #444;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .data-point-item:hover {
+            background: #333;
+        }
+        
+        .data-point-item:last-child {
+            border-bottom: none;
+        }
+        
+        .point-info {
+            font-size: 0.875rem;
+        }
+        
+        .point-coords {
+            color: #4CAF50;
+            font-weight: 500;
+        }
+        
+        .point-time {
+            color: #999;
+        }
+        
+        .point-quality {
+            color: #FF9800;
+        }
+        
+        .legend {
+            margin-top: 1rem;
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+        
+        .legend h4 {
+            margin-bottom: 0.75rem;
+            color: #ccc;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .legend-text {
+            font-size: 0.875rem;
+            color: #aaa;
+        }
+        
+        .leaflet-popup-content {
+            color: #000;
+        }
+        
+        .popup-content h4 {
+            margin-bottom: 0.5rem;
+            color: #2196F3;
+        }
+        
+        .popup-info {
+            font-size: 0.875rem;
+            margin: 0.25rem 0;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-excellent {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-good {
+            background: #8BC34A;
+            color: white;
+        }
+        
+        .status-fair {
+            background: #FFC107;
+            color: #333;
+        }
+        
+        .status-poor {
+            background: #FF9800;
+            color: white;
+        }
+        
+        .status-very-poor {
+            background: #F44336;
+            color: white;
+        }
+        
+        .edit-modal {
+            display: none;
+            position: fixed;
+            z-index: 3000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        
+        .modal-content {
+            background-color: #2a2a2a;
+            margin: 5% auto;
+            padding: 2rem;
+            border: 1px solid #444;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            color: #fff;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-header h2 {
+            color: #4CAF50;
+            margin: 0;
+        }
+        
+        .close-btn {
+            color: #aaa;
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .close-btn:hover {
+            color: #fff;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #fff;
+        }
+        
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .btn-save {
+            background: #4CAF50;
+            flex: 1;
+        }
+        
+        .btn-cancel {
+            background: #666;
+            flex: 1;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-small:hover {
+            opacity: 0.8;
+        }
+        
+        .btn-edit {
+            background: #2196F3;
+        }
+        
+        .btn-delete {
+            background: #F44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            🚗 Good Road - Панель Администратора
+        </h1>
+        <div class="subtitle">Визуальный анализ данных мобильных устройств</div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <!-- Статистика -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPoints">-</div>
+                    <div class="stat-label">Всего точек</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-number warning" id="hazardPoints">-</div>
+                    <div class="stat-label">Опасностей</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="verifiedPoints">-</div>
+                    <div class="stat-label">Проверено</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgQuality">-</div>
+                    <div class="stat-label">Средн. качество</div>
+                </div>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="filters">
+                <h3 style="margin-bottom: 1rem; color: #ccc;">Фильтры</h3>
+                
+                <div class="filter-group">
+                    <label for="hazardType">Тип опасности:</label>
+                    <select id="hazardType">
+                        <option value="">Все типы</option>
+                        <option value="pothole">Яма</option>
+                        <option value="speed_bump">Лежачий полицейский</option>
+                        <option value="road_defect">Дефект покрытия</option>
+                        <option value="construction">Дорожные работы</option>
+                        <option value="unpaved_road">Грунтовая дорога</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="deviceFilter">Устройство:</label>
+                    <select id="deviceFilter">
+                        <option value="">Все устройства</option>
+                        <!-- Динамически заполняется -->
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="dateFrom">Дата от:</label>
+                    <input type="date" id="dateFrom">
+                </div>
+
+                <div class="filter-group">
+                    <label for="dateTo">Дата до:</label>
+                    <input type="date" id="dateTo">
+                </div>
+
+                <button class="btn" onclick="applyFilters()">Применить фильтры</button>
+                <button class="btn btn-secondary" onclick="resetFilters()">Сбросить</button>
+                <button class="btn btn-secondary" onclick="centerMap()">Центрировать карту</button>
+                <button class="btn btn-danger" onclick="clearZeroCoords()">Очистить (0,0) точки</button>
+                <button class="btn btn-danger" onclick="clearTestData()">Удалить тестовые данные</button>
+            </div>
+
+            <!-- Тестирование обмена данными -->
+            <div style="margin-top: 2rem; padding: 1rem; background: #333; border-radius: 8px;">
+                <h4 style="margin-bottom: 1rem; color: #4CAF50;">🧪 Тестирование обмена данными:</h4>
+                <p style="font-size: 0.75rem; color: #999; margin-bottom: 1rem;">
+                    Эта кнопка генерирует и отправляет тестовые данные, имитируя мобильное приложение.
+                    Используйте для проверки работы API и отображения данных на карте.
+                </p>
+                <button class="btn" onclick="sendTestData()" style="background: #FF9800;">
+                    📡 Отправить тестовые данные
+                </button>
+                <div id="testDataLog" style="margin-top: 1rem; font-size: 0.75rem; color: #ccc; max-height: 200px; overflow-y: auto; font-family: monospace; background: #222; padding: 0.5rem; border-radius: 4px; display: none;"></div>
+            </div>
+
+            <!-- Легенда -->
+            <div class="legend">
+                <h4>Легенда:</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4CAF50;"></div>
+                    <span class="legend-text">Отличное (80-100)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8BC34A;"></div>
+                    <span class="legend-text">Хорошее (60-79)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFC107;"></div>
+                    <span class="legend-text">Среднее (40-59)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF9800;"></div>
+                    <span class="legend-text">Плохое (20-39)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F44336;"></div>
+                    <span class="legend-text">Очень плохое (0-19)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF0000; border: 2px solid #FFF;"></div>
+                    <span class="legend-text">Опасность!</span>
+                </div>
+            </div>
+
+            <!-- Калибровка -->
+            <div class="legend" style="margin-top: 1rem;">
+                <h4>🎯 Адаптивная калибровка:</h4>
+                <div style="font-size: 0.75rem; color: #999; margin-top: 0.5rem; line-height: 1.4;">
+                    <p>Система использует статистический анализ для определения персональных порогов обнаружения дефектов дороги для каждого устройства.</p>
+                    <p style="margin-top: 0.5rem;"><strong>Алгоритм:</strong></p>
+                    <ul style="margin-left: 1rem;">
+                        <li>Базовая линия = среднее значение</li>
+                        <li>Порог = базовая линия ± 2σ</li>
+                        <li>Адаптация: 70% старые данные + 30% новые</li>
+                    </ul>
+                </div>
+                <button class="btn btn-secondary" onclick="showCalibrationStats()" style="margin-top: 0.5rem; font-size: 0.875rem;">Статистика калибровки</button>
+            </div>
+
+            <!-- Последние точки -->
+            <div style="margin-top: 2rem;">
+                <h4 style="margin-bottom: 0.75rem; color: #ccc;">Последние точки:</h4>
+                <div class="data-points-list" id="dataPointsList">
+                    <!-- Динамически заполняется -->
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="loading" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <p>Загрузка данных...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактирование точки</h2>
+                <span class="close-btn" onclick="closeEditModal()">&times;</span>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="edit_point_id">
+                
+                <div class="form-group">
+                    <label>Координаты (только для просмотра):</label>
+                    <input type="text" id="edit_coords" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_hazard_type">Тип опасности:</label>
+                    <select id="edit_hazard_type">
+                        <option value="">Нет опасности</option>
+                        <option value="pothole">Яма</option>
+                        <option value="speed_bump">Лежачий полицейский</option>
+                        <option value="road_defect">Дефект покрытия</option>
+                        <option value="pedestrian_crossing">Пешеходный переход</option>
+                        <option value="railway_crossing">Железнодорожный переезд</option>
+                        <option value="construction">Дорожные работы</option>
+                        <option value="unpaved_road">Грунтовая дорога</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_severity">Серьезность:</label>
+                    <select id="edit_severity">
+                        <option value="low">Низкая</option>
+                        <option value="medium">Средняя</option>
+                        <option value="high">Высокая</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_verified">
+                        <input type="checkbox" id="edit_verified" style="width: auto; margin-right: 0.5rem;">
+                        Проверено администратором
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_notes">Заметки администратора:</label>
+                    <textarea id="edit_notes" placeholder="Дополнительная информация..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-save" onclick="saveEdit()">Сохранить</button>
+                    <button type="button" class="btn btn-cancel" onclick="closeEditModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Глобальные переменные
+        let map;
+        let allDataPoints = [];
+        let filteredDataPoints = [];
+        let markers = [];
+        const API_BASE = '/api';
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            loadData();
+            
+            // Автообновление каждые 30 секунд
+            setInterval(() => {
+                loadData();
+            }, 30000);
+        });
+
+        // Инициализация карты
+        function initMap() {
+            // Создаем карту с центром в Москве
+            map = L.map('map').setView([55.7558, 37.6176], 12);
+
+            // Добавляем OpenStreetMap тайлы
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        // Загрузка всех данных
+        async function loadData() {
+            showLoading(true);
+            try {
+                // Загрузка статистики
+                const analyticsResponse = await fetch(`${API_BASE}/admin/analytics`);
+                const analytics = await analyticsResponse.json();
+                updateStatistics(analytics);
+
+                // Загрузка данных точек
+                const dataResponse = await fetch(`${API_BASE}/admin/sensor-data?limit=1000`);
+                const dataResult = await dataResponse.json();
+                
+                allDataPoints = dataResult.data;
+                filteredDataPoints = allDataPoints;
+                
+                // Заполняем список устройств
+                populateDeviceFilter();
+                
+                displayMarkersOnMap();
+                updateDataPointsList();
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                alert('Ошибка загрузки данных: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Заполнение фильтра устройств
+        function populateDeviceFilter() {
+            const deviceFilter = document.getElementById('deviceFilter');
+            const devices = new Set();
+            
+            allDataPoints.forEach(point => {
+                if (point.deviceId && point.deviceId !== 'unknown') {
+                    devices.add(point.deviceId);
+                }
+            });
+            
+            // Очищаем и добавляем опции
+            deviceFilter.innerHTML = '<option value="">Все устройства</option>';
+            
+            Array.from(devices).sort().forEach(deviceId => {
+                const option = document.createElement('option');
+                option.value = deviceId;
+                option.textContent = `${deviceId.substring(0, 8)}... (${allDataPoints.filter(p => p.deviceId === deviceId).length} точек)`;
+                deviceFilter.appendChild(option);
+            });
+            
+            console.log(`📱 Найдено устройств: ${devices.size}`);
+        }
+
+        // Обновление статистики
+        function updateStatistics(analytics) {
+            document.getElementById('totalPoints').textContent = analytics.total_points;
+            document.getElementById('hazardPoints').textContent = analytics.hazard_points;
+            document.getElementById('verifiedPoints').textContent = analytics.verified_points;
+            document.getElementById('avgQuality').textContent = analytics.avg_road_quality.toFixed(1);
+        }
+
+        // Отображение маркеров на карте
+        function displayMarkersOnMap() {
+            // Удаляем старые маркеры
+            markers.forEach(marker => marker.remove());
+            markers = [];
+
+            if (filteredDataPoints.length === 0) {
+                alert('Нет данных для отображения');
+                return;
+            }
+
+            // Добавляем маркеры для каждой точки
+            filteredDataPoints.forEach(point => {
+                const lat = parseFloat(point.latitude);
+                const lng = parseFloat(point.longitude);
+                
+                // Пропускаем невалидные координаты
+                if (!lat || !lng || lat === 0 || lng === 0) {
+                    return;
+                }
+
+                // Определяем цвет маркера по качеству дороги
+                const color = getColorByQuality(point.road_quality_score);
+                
+                // Создаем кастомную иконку
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="
+                        background-color: ${color};
+                        width: 12px;
+                        height: 12px;
+                        border-radius: 50%;
+                        border: 2px solid #fff;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    "></div>`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+
+                // Создаем маркер
+                const marker = L.marker([lat, lng], { icon: icon });
+                
+                // Добавляем popup с информацией
+                const popupContent = createPopupContent(point);
+                marker.bindPopup(popupContent);
+                
+                marker.addTo(map);
+                markers.push(marker);
+            });
+
+            // Центрируем карту на маркерах
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Получение цвета по качеству дороги
+        function getColorByQuality(quality) {
+            if (quality >= 80) return '#4CAF50'; // Отличное
+            if (quality >= 60) return '#8BC34A'; // Хорошее
+            if (quality >= 40) return '#FFC107'; // Среднее
+            if (quality >= 20) return '#FF9800'; // Плохое
+            return '#F44336'; // Очень плохое
+        }
+
+        // Создание содержимого popup
+        function createPopupContent(point) {
+            const date = new Date(point.timestamp);
+            const formattedDate = date.toLocaleString('ru-RU');
+            
+            const statusClass = getStatusClass(point.road_quality_score);
+            const hazardInfo = point.hazard_type ? 
+                `<div class="popup-info"><strong>Опасность:</strong> ${getHazardName(point.hazard_type)} (${point.severity})</div>` : 
+                '';
+            
+            const deviceId = point.deviceId || 'unknown';
+            const deviceName = deviceId.substring(0, 8); // Первые 8 символов для краткости
+            const coords = `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
+            
+            return `
+                <div class="popup-content">
+                    <h4>Данные точки</h4>
+                    <div class="popup-info"><strong>Устройство:</strong> <span style="color: #2196F3; font-family: monospace;">${deviceName}</span></div>
+                    <div class="popup-info"><strong>Координаты:</strong> ${coords}</div>
+                    <div class="popup-info"><strong>Дата:</strong> ${formattedDate}</div>
+                    <div class="popup-info"><strong>Качество дороги:</strong> <span class="${statusClass}">${point.road_quality_score.toFixed(1)}</span></div>
+                    <div class="popup-info"><strong>Скорость:</strong> ${point.speed.toFixed(1)} км/ч</div>
+                    <div class="popup-info"><strong>Точность GPS:</strong> ${point.accuracy.toFixed(1)} м</div>
+                    ${hazardInfo}
+                    <div class="popup-info"><strong>Проверено:</strong> ${point.is_verified ? 'Да ✓' : 'Нет'}</div>
+                    ${point.admin_notes ? `<div class="popup-info"><strong>Заметки:</strong> ${point.admin_notes}</div>` : ''}
+                    <div class="action-buttons">
+                        <button class="btn-small btn-edit" onclick='openEditModal(${JSON.stringify(point)})'>✏️ Редактировать</button>
+                        <button class="btn-small btn-delete" onclick='deletePoint("${point._id}", "${coords}")'>🗑️ Удалить</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Получение CSS класса статуса
+        function getStatusClass(quality) {
+            if (quality >= 80) return 'status-excellent';
+            if (quality >= 60) return 'status-good';
+            if (quality >= 40) return 'status-fair';
+            if (quality >= 20) return 'status-poor';
+            return 'status-very-poor';
+        }
+
+        // Получение названия опасности
+        function getHazardName(type) {
+            const names = {
+                'pothole': 'Яма',
+                'speed_bump': 'Лежачий полицейский',
+                'road_defect': 'Дефект покрытия',
+                'pedestrian_crossing': 'Пешеходный переход',
+                'railway_crossing': 'Железнодорожный переезд',
+                'construction': 'Дорожные работы',
+                'unpaved_road': 'Грунтовая дорога'
+            };
+            return names[type] || type;
+        }
+
+        // Обновление списка точек
+        function updateDataPointsList() {
+            const listContainer = document.getElementById('dataPointsList');
+            listContainer.innerHTML = '';
+
+            const recentPoints = filteredDataPoints.slice(0, 10);
+            
+            if (recentPoints.length === 0) {
+                listContainer.innerHTML = '<div style="padding: 1rem; color: #999;">Нет данных</div>';
+                return;
+            }
+
+            recentPoints.forEach(point => {
+                if (!point.latitude || !point.longitude || point.latitude === 0 || point.longitude === 0) {
+                    return;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'data-point-item';
+                
+                const date = new Date(point.timestamp);
+                const formattedDate = date.toLocaleString('ru-RU', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                const deviceName = point.deviceId ? point.deviceId.substring(0, 8) : 'unknown';
+                
+                item.innerHTML = `
+                    <div class="point-info">
+                        <div style="color: #2196F3; font-size: 0.75rem; margin-bottom: 2px;">📱 ${deviceName}</div>
+                        <div class="point-coords">${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}</div>
+                        <div class="point-time">${formattedDate}</div>
+                        <div class="point-quality">Качество: ${point.road_quality_score.toFixed(1)}</div>
+                    </div>
+                `;
+                
+                item.onclick = () => {
+                    map.setView([point.latitude, point.longitude], 16);
+                    // Находим соответствующий маркер и открываем его popup
+                    markers.forEach(marker => {
+                        const latLng = marker.getLatLng();
+                        if (Math.abs(latLng.lat - point.latitude) < 0.0001 && 
+                            Math.abs(latLng.lng - point.longitude) < 0.0001) {
+                            marker.openPopup();
+                        }
+                    });
+                };
+                
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Применение фильтров
+        function applyFilters() {
+            const hazardType = document.getElementById('hazardType').value;
+            const deviceId = document.getElementById('deviceFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            filteredDataPoints = allDataPoints.filter(point => {
+                // Фильтр по типу опасности
+                if (hazardType && point.hazard_type !== hazardType) {
+                    return false;
+                }
+
+                // Фильтр по устройству
+                if (deviceId && point.deviceId !== deviceId) {
+                    return false;
+                }
+
+                // Фильтр по дате
+                if (dateFrom || dateTo) {
+                    const pointDate = new Date(point.timestamp);
+                    if (dateFrom && pointDate < new Date(dateFrom)) {
+                        return false;
+                    }
+                    if (dateTo && pointDate > new Date(dateTo + 'T23:59:59')) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            displayMarkersOnMap();
+            updateDataPointsList();
+            
+            const deviceName = deviceId ? deviceId.substring(0, 8) : 'все';
+            alert(`Найдено точек: ${filteredDataPoints.length}\nУстройство: ${deviceName}`);
+        }
+
+        // Сброс фильтров
+        function resetFilters() {
+            document.getElementById('hazardType').value = '';
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            
+            filteredDataPoints = allDataPoints;
+            displayMarkersOnMap();
+            updateDataPointsList();
+        }
+
+        // Центрирование карты
+        function centerMap() {
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            } else {
+                map.setView([55.7558, 37.6176], 12);
+            }
+        }
+
+        // Очистка точек с нулевыми координатами
+        async function clearZeroCoords() {
+            if (!confirm('Вы уверены, что хотите удалить все точки с координатами (0, 0)? Это действие необратимо.')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/admin/cleanup-zero-coords`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                alert(`Очистка завершена!\nУдалено записей: ${result.deleted_records}\nОсталось записей: ${result.remaining_records}`);
+                
+                // Перезагружаем данные
+                await loadData();
+            } catch (error) {
+                console.error('Ошибка очистки:', error);
+                alert('Ошибка очистки данных: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Удаление тестовых данных
+        async function clearTestData() {
+            if (!confirm('⚠️ ВНИМАНИЕ!\n\nВы уверены, что хотите удалить ВСЕ тестовые данные?\n\nБудут удалены все записи от устройств содержащих "test" в названии.\n\nЭто действие НЕОБРАТИМО!')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/admin/cleanup-test-data`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка удаления тестовых данных');
+                }
+                
+                const result = await response.json();
+                alert(`✅ Тестовые данные удалены!\n\n` +
+                      `Найдено тестовых записей: ${result.found_test_records}\n` +
+                      `Удалено: ${result.deleted_records}\n` +
+                      `Осталось в базе: ${result.remaining_records}\n\n` +
+                      `Критерий: ${result.test_pattern}`);
+                
+                // Перезагружаем данные
+                await loadData();
+            } catch (error) {
+                console.error('Ошибка удаления:', error);
+                alert('❌ Ошибка при удалении тестовых данных: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Показать/скрыть индикатор загрузки
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+        }
+
+        // Открыть модальное окно редактирования
+        function openEditModal(point) {
+            document.getElementById('edit_point_id').value = point._id;
+            document.getElementById('edit_coords').value = `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
+            document.getElementById('edit_hazard_type').value = point.hazard_type || '';
+            document.getElementById('edit_severity').value = point.severity || 'medium';
+            document.getElementById('edit_verified').checked = point.is_verified || false;
+            document.getElementById('edit_notes').value = point.admin_notes || '';
+            
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        // Закрыть модальное окно
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // Сохранить изменения
+        async function saveEdit() {
+            const pointId = document.getElementById('edit_point_id').value;
+            const updates = {
+                hazard_type: document.getElementById('edit_hazard_type').value || null,
+                severity: document.getElementById('edit_severity').value,
+                is_verified: document.getElementById('edit_verified').checked,
+                admin_notes: document.getElementById('edit_notes').value
+            };
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/admin/sensor-data/${pointId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updates)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Ошибка сохранения');
+                }
+
+                alert('✅ Изменения сохранены успешно!');
+                closeEditModal();
+                
+                // Перезагрузить данные
+                await loadData();
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                alert('❌ Ошибка при сохранении: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Удалить точку
+        async function deletePoint(pointId, coords) {
+            if (!confirm(`Вы уверены, что хотите удалить точку?\nКоординаты: ${coords}\n\nЭто действие необратимо!`)) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/admin/sensor-data/${pointId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Ошибка удаления');
+                }
+
+                alert('✅ Точка успешно удалена!');
+                
+                // Перезагрузить данные
+                await loadData();
+            } catch (error) {
+                console.error('Ошибка удаления:', error);
+                alert('❌ Ошибка при удалении: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Показать статистику калибровки
+        async function showCalibrationStats() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/calibration/stats`);
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки статистики');
+                }
+                
+                const stats = await response.json();
+                
+                let message = `🎯 Статистика адаптивной калибровки\n\n`;
+                message += `📱 Всего откалиброванных устройств: ${stats.total_calibrated_devices}\n\n`;
+                
+                if (stats.top_calibrated_devices.length > 0) {
+                    message += `🏆 Топ устройств по количеству данных:\n\n`;
+                    stats.top_calibrated_devices.forEach((device, index) => {
+                        const deviceName = device.deviceId.substring(0, 12);
+                        const date = new Date(device.last_updated).toLocaleDateString('ru-RU');
+                        message += `${index + 1}. ${deviceName}...\n`;
+                        message += `   📊 Образцов: ${device.sample_count}\n`;
+                        message += `   🛣️  Тип дороги: ${device.road_type}\n`;
+                        message += `   📅 Обновлено: ${date}\n\n`;
+                    });
+                } else {
+                    message += `\nПока нет откалиброванных устройств.\n`;
+                    message += `Калибровка начнется автоматически при первой поездке.`;
+                }
+                
+                alert(message);
+                
+            } catch (error) {
+                console.error('Ошибка получения статистики:', error);
+                alert('❌ Ошибка при получении статистики калибровки: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Генерация и отправка тестовых данных
+        async function sendTestData() {
+            const logDiv = document.getElementById('testDataLog');
+            logDiv.style.display = 'block';
+            logDiv.innerHTML = '';
+            
+            function log(message, isError = false) {
+                const color = isError ? '#F44336' : '#4CAF50';
+                logDiv.innerHTML += `<div style="color: ${color}; margin: 2px 0;">${message}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            log('🧪 === НАЧАЛО ТЕСТА ОБМЕНА ДАННЫМИ ===');
+            log('');
+            
+            showLoading(true);
+
+            try {
+                // Генерируем тестовое устройство
+                const deviceId = `test-admin-${Date.now()}`;
+                log(`📱 Device ID: ${deviceId}`);
+                
+                // Генерируем реалистичные GPS координаты (Москва, разные точки)
+                const baseCoords = [
+                    { lat: 55.7558, lng: 37.6176, name: 'Красная площадь' },
+                    { lat: 55.7539, lng: 37.6208, name: 'ГУМ' },
+                    { lat: 55.7520, lng: 37.6156, name: 'Театральная' },
+                    { lat: 55.7504, lng: 37.6174, name: 'Лубянка' },
+                    { lat: 55.7558, lng: 37.6300, name: 'Китай-город' }
+                ];
+                
+                const selectedCoord = baseCoords[Math.floor(Math.random() * baseCoords.length)];
+                log(`📍 Локация: ${selectedCoord.name}`);
+                log(`📍 GPS: ${selectedCoord.lat.toFixed(4)}, ${selectedCoord.lng.toFixed(4)}`);
+                
+                // Генерируем 5 точек данных
+                const sensorData = [];
+                const numPoints = 5;
+                log('');
+                log(`📊 Генерация ${numPoints} точек данных...`);
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const timestamp = Date.now() + (i * 1000);
+                    
+                    // Добавляем небольшое смещение для каждой точки (движение)
+                    const latOffset = (Math.random() - 0.5) * 0.001;
+                    const lngOffset = (Math.random() - 0.5) * 0.001;
+                    
+                    // Генерируем реалистичные данные акселерометра
+                    // Обычная езда: небольшие колебания вокруг гравитации
+                    const smoothRoad = Math.random() > 0.3; // 70% - ровная дорога
+                    
+                    let accelX, accelY, accelZ;
+                    if (smoothRoad) {
+                        // Ровная дорога - малые колебания
+                        accelX = (Math.random() - 0.5) * 0.4;
+                        accelY = (Math.random() - 0.5) * 0.4;
+                        accelZ = 9.8 + (Math.random() - 0.5) * 0.2;
+                    } else {
+                        // Яма или кочка - большие колебания
+                        accelX = (Math.random() - 0.5) * 3.0;
+                        accelY = (Math.random() - 0.5) * 3.0;
+                        accelZ = 9.8 + (Math.random() - 0.5) * 4.0;
+                    }
+                    
+                    // Location data
+                    sensorData.push({
+                        type: 'location',
+                        timestamp: timestamp,
+                        data: {
+                            latitude: selectedCoord.lat + latOffset,
+                            longitude: selectedCoord.lng + lngOffset,
+                            speed: 20 + Math.random() * 20, // 20-40 км/ч
+                            accuracy: 3 + Math.random() * 3  // 3-6 метров
+                        }
+                    });
+                    
+                    // Accelerometer data (идет сразу после location)
+                    sensorData.push({
+                        type: 'accelerometer',
+                        timestamp: timestamp,
+                        data: {
+                            x: accelX,
+                            y: accelY,
+                            z: accelZ
+                        }
+                    });
+                    
+                    const roadType = smoothRoad ? '✅ Ровная' : '⚠️  Яма/кочка';
+                    log(`  Точка ${i+1}: ${roadType} (accel: ${Math.abs(accelZ - 9.8).toFixed(2)})`);
+                }
+                
+                log('');
+                log(`📦 Всего сенсорных записей: ${sensorData.length}`);
+                
+                // Формируем payload
+                const payload = {
+                    deviceId: deviceId,
+                    sensorData: sensorData
+                };
+                
+                const payloadSize = JSON.stringify(payload).length;
+                log(`📦 Размер payload: ${payloadSize} bytes`);
+                log('');
+                log('🌐 Отправка на сервер...');
+                log(`🔗 URL: ${API_BASE}/sensor-data`);
+                
+                // Отправляем на сервер
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE}/sensor-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseTime = Date.now() - startTime;
+                log(`⏱️  Время ответа: ${responseTime}ms`);
+                log(`📡 HTTP Status: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('', true);
+                    log('❌ ОШИБКА СЕРВЕРА:', true);
+                    log(errorText, true);
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                log('');
+                log('✅ УСПЕШНО! Ответ сервера:');
+                log(`  📨 Message: ${result.message}`);
+                log(`  📊 Raw data points: ${result.rawDataPoints || 0}`);
+                log(`  🛣️  Conditions processed: ${result.conditionsProcessed || 0}`);
+                log(`  ⚠️  Warnings generated: ${result.warningsGenerated || 0}`);
+                
+                log('');
+                log('💾 Проверка данных в базе...');
+                
+                // Ждем немного чтобы данные точно попали в базу
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Проверяем что данные появились в базе
+                const checkResponse = await fetch(`${API_BASE}/admin/sensor-data?limit=1`);
+                if (checkResponse.ok) {
+                    const checkData = await checkResponse.json();
+                    const latestPoint = checkData.data[0];
+                    
+                    if (latestPoint && latestPoint.deviceId === deviceId) {
+                        log('✅ Данные НАЙДЕНЫ в базе!');
+                        log(`  🆔 Device ID: ${latestPoint.deviceId}`);
+                        log(`  📍 GPS: ${latestPoint.latitude}, ${latestPoint.longitude}`);
+                        log(`  ⏰ Timestamp: ${latestPoint.timestamp}`);
+                    } else {
+                        log('⚠️  Данные еще не появились в базе (проверьте позже)', true);
+                    }
+                } else {
+                    log('⚠️  Не удалось проверить базу данных', true);
+                }
+                
+                log('');
+                log('🎉 === ТЕСТ ЗАВЕРШЕН УСПЕШНО ===');
+                log('');
+                log('💡 Обновите карту (F5) чтобы увидеть новые точки');
+                
+                // Предлагаем перезагрузить данные
+                setTimeout(() => {
+                    if (confirm('✅ Тест успешно завершен!\n\nОбновить карту чтобы увидеть новые точки?')) {
+                        loadData();
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                log('', true);
+                log('❌ === ОШИБКА ТЕСТА ===', true);
+                log(`Ошибка: ${error.message}`, true);
+                log(`Stack: ${error.stack}`, true);
+                
+                alert('❌ Ошибка при отправке тестовых данных!\n\nСмотрите логи для деталей.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Закрыть модальное окно при клике вне его
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
+            }
+        }
+    </script>
+</body>
+</html>
