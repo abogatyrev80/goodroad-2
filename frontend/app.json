@@ -48,7 +48,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "extra": {
-      "backendUrl": "https://roadquality.preview.emergentagent.com"
+      "backendUrl": "https://roadquality.emergent.host"
     },
     "plugins": [
       "expo-router"
