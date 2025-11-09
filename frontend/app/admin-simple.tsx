@@ -200,7 +200,7 @@ export default function AdminPanelSimple() {
   };
 
   const copyDashboardUrl = async () => {
-    const dashboardUrl = 'https://roadquality.preview.emergentagent.com/api/admin/dashboard';
+    const dashboardUrl = 'https://roadquality.emergent.host/api/admin/dashboard';
     
     try {
       await Clipboard.setStringAsync(dashboardUrl);
