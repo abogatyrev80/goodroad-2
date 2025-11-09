@@ -182,7 +182,7 @@ export default function GoodRoadApp() {
       // Get backend URL from environment or app config
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                         Constants.expoConfig?.extra?.backendUrl || 
-                        'https://roadquality.preview.emergentagent.com';
+                        'https://roadquality.emergent.host';
       
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
 
