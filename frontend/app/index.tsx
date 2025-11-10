@@ -27,6 +27,9 @@ import { AppSettings, SoundOption } from './settings';
 // Импортируем Event Detector для умной детекции событий
 import EventDetector, { DetectedEvent, CalibrationProfile } from '../services/EventDetector';
 
+// Импортируем BatchOfflineManager для батчинга и offline поддержки
+import { batchOfflineManager, BatchStats } from '../services/BatchOfflineManager';
+
 // IMPORTANT: Conditional imports for web compatibility
 // On web, we skip SQLite-dependent services to avoid WASM loading errors
 let syncService: any = null;
