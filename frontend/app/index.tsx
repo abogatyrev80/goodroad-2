@@ -93,6 +93,13 @@ export default function GoodRoadApp() {
   // Акселерометр
   const [accelerometerData, setAccelerometerData] = useState({ x: 0, y: 0, z: 0 });
   
+  // EventDetector - умная детекция событий
+  const [eventDetector, setEventDetector] = useState<EventDetector | null>(null);
+  const [detectedEvents, setDetectedEvents] = useState<DetectedEvent[]>([]); // Буфер событий
+  const [lastEvent, setLastEvent] = useState<DetectedEvent | null>(null); // Последнее событие
+  const [eventCount, setEventCount] = useState(0); // Счётчик событий
+  const [currentRoadType, setCurrentRoadType] = useState<string>('unknown'); // Тип дороги
+  
   // Умная система предупреждений
   const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
   const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
