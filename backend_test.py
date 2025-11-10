@@ -115,40 +115,87 @@ def check_current_deployed_state():
         print_result("Current State Check", False, f"Error: {str(e)}")
         return None
 
-def check_analytics_data():
-    """Check analytics for recent activity"""
-    print_section("3. ПРОВЕРКА АНАЛИТИКИ И АКТИВНОСТИ")
+def monitor_deployed_backend_30_seconds():
+    """Monitor deployed backend for 30 seconds checking at 10, 20, 30 second intervals"""
+    print_section("3. МОНИТОРИНГ В ТЕЧЕНИЕ 30 СЕКУНД")
     
-    try:
-        response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
-        
-        if response.status_code != 200:
-            print_result("Analytics API", False, f"Status: {response.status_code}")
-            return False
-        
-        analytics = response.json()
-        
-        print_result("Analytics API", True, "Successfully retrieved analytics")
-        
-        print(f"\n📈 СТАТИСТИКА БАЗЫ ДАННЫХ:")
-        print(f"   Всего точек данных: {analytics.get('total_points', 0)}")
-        print(f"   Проверенных точек: {analytics.get('verified_points', 0)}")
-        print(f"   Точек с препятствиями: {analytics.get('hazard_points', 0)}")
-        print(f"   Средняя оценка дороги: {analytics.get('avg_road_quality', 0)}")
-        print(f"   Активность за 7 дней: {analytics.get('recent_points_7d', 0)}")
-        
-        # Check hazard distribution
-        hazard_dist = analytics.get('hazard_distribution', [])
-        if hazard_dist:
-            print(f"\n🚧 РАСПРЕДЕЛЕНИЕ ПРЕПЯТСТВИЙ:")
-            for hazard in hazard_dist:
-                print(f"   {hazard.get('hazard_type', 'Unknown')}: {hazard.get('count', 0)}")
-        
-        return analytics.get('recent_points_7d', 0) > 0
-        
-    except Exception as e:
-        print_result("Analytics Check", False, f"Error: {str(e)}")
+    # Get initial state
+    print("📊 Получение начального состояния...")
+    initial_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
+    
+    if initial_response.status_code != 200:
+        print_result("Initial Analytics", False, f"Status: {initial_response.status_code}")
         return False
+    
+    initial_analytics = initial_response.json()
+    initial_total = initial_analytics.get('total_points', 0)
+    
+    print(f"   Начальное количество точек: {initial_total}")
+    print(f"   Начало мониторинга: {datetime.now().strftime('%H:%M:%S')}")
+    
+    start_time = time.time()
+    check_intervals = [10, 20, 30]
+    new_data_detected = False
+    
+    for interval in check_intervals:
+        # Wait until the interval time
+        elapsed = time.time() - start_time
+        wait_time = interval - elapsed
+        
+        if wait_time > 0:
+            print(f"\n⏳ Ожидание до {interval}с проверки... ({wait_time:.1f}с)")
+            time.sleep(wait_time)
+        
+        # Check current state
+        current_time = datetime.now().strftime('%H:%M:%S')
+        print(f"\n🔍 ПРОВЕРКА НА {interval}с ({current_time}):")
+        
+        try:
+            response = requests.get(f"{API_BASE}/admin/analytics", timeout=10)
+            
+            if response.status_code == 200:
+                current_analytics = response.json()
+                current_total = current_analytics.get('total_points', 0)
+                change = current_total - initial_total
+                
+                print(f"   Текущее количество точек: {current_total}")
+                
+                if change > 0:
+                    print(f"   🎉 ОБНАРУЖЕНЫ НОВЫЕ ДАННЫЕ! +{change} точек")
+                    new_data_detected = True
+                    
+                    # Get latest data to show details
+                    sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=5", timeout=10)
+                    if sensor_response.status_code == 200:
+                        sensor_data = sensor_response.json()
+                        latest_records = sensor_data.get('data', [])
+                        if latest_records:
+                            latest = latest_records[0]
+                            print(f"   Последняя запись: {latest.get('timestamp', 'N/A')}")
+                            print(f"   Device ID: {latest.get('deviceId', 'N/A')}")
+                elif change == 0:
+                    print(f"   📊 Изменений нет (остается {current_total})")
+                else:
+                    print(f"   ⚠️  Количество уменьшилось на {abs(change)} (возможна очистка данных)")
+                    
+            else:
+                print(f"   ❌ Ошибка получения данных: {response.status_code}")
+                
+        except Exception as e:
+            print(f"   ❌ Ошибка при проверке: {str(e)}")
+    
+    print(f"\n📋 РЕЗУЛЬТАТ МОНИТОРИНГА:")
+    if new_data_detected:
+        print("   ✅ Deployed приложение АКТИВНО отправляет данные")
+    else:
+        print("   ❌ Новых данных не обнаружено за 30 секунд")
+        print("   Возможные причины:")
+        print("     - Мобильное приложение не используется")
+        print("     - Проблемы с сетевым подключением")
+        print("     - React hooks stale closure bug")
+        print("     - Фоновые задачи не работают")
+    
+    return new_data_detected
 
 def test_sensor_data_endpoint():
     """Test if sensor data endpoint is working"""
