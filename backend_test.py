@@ -197,58 +197,83 @@ def monitor_deployed_backend_30_seconds():
     
     return new_data_detected
 
-def test_sensor_data_endpoint():
-    """Test if sensor data endpoint is working"""
-    print_section("4. ТЕСТ API ENDPOINT /api/sensor-data")
+def check_latest_sensor_data():
+    """Check latest 10 sensor data records with fresh data analysis"""
+    print_section("4. ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ (limit=10)")
     
     try:
-        # Create test sensor data similar to mobile app
-        test_data = {
-            "deviceId": "test-device-urgent-check-20250119",
-            "sensorData": [
-                {
-                    "type": "location",
-                    "timestamp": int(datetime.now().timestamp() * 1000),
-                    "data": {
-                        "latitude": 55.7558,
-                        "longitude": 37.6176,
-                        "speed": 25.0,
-                        "accuracy": 5.0,
-                        "heading": 180.0
-                    }
-                },
-                {
-                    "type": "accelerometer", 
-                    "timestamp": int(datetime.now().timestamp() * 1000),
-                    "data": {
-                        "x": 0.2,
-                        "y": 0.4,
-                        "z": 9.8,
-                        "totalAcceleration": 9.82
-                    }
-                }
-            ]
-        }
+        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=15)
         
-        response = requests.post(
-            f"{API_BASE}/sensor-data",
-            json=test_data,
-            headers={"Content-Type": "application/json"},
-            timeout=15
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            print_result("POST /api/sensor-data", True, f"Processed {result.get('rawDataPoints', 0)} points")
-            print(f"   Условия дороги созданы: {result.get('conditionsProcessed', 0)}")
-            print(f"   Предупреждения созданы: {result.get('warningsGenerated', 0)}")
-            return True
-        else:
-            print_result("POST /api/sensor-data", False, f"Status: {response.status_code}, Response: {response.text}")
+        if response.status_code != 200:
+            print_result("Latest Sensor Data API", False, f"Status: {response.status_code}")
             return False
-            
+        
+        data = response.json()
+        records = data.get('data', [])
+        
+        print_result("Latest Sensor Data API", True, f"Retrieved {len(records)} records")
+        
+        if not records:
+            print("   ❌ База данных пуста")
+            return False
+        
+        print(f"\n📊 АНАЛИЗ ПОСЛЕДНИХ {len(records)} ЗАПИСЕЙ:")
+        
+        # Analyze records by date
+        today = datetime.now().date()
+        date_counts = {}
+        device_ids = set()
+        
+        for record in records:
+            try:
+                timestamp = record.get('timestamp', '')
+                record_date = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).date()
+                date_str = record_date.strftime('%Y-%m-%d')
+                
+                if date_str not in date_counts:
+                    date_counts[date_str] = 0
+                date_counts[date_str] += 1
+                
+                device_id = record.get('deviceId', 'unknown')
+                device_ids.add(device_id)
+                
+            except Exception as e:
+                print(f"   ⚠️  Ошибка обработки записи: {str(e)}")
+        
+        # Show date distribution
+        print(f"   Распределение по датам:")
+        for date_str, count in sorted(date_counts.items(), reverse=True):
+            is_today = date_str == today.strftime('%Y-%m-%d')
+            marker = "🟢 СЕГОДНЯ" if is_today else ""
+            print(f"     {date_str}: {count} записей {marker}")
+        
+        # Show device IDs
+        print(f"   Device ID последних записей:")
+        for device_id in sorted(device_ids):
+            print(f"     - {device_id}")
+        
+        # Show latest record details
+        latest = records[0]
+        print(f"\n📍 САМАЯ ПОСЛЕДНЯЯ ЗАПИСЬ:")
+        print(f"   Время: {latest.get('timestamp', 'N/A')}")
+        print(f"   Device ID: {latest.get('deviceId', 'N/A')}")
+        print(f"   GPS: ({latest.get('latitude', 0)}, {latest.get('longitude', 0)})")
+        print(f"   Скорость: {latest.get('speed', 0)} км/ч")
+        print(f"   Точность GPS: {latest.get('accuracy', 0)} м")
+        
+        # Check if there's fresh data (today)
+        today_str = today.strftime('%Y-%m-%d')
+        has_fresh_data = today_str in date_counts
+        
+        if has_fresh_data:
+            print(f"   ✅ Есть свежие записи с сегодняшней датой ({date_counts[today_str]} записей)")
+        else:
+            print(f"   ❌ Нет записей с сегодняшней датой")
+        
+        return has_fresh_data
+        
     except Exception as e:
-        print_result("Sensor Data Endpoint Test", False, f"Error: {str(e)}")
+        print_result("Latest Sensor Data Check", False, f"Error: {str(e)}")
         return False
 
 def check_backend_logs():
