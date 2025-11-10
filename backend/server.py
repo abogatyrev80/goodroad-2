@@ -317,10 +317,14 @@ async def upload_sensor_data(batch: SensorDataBatch):
         
         if processed_warnings:
             await db.road_warnings.insert_many(processed_warnings)
+            print(f"✅ Stored {len(processed_warnings)} warnings")
         
         return {
             "message": "Sensor data processed successfully",
             "rawDataPoints": len(batch.sensorData),
+            "locationPoints": len(location_data),
+            "accelerometerPoints": len(accel_data),
+            "eventPoints": len(event_data),  # NEW
             "conditionsProcessed": len(processed_conditions),
             "warningsGenerated": len(processed_warnings)
         }
