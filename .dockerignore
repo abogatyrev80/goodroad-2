@@ -1,0 +1,48 @@
+# Node modules
+frontend/node_modules
+frontend/.expo
+frontend/.expo-shared
+frontend/dist
+
+# Python cache
+backend/__pycache__
+backend/*.pyc
+backend/.pytest_cache
+backend/venv
+backend/.venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+frontend/services/*.test.ts
+backend/tests
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment (will be injected by platform)
+.env.local
+.env.*.local
+
+# Large dependencies that can be cached
+frontend/.yarn/cache
