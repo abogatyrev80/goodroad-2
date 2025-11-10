@@ -427,6 +427,37 @@ class BatchOfflineManager {
   async forceSyncNow(currentLocation: any, currentSpeed: number, gpsAccuracy: number) {
     console.log('🔄 Принудительная синхронизация...');
     
+    // Если batch пустой, создать тестовое событие для подтверждения связи
+    if (this.batch.length === 0 && currentLocation) {
+      console.log('📍 Batch пустой, создаём тестовую точку для синхронизации...');
+      
+      // Создать тестовое событие с текущими GPS координатами
+      const testEvent: DetectedEvent = {
+        timestamp: Date.now(),
+        eventType: 'test_sync',
+        severity: 5, // Минимальная важность
+        location: {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          speed: currentSpeed,
+          accuracy: gpsAccuracy,
+        },
+        accelerometer: {
+          x: 0,
+          y: 0,
+          z: 9.8,
+          magnitude: 9.8,
+          deltaY: 0,
+          deltaZ: 0,
+        },
+        roadType: 'unknown',
+        shouldNotifyUser: false,
+      };
+      
+      this.batch.push(testEvent);
+      console.log('✅ Тестовая точка добавлена в batch');
+    }
+    
     // Отправить текущий batch
     if (this.batch.length > 0) {
       await this.sendBatch(currentLocation, currentSpeed, gpsAccuracy, 'high');
