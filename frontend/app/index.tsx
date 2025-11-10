@@ -134,11 +134,29 @@ export default function GoodRoadApp() {
     requestLocationPermission();
     loadAppSettings();
     initializeEventDetector();
+    initializeBatchManager();
     
     return () => {
       cleanup();
     };
   }, []);
+
+  const initializeBatchManager = () => {
+    try {
+      // Настроить callback для обновления статистики в UI
+      batchOfflineManager.setStatsCallback((stats) => {
+        setBatchStats(stats);
+        console.log('📊 Batch stats updated:', stats);
+      });
+      
+      // Получить начальную статистику
+      setBatchStats(batchOfflineManager.getStats());
+      
+      console.log('✅ BatchOfflineManager инициализирован');
+    } catch (error) {
+      console.error('❌ Ошибка инициализации BatchOfflineManager:', error);
+    }
+  };
 
   const initializeEventDetector = () => {
     try {
