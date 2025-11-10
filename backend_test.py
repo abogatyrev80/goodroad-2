@@ -1,26 +1,17 @@
 #!/usr/bin/env python3
 """
-ТЕСТИРОВАНИЕ DEPLOYED ВЕРСИИ: Backend Testing for Good Road App
-Проверка deployed приложения на https://roadquality.emergent.host
+Backend Testing Suite for EventDetector (Phase 2) and BatchOfflineManager (Phase 3)
+Tests the new event-driven data collection functionality
 """
 
 import requests
 import json
 import time
-from datetime import datetime, timedelta
-import os
-import subprocess
-from urllib.parse import urljoin
+from datetime import datetime
+import sys
 
-# DEPLOYED backend URL as specified in review request
-DEPLOYED_BACKEND_URL = 'https://roadquality.emergent.host'
-API_BASE = urljoin(DEPLOYED_BACKEND_URL, '/api')
-
-print(f"🚀 ТЕСТИРОВАНИЕ DEPLOYED ВЕРСИИ: Good Road Backend Analysis")
-print(f"Проверка deployed приложения с мониторингом в течение 30 секунд")
-print(f"Deployed Backend URL: {DEPLOYED_BACKEND_URL}")
-print(f"API Base: {API_BASE}")
-print("=" * 80)
+# Backend URL from frontend/.env
+BACKEND_URL = "https://roadqual-track.preview.emergentagent.com/api"
 
 def print_section(title):
     print(f"\n{'='*60}")
