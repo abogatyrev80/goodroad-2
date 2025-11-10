@@ -383,10 +383,7 @@
   run_ui: false
 
 ## test_plan:
-  current_focus:
-    - "EventDetector Integration (Phase 2)"
-    - "BatchOfflineManager Integration (Phase 3)"
-    - "Backend Event Processing Support"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
