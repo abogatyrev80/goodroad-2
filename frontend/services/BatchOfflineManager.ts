@@ -79,6 +79,18 @@ class BatchOfflineManager {
       // Загрузить offline очередь из AsyncStorage
       await this.loadOfflineQueue();
       
+      // 🔧 MIGRATION: Очистить старые данные с неправильным форматом (2025-01-19)
+      // После исправления формата сообщений нужно очистить offline очередь
+      if (this.offlineQueue.length > 0 && !IS_WEB) {
+        console.log('🧹 Обнаружена старая offline очередь, очистка...');
+        this.offlineQueue = [];
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        this.stats.offlineQueueSize = 0;
+        this.stats.failedSends = 0;
+        this.updateStats();
+        console.log('✅ Offline очередь очищена после обновления формата');
+      }
+      
       // Проверить состояние сети
       await this.checkNetworkStatus();
       
