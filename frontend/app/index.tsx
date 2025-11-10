@@ -24,6 +24,9 @@ import Constants from 'expo-constants';
 // Импортируем типы из настроек (без offline зависимостей)
 import { AppSettings, SoundOption } from './settings';
 
+// Импортируем Event Detector для умной детекции событий
+import EventDetector, { DetectedEvent, CalibrationProfile } from '../services/EventDetector';
+
 // IMPORTANT: Conditional imports for web compatibility
 // On web, we skip SQLite-dependent services to avoid WASM loading errors
 let syncService: any = null;
