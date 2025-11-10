@@ -442,7 +442,12 @@ class BatchOfflineManager {
   async clearAll() {
     this.batch = [];
     this.offlineQueue = [];
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    
+    // Skip AsyncStorage on web
+    if (!IS_WEB) {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    }
+    
     this.stats = {
       totalEvents: 0,
       pendingEvents: 0,
