@@ -250,7 +250,7 @@ export default function GoodRoadApp() {
       clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
-  }, [isTracking]); // Зависимость только от isTracking, чтобы не пересоздавать интервал
+  }, [isTracking, currentLocation, accelerometerData]); // Зависимости включают данные для отправки
 
   // Функции для системы предупреждений
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
