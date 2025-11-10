@@ -44,466 +44,521 @@ class EventDetectorTester:
         except Exception as e:
             self.log_test("API Connectivity", False, f"Error: {str(e)}")
             return False
-
-def check_current_deployed_state():
-    """Check current state of deployed backend"""
-    print_section("2. ПРОВЕРКА ТЕКУЩЕГО СОСТОЯНИЯ DEPLOYED BACKEND")
-    
-    try:
-        # Get analytics first
-        analytics_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
-        
-        if analytics_response.status_code != 200:
-            print_result("Admin Analytics API", False, f"Status: {analytics_response.status_code}")
-            return None
-        
-        analytics = analytics_response.json()
-        print_result("Admin Analytics API", True, "Successfully retrieved analytics")
-        
-        print(f"\n📊 ТЕКУЩЕЕ СОСТОЯНИЕ БАЗЫ ДАННЫХ:")
-        print(f"   Всего точек данных: {analytics.get('total_points', 0)}")
-        print(f"   Проверенных точек: {analytics.get('verified_points', 0)}")
-        print(f"   Точек с препятствиями: {analytics.get('hazard_points', 0)}")
-        print(f"   Средняя оценка дороги: {analytics.get('avg_road_quality', 0)}")
-        print(f"   Активность за 7 дней: {analytics.get('recent_points_7d', 0)}")
-        
-        # Get latest sensor data
-        sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=15)
-        
-        if sensor_response.status_code != 200:
-            print_result("Admin Sensor Data API", False, f"Status: {sensor_response.status_code}")
-            return analytics
-        
-        sensor_data = sensor_response.json()
-        sensor_records = sensor_data.get('data', [])
-        
-        print_result("Admin Sensor Data API", True, f"Retrieved {len(sensor_records)} records")
-        
-        if sensor_records:
-            latest_record = sensor_records[0]  # Most recent first
-            print(f"\n📍 ПОСЛЕДНЯЯ ЗАПИСЬ:")
-            print(f"   Время: {latest_record.get('timestamp', 'N/A')}")
-            print(f"   Device ID: {latest_record.get('deviceId', 'N/A')}")
-            print(f"   GPS координаты: ({latest_record.get('latitude', 0)}, {latest_record.get('longitude', 0)})")
             
-            # Check if today's data exists
-            today = datetime.now().date()
-            today_count = 0
-            for record in sensor_records:
-                try:
-                    record_date = datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00')).date()
-                    if record_date == today:
-                        today_count += 1
-                except:
-                    continue
-            
-            print(f"   Записей за сегодня: {today_count}")
-        else:
-            print(f"\n📍 База данных пуста")
+    def test_event_type_sensor_data(self):
+        """Test POST /api/sensor-data with NEW event type data format"""
+        print("\n🎯 Testing EventDetector Event Type Data Processing...")
         
-        return {
-            'analytics': analytics,
-            'sensor_data': sensor_data,
-            'latest_record': sensor_records[0] if sensor_records else None
+        # Create test data with event type format
+        current_timestamp = int(time.time() * 1000)
+        
+        test_data = {
+            "deviceId": "test-event-detector-001",
+            "sensorData": [
+                {
+                    "type": "event",
+                    "timestamp": current_timestamp,
+                    "data": {
+                        "eventType": "pothole",
+                        "severity": 1,
+                        "roadType": "asphalt",
+                        "location": {
+                            "latitude": 55.7558,
+                            "longitude": 37.6176,
+                            "speed": 45.5,
+                            "accuracy": 5.0
+                        },
+                        "accelerometer": {
+                            "x": 0.5,
+                            "y": 4.8,
+                            "z": 9.8,
+                            "magnitude": 5.2,
+                            "deltaY": 4.5,
+                            "deltaZ": 0.3
+                        }
+                    }
+                },
+                {
+                    "type": "event",
+                    "timestamp": current_timestamp + 1000,
+                    "data": {
+                        "eventType": "braking",
+                        "severity": 2,
+                        "roadType": "asphalt",
+                        "location": {
+                            "latitude": 55.7559,
+                            "longitude": 37.6177,
+                            "speed": 25.0,
+                            "accuracy": 5.0
+                        },
+                        "accelerometer": {
+                            "x": 0.2,
+                            "y": 0.5,
+                            "z": 3.5,
+                            "magnitude": 3.8,
+                            "deltaY": 0.4,
+                            "deltaZ": 3.2
+                        }
+                    }
+                }
+            ]
         }
-        
-    except Exception as e:
-        print_result("Current State Check", False, f"Error: {str(e)}")
-        return None
-
-def monitor_deployed_backend_30_seconds():
-    """Monitor deployed backend for 30 seconds checking at 10, 20, 30 second intervals"""
-    print_section("3. МОНИТОРИНГ В ТЕЧЕНИЕ 30 СЕКУНД")
-    
-    # Get initial state
-    print("📊 Получение начального состояния...")
-    initial_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
-    
-    if initial_response.status_code != 200:
-        print_result("Initial Analytics", False, f"Status: {initial_response.status_code}")
-        return False
-    
-    initial_analytics = initial_response.json()
-    initial_total = initial_analytics.get('total_points', 0)
-    
-    print(f"   Начальное количество точек: {initial_total}")
-    print(f"   Начало мониторинга: {datetime.now().strftime('%H:%M:%S')}")
-    
-    start_time = time.time()
-    check_intervals = [10, 20, 30]
-    new_data_detected = False
-    
-    for interval in check_intervals:
-        # Wait until the interval time
-        elapsed = time.time() - start_time
-        wait_time = interval - elapsed
-        
-        if wait_time > 0:
-            print(f"\n⏳ Ожидание до {interval}с проверки... ({wait_time:.1f}с)")
-            time.sleep(wait_time)
-        
-        # Check current state
-        current_time = datetime.now().strftime('%H:%M:%S')
-        print(f"\n🔍 ПРОВЕРКА НА {interval}с ({current_time}):")
         
         try:
-            response = requests.get(f"{API_BASE}/admin/analytics", timeout=10)
+            response = self.session.post(
+                f"{BACKEND_URL}/sensor-data",
+                json=test_data,
+                headers={"Content-Type": "application/json"}
+            )
             
             if response.status_code == 200:
-                current_analytics = response.json()
-                current_total = current_analytics.get('total_points', 0)
-                change = current_total - initial_total
+                result = response.json()
                 
-                print(f"   Текущее количество точек: {current_total}")
+                # Check response structure
+                expected_fields = ["message", "rawDataPoints", "eventPoints", "conditionsProcessed", "warningsGenerated"]
+                missing_fields = [field for field in expected_fields if field not in result]
                 
-                if change > 0:
-                    print(f"   🎉 ОБНАРУЖЕНЫ НОВЫЕ ДАННЫЕ! +{change} точек")
-                    new_data_detected = True
-                    
-                    # Get latest data to show details
-                    sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=5", timeout=10)
-                    if sensor_response.status_code == 200:
-                        sensor_data = sensor_response.json()
-                        latest_records = sensor_data.get('data', [])
-                        if latest_records:
-                            latest = latest_records[0]
-                            print(f"   Последняя запись: {latest.get('timestamp', 'N/A')}")
-                            print(f"   Device ID: {latest.get('deviceId', 'N/A')}")
-                elif change == 0:
-                    print(f"   📊 Изменений нет (остается {current_total})")
+                if missing_fields:
+                    self.log_test("Event Type Data Upload", False, f"Missing fields: {missing_fields}")
+                    return False
+                
+                # Verify event processing
+                event_points = result.get("eventPoints", 0)
+                conditions_processed = result.get("conditionsProcessed", 0)
+                warnings_generated = result.get("warningsGenerated", 0)
+                
+                if event_points == 2 and conditions_processed >= 2:
+                    self.log_test("Event Type Data Upload", True, 
+                                f"Processed {event_points} events, created {conditions_processed} conditions, {warnings_generated} warnings")
+                    return True
                 else:
-                    print(f"   ⚠️  Количество уменьшилось на {abs(change)} (возможна очистка данных)")
-                    
+                    self.log_test("Event Type Data Upload", False, 
+                                f"Expected 2 events, got {event_points}. Conditions: {conditions_processed}")
+                    return False
             else:
-                print(f"   ❌ Ошибка получения данных: {response.status_code}")
+                self.log_test("Event Type Data Upload", False, f"HTTP {response.status_code}: {response.text}")
+                return False
                 
         except Exception as e:
-            print(f"   ❌ Ошибка при проверке: {str(e)}")
-    
-    print(f"\n📋 РЕЗУЛЬТАТ МОНИТОРИНГА:")
-    if new_data_detected:
-        print("   ✅ Deployed приложение АКТИВНО отправляет данные")
-    else:
-        print("   ❌ Новых данных не обнаружено за 30 секунд")
-        print("   Возможные причины:")
-        print("     - Мобильное приложение не используется")
-        print("     - Проблемы с сетевым подключением")
-        print("     - React hooks stale closure bug")
-        print("     - Фоновые задачи не работают")
-    
-    return new_data_detected
-
-def check_latest_sensor_data():
-    """Check latest 10 sensor data records with fresh data analysis"""
-    print_section("4. ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ (limit=10)")
-    
-    try:
-        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=15)
-        
-        if response.status_code != 200:
-            print_result("Latest Sensor Data API", False, f"Status: {response.status_code}")
+            self.log_test("Event Type Data Upload", False, f"Error: {str(e)}")
             return False
+            
+    def test_severity_mapping(self):
+        """Test severity to condition score mapping (1->80, 2->60, 3->40, 4->20, 5->0)"""
+        print("\n🎯 Testing Severity to Condition Score Mapping...")
         
-        data = response.json()
-        records = data.get('data', [])
+        severity_tests = [
+            {"severity": 1, "expected_score": 80, "event_type": "pothole"},
+            {"severity": 2, "expected_score": 60, "event_type": "braking"},
+            {"severity": 3, "expected_score": 40, "event_type": "bump"},
+            {"severity": 4, "expected_score": 20, "event_type": "vibration"},
+            {"severity": 5, "expected_score": 0, "event_type": "normal"}
+        ]
         
-        print_result("Latest Sensor Data API", True, f"Retrieved {len(records)} records")
+        all_passed = True
         
-        if not records:
-            print("   ❌ База данных пуста")
-            return False
-        
-        print(f"\n📊 АНАЛИЗ ПОСЛЕДНИХ {len(records)} ЗАПИСЕЙ:")
-        
-        # Analyze records by date
-        today = datetime.now().date()
-        date_counts = {}
-        device_ids = set()
-        
-        for record in records:
+        for test_case in severity_tests:
+            current_timestamp = int(time.time() * 1000)
+            
+            test_data = {
+                "deviceId": f"test-severity-{test_case['severity']}",
+                "sensorData": [
+                    {
+                        "type": "event",
+                        "timestamp": current_timestamp,
+                        "data": {
+                            "eventType": test_case["event_type"],
+                            "severity": test_case["severity"],
+                            "roadType": "asphalt",
+                            "location": {
+                                "latitude": 55.7560 + test_case["severity"] * 0.0001,
+                                "longitude": 37.6180 + test_case["severity"] * 0.0001,
+                                "speed": 30.0,
+                                "accuracy": 5.0
+                            },
+                            "accelerometer": {
+                                "x": 0.1,
+                                "y": 0.2,
+                                "z": 9.8,
+                                "magnitude": 2.0,
+                                "deltaY": 0.1,
+                                "deltaZ": 0.1
+                            }
+                        }
+                    }
+                ]
+            }
+            
             try:
-                timestamp = record.get('timestamp', '')
-                record_date = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).date()
-                date_str = record_date.strftime('%Y-%m-%d')
+                response = self.session.post(
+                    f"{BACKEND_URL}/sensor-data",
+                    json=test_data,
+                    headers={"Content-Type": "application/json"}
+                )
                 
-                if date_str not in date_counts:
-                    date_counts[date_str] = 0
-                date_counts[date_str] += 1
-                
-                device_id = record.get('deviceId', 'unknown')
-                device_ids.add(device_id)
-                
+                if response.status_code == 200:
+                    result = response.json()
+                    conditions_processed = result.get("conditionsProcessed", 0)
+                    
+                    if conditions_processed >= 1:
+                        self.log_test(f"Severity {test_case['severity']} Mapping", True, 
+                                    f"Event processed successfully, expected score: {test_case['expected_score']}")
+                    else:
+                        self.log_test(f"Severity {test_case['severity']} Mapping", False, 
+                                    f"No conditions processed for severity {test_case['severity']}")
+                        all_passed = False
+                else:
+                    self.log_test(f"Severity {test_case['severity']} Mapping", False, 
+                                f"HTTP {response.status_code}")
+                    all_passed = False
+                    
             except Exception as e:
-                print(f"   ⚠️  Ошибка обработки записи: {str(e)}")
+                self.log_test(f"Severity {test_case['severity']} Mapping", False, f"Error: {str(e)}")
+                all_passed = False
+                
+            # Small delay between requests
+            time.sleep(0.5)
+            
+        return all_passed
         
-        # Show date distribution
-        print(f"   Распределение по датам:")
-        for date_str, count in sorted(date_counts.items(), reverse=True):
-            is_today = date_str == today.strftime('%Y-%m-%d')
-            marker = "🟢 СЕГОДНЯ" if is_today else ""
-            print(f"     {date_str}: {count} записей {marker}")
+    def test_warning_generation(self):
+        """Test warning generation for severity 1-2 events"""
+        print("\n🎯 Testing Warning Generation for Critical Events...")
         
-        # Show device IDs
-        print(f"   Device ID последних записей:")
-        for device_id in sorted(device_ids):
-            print(f"     - {device_id}")
+        current_timestamp = int(time.time() * 1000)
         
-        # Show latest record details
-        latest = records[0]
-        print(f"\n📍 САМАЯ ПОСЛЕДНЯЯ ЗАПИСЬ:")
-        print(f"   Время: {latest.get('timestamp', 'N/A')}")
-        print(f"   Device ID: {latest.get('deviceId', 'N/A')}")
-        print(f"   GPS: ({latest.get('latitude', 0)}, {latest.get('longitude', 0)})")
-        print(f"   Скорость: {latest.get('speed', 0)} км/ч")
-        print(f"   Точность GPS: {latest.get('accuracy', 0)} м")
+        # Test critical events (severity 1-2) that should generate warnings
+        critical_events = [
+            {"eventType": "pothole", "severity": 1, "expected_warning": "pothole"},
+            {"eventType": "braking", "severity": 2, "expected_warning": "rough_road"},
+            {"eventType": "bump", "severity": 1, "expected_warning": "speed_bump"},
+            {"eventType": "vibration", "severity": 2, "expected_warning": "rough_road"}
+        ]
         
-        # Check if there's fresh data (today)
-        today_str = today.strftime('%Y-%m-%d')
-        has_fresh_data = today_str in date_counts
+        warnings_generated = 0
         
-        if has_fresh_data:
-            print(f"   ✅ Есть свежие записи с сегодняшней датой ({date_counts[today_str]} записей)")
+        for i, event in enumerate(critical_events):
+            test_data = {
+                "deviceId": f"test-warning-{i+1}",
+                "sensorData": [
+                    {
+                        "type": "event",
+                        "timestamp": current_timestamp + i * 1000,
+                        "data": {
+                            "eventType": event["eventType"],
+                            "severity": event["severity"],
+                            "roadType": "asphalt",
+                            "location": {
+                                "latitude": 55.7570 + i * 0.0001,
+                                "longitude": 37.6190 + i * 0.0001,
+                                "speed": 40.0,
+                                "accuracy": 5.0
+                            },
+                            "accelerometer": {
+                                "x": 0.3,
+                                "y": 2.5,
+                                "z": 9.8,
+                                "magnitude": 4.0,
+                                "deltaY": 2.0,
+                                "deltaZ": 0.2
+                            }
+                        }
+                    }
+                ]
+            }
+            
+            try:
+                response = self.session.post(
+                    f"{BACKEND_URL}/sensor-data",
+                    json=test_data,
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    warnings_count = result.get("warningsGenerated", 0)
+                    warnings_generated += warnings_count
+                    
+                    if warnings_count > 0:
+                        self.log_test(f"Warning for {event['eventType']} (severity {event['severity']})", True, 
+                                    f"Generated {warnings_count} warning(s)")
+                    else:
+                        self.log_test(f"Warning for {event['eventType']} (severity {event['severity']})", False, 
+                                    "No warnings generated for critical event")
+                else:
+                    self.log_test(f"Warning for {event['eventType']}", False, f"HTTP {response.status_code}")
+                    
+            except Exception as e:
+                self.log_test(f"Warning for {event['eventType']}", False, f"Error: {str(e)}")
+                
+            time.sleep(0.5)
+            
+        # Overall warning generation test
+        if warnings_generated >= 3:  # Expect at least 3 warnings from 4 critical events
+            self.log_test("Critical Event Warning Generation", True, 
+                        f"Generated {warnings_generated} warnings from critical events")
+            return True
         else:
-            print(f"   ❌ Нет записей с сегодняшней датой")
-        
-        return has_fresh_data
-        
-    except Exception as e:
-        print_result("Latest Sensor Data Check", False, f"Error: {str(e)}")
-        return False
-
-def analyze_deployed_app_status():
-    """Final analysis of deployed application status"""
-    print_section("5. АНАЛИЗ СОСТОЯНИЯ DEPLOYED ПРИЛОЖЕНИЯ")
-    
-    try:
-        # Get comprehensive data
-        analytics_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
-        sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=20", timeout=15)
-        
-        if analytics_response.status_code != 200 or sensor_response.status_code != 200:
-            print_result("Final Analysis APIs", False, "Cannot get required data")
+            self.log_test("Critical Event Warning Generation", False, 
+                        f"Only {warnings_generated} warnings generated from 4 critical events")
             return False
+            
+    def test_mixed_data_format(self):
+        """Test mixed old format (location + accelerometer) and new format (events)"""
+        print("\n🎯 Testing Mixed Data Format Processing...")
         
-        analytics = analytics_response.json()
-        sensor_data = sensor_response.json()
-        records = sensor_data.get('data', [])
+        current_timestamp = int(time.time() * 1000)
         
-        print_result("Final Analysis APIs", True, "Successfully retrieved all data")
-        
-        # Analyze activity patterns
-        now = datetime.now()
-        activity_periods = {
-            'last_hour': 0,
-            'last_24h': 0,
-            'last_7d': analytics.get('recent_points_7d', 0),
-            'total': analytics.get('total_points', 0)
+        mixed_data = {
+            "deviceId": "test-mixed-format-001",
+            "sensorData": [
+                # Old format - location data
+                {
+                    "type": "location",
+                    "timestamp": current_timestamp,
+                    "data": {
+                        "latitude": 55.7580,
+                        "longitude": 37.6200,
+                        "speed": 35.0,
+                        "accuracy": 4.0
+                    }
+                },
+                # Old format - accelerometer data
+                {
+                    "type": "accelerometer",
+                    "timestamp": current_timestamp + 100,
+                    "data": {
+                        "x": 0.2,
+                        "y": 1.5,
+                        "z": 9.8,
+                        "totalAcceleration": 10.0
+                    }
+                },
+                {
+                    "type": "accelerometer",
+                    "timestamp": current_timestamp + 200,
+                    "data": {
+                        "x": 0.3,
+                        "y": 2.0,
+                        "z": 9.7,
+                        "totalAcceleration": 10.1
+                    }
+                },
+                {
+                    "type": "accelerometer",
+                    "timestamp": current_timestamp + 300,
+                    "data": {
+                        "x": 0.1,
+                        "y": 1.8,
+                        "z": 9.9,
+                        "totalAcceleration": 10.05
+                    }
+                },
+                {
+                    "type": "accelerometer",
+                    "timestamp": current_timestamp + 400,
+                    "data": {
+                        "x": 0.4,
+                        "y": 1.2,
+                        "z": 9.8,
+                        "totalAcceleration": 9.95
+                    }
+                },
+                {
+                    "type": "accelerometer",
+                    "timestamp": current_timestamp + 500,
+                    "data": {
+                        "x": 0.2,
+                        "y": 1.7,
+                        "z": 9.8,
+                        "totalAcceleration": 10.02
+                    }
+                },
+                # New format - event data
+                {
+                    "type": "event",
+                    "timestamp": current_timestamp + 1000,
+                    "data": {
+                        "eventType": "pothole",
+                        "severity": 2,
+                        "roadType": "concrete",
+                        "location": {
+                            "latitude": 55.7581,
+                            "longitude": 37.6201,
+                            "speed": 30.0,
+                            "accuracy": 5.0
+                        },
+                        "accelerometer": {
+                            "x": 0.8,
+                            "y": 3.2,
+                            "z": 9.5,
+                            "magnitude": 4.5,
+                            "deltaY": 3.0,
+                            "deltaZ": 0.3
+                        }
+                    }
+                }
+            ]
         }
         
-        latest_record_time = None
+        try:
+            response = self.session.post(
+                f"{BACKEND_URL}/sensor-data",
+                json=mixed_data,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                location_points = result.get("locationPoints", 0)
+                accel_points = result.get("accelerometerPoints", 0)
+                event_points = result.get("eventPoints", 0)
+                conditions_processed = result.get("conditionsProcessed", 0)
+                
+                # Verify both old and new formats were processed
+                if (location_points == 1 and accel_points == 5 and event_points == 1 and 
+                    conditions_processed >= 1):
+                    self.log_test("Mixed Data Format Processing", True, 
+                                f"Location: {location_points}, Accel: {accel_points}, Events: {event_points}, Conditions: {conditions_processed}")
+                    return True
+                else:
+                    self.log_test("Mixed Data Format Processing", False, 
+                                f"Unexpected counts - Location: {location_points}, Accel: {accel_points}, Events: {event_points}")
+                    return False
+            else:
+                self.log_test("Mixed Data Format Processing", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Mixed Data Format Processing", False, f"Error: {str(e)}")
+            return False
+            
+    def test_database_verification(self):
+        """Verify database storage of event data"""
+        print("\n🎯 Testing Database Verification...")
         
-        for record in records:
-            try:
-                record_time = datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00'))
+        # Test admin sensor data endpoint
+        try:
+            response = self.session.get(f"{BACKEND_URL}/admin/sensor-data?limit=5")
+            if response.status_code == 200:
+                data = response.json()
+                sensor_data = data.get("data", [])
                 
-                if latest_record_time is None or record_time > latest_record_time:
-                    latest_record_time = record_time
+                # Look for eventPoints field in recent data
+                has_event_data = False
+                for record in sensor_data:
+                    if "eventPoints" in str(record) or any("event" in str(item) for item in record.get("rawData", [])):
+                        has_event_data = True
+                        break
                 
-                hours_ago = (now - record_time).total_seconds() / 3600
-                
-                if hours_ago <= 1:
-                    activity_periods['last_hour'] += 1
-                if hours_ago <= 24:
-                    activity_periods['last_24h'] += 1
+                if has_event_data:
+                    self.log_test("Database Event Storage", True, f"Found event data in {len(sensor_data)} recent records")
+                else:
+                    self.log_test("Database Event Storage", False, "No event data found in recent records")
                     
-            except Exception:
-                continue
-        
-        print(f"\n📊 АНАЛИЗ АКТИВНОСТИ DEPLOYED ПРИЛОЖЕНИЯ:")
-        print(f"   Всего точек в базе: {activity_periods['total']}")
-        print(f"   За последний час: {activity_periods['last_hour']}")
-        print(f"   За последние 24 часа: {activity_periods['last_24h']}")
-        print(f"   За последние 7 дней: {activity_periods['last_7d']}")
-        
-        if latest_record_time:
-            age = now - latest_record_time
-            print(f"   Последняя запись: {latest_record_time.strftime('%Y-%m-%d %H:%M:%S')} ({age.days} дней назад)")
-        
-        # Determine status
-        if activity_periods['last_hour'] > 0:
-            status = "🟢 АКТИВНО"
-            description = "Deployed приложение отправляет данные прямо сейчас"
-        elif activity_periods['last_24h'] > 0:
-            status = "🟡 НЕДАВНО АКТИВНО"
-            description = "Приложение отправляло данные в последние 24 часа"
-        elif activity_periods['last_7d'] > 0:
-            status = "🟠 НЕАКТИВНО"
-            description = "Приложение отправляло данные на этой неделе, но не недавно"
-        else:
-            status = "🔴 СПЯЩИЙ РЕЖИМ"
-            description = "Нет активности в последние 7 дней"
-        
-        print(f"\n🎯 СТАТУС DEPLOYED ПРИЛОЖЕНИЯ: {status}")
-        print(f"   {description}")
-        
-        # Check for issues
-        print(f"\n🔍 ВОЗМОЖНЫЕ ПРОБЛЕМЫ:")
-        
-        if activity_periods['last_hour'] == 0:
-            print("   ❌ Нет данных в последний час")
-            print("     - Мобильное приложение может не работать")
-            print("     - React hooks stale closure bug (упомянут в задаче)")
-            print("     - Проблемы с фоновыми задачами")
-        
-        if activity_periods['total'] > 0 and activity_periods['last_24h'] == 0:
-            print("   ⚠️  Есть исторические данные, но нет свежих")
-            print("     - Deployed версия использует СТАРЫЙ код")
-            print("     - Нужен новый deployment после исправлений")
-        
-        # Recommendations
-        print(f"\n💡 РЕКОМЕНДАЦИИ:")
-        if activity_periods['last_hour'] == 0:
-            print("   1. Проверить работу мобильного приложения")
-            print("   2. Сделать новый deployment с исправлениями")
-            print("   3. Исправить React hooks stale closure bug")
-            print("   4. Проверить EventDetector и BatchOfflineManager")
-        else:
-            print("   ✅ Deployed приложение работает корректно")
-        
-        return activity_periods['last_hour'] > 0
-        
-    except Exception as e:
-        print_result("Deployed App Analysis", False, f"Error: {str(e)}")
-        return False
-
-def check_road_conditions_and_warnings():
-    """Check for road conditions and warnings near common locations"""
-    print_section("6. ПРОВЕРКА УСЛОВИЙ ДОРОГИ И ПРЕДУПРЕЖДЕНИЙ")
-    
-    try:
-        # Test coordinates (Moscow area)
-        test_lat, test_lng = 55.7558, 37.6176
-        
-        # Check road conditions
-        conditions_response = requests.get(
-            f"{API_BASE}/road-conditions?latitude={test_lat}&longitude={test_lng}&radius=5000",
-            timeout=15
-        )
-        
-        warnings_response = requests.get(
-            f"{API_BASE}/warnings?latitude={test_lat}&longitude={test_lng}&radius=5000", 
-            timeout=15
-        )
-        
-        conditions_success = conditions_response.status_code == 200
-        warnings_success = warnings_response.status_code == 200
-        
-        print_result("Road Conditions API", conditions_success)
-        print_result("Road Warnings API", warnings_success)
-        
-        if conditions_success:
-            conditions_data = conditions_response.json()
-            conditions = conditions_data.get('conditions', [])
-            print(f"   Найдено условий дороги: {len(conditions)}")
+            else:
+                self.log_test("Database Event Storage", False, f"Admin API error: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Database Event Storage", False, f"Error: {str(e)}")
             
-            if conditions:
-                latest_condition = conditions[0]
-                print(f"   Последнее условие: оценка {latest_condition.get('condition_score', 0)}, уровень {latest_condition.get('severity_level', 'N/A')}")
-        
-        if warnings_success:
-            warnings_data = warnings_response.json()
-            warnings = warnings_data.get('warnings', [])
-            print(f"   Найдено предупреждений: {len(warnings)}")
+        # Test road conditions with event metadata
+        try:
+            response = self.session.get(f"{BACKEND_URL}/road-conditions?latitude=55.7558&longitude=37.6176&radius=5000")
+            if response.status_code == 200:
+                data = response.json()
+                conditions = data.get("conditions", [])
+                
+                # Look for event_type and road_type fields
+                event_conditions = [c for c in conditions if "event_type" in c or "road_type" in c]
+                
+                if event_conditions:
+                    self.log_test("Road Conditions Event Metadata", True, 
+                                f"Found {len(event_conditions)} conditions with event metadata")
+                else:
+                    self.log_test("Road Conditions Event Metadata", False, 
+                                "No event metadata found in road conditions")
+                    
+            else:
+                self.log_test("Road Conditions Event Metadata", False, f"API error: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Road Conditions Event Metadata", False, f"Error: {str(e)}")
             
-            if warnings:
-                latest_warning = warnings[0]
-                print(f"   Последнее предупреждение: {latest_warning.get('warning_type', 'N/A')}, серьезность {latest_warning.get('severity', 'N/A')}")
+        # Test warnings for event-generated alerts
+        try:
+            response = self.session.get(f"{BACKEND_URL}/warnings?latitude=55.7558&longitude=37.6176&radius=5000")
+            if response.status_code == 200:
+                data = response.json()
+                warnings = data.get("warnings", [])
+                
+                # Look for event-related warnings
+                event_warnings = [w for w in warnings if "event_type" in w or "road_type" in w]
+                
+                if warnings:
+                    self.log_test("Event-Generated Warnings", True, 
+                                f"Found {len(warnings)} warnings, {len(event_warnings)} with event metadata")
+                else:
+                    self.log_test("Event-Generated Warnings", False, "No warnings found")
+                    
+            else:
+                self.log_test("Event-Generated Warnings", False, f"API error: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Event-Generated Warnings", False, f"Error: {str(e)}")
+            
+    def run_all_tests(self):
+        """Run all EventDetector and BatchOfflineManager tests"""
+        print("🚀 Starting EventDetector (Phase 2) and BatchOfflineManager (Phase 3) Backend Testing")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("=" * 80)
         
-        return conditions_success and warnings_success
+        # Test sequence
+        tests = [
+            ("API Connectivity", self.test_api_connectivity),
+            ("Event Type Data Processing", self.test_event_type_sensor_data),
+            ("Severity Mapping", self.test_severity_mapping),
+            ("Warning Generation", self.test_warning_generation),
+            ("Mixed Data Format", self.test_mixed_data_format),
+            ("Database Verification", self.test_database_verification)
+        ]
         
-    except Exception as e:
-        print_result("Road Conditions Check", False, f"Error: {str(e)}")
-        return False
-
-def main():
-    """Main test execution for deployed backend monitoring"""
-    print(f"Начало тестирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    results = []
-    
-    # Step 1: Test connectivity
-    results.append(("API Connectivity", test_api_connectivity()))
-    
-    if not results[0][1]:
-        print("\n❌ КРИТИЧЕСКАЯ ОШИБКА: Не удается подключиться к deployed backend")
-        print("Тестирование прервано.")
-        return results
-    
-    # Step 2: Check current state
-    results.append(("Current Deployed State", check_current_deployed_state() is not None))
-    
-    # Step 3: Monitor for 30 seconds
-    results.append(("30-Second Monitoring", monitor_deployed_backend_30_seconds()))
-    
-    # Step 4: Check latest data
-    results.append(("Latest Sensor Data", check_latest_sensor_data()))
-    
-    # Step 5: Final analysis
-    results.append(("Deployed App Analysis", analyze_deployed_app_status()))
-    
-    # Summary
-    print_section("ИТОГОВЫЙ ОТЧЕТ DEPLOYED ВЕРСИИ")
-    
-    passed = sum(1 for _, success in results if success)
-    total = len(results)
-    
-    print(f"Тестов пройдено: {passed}/{total}")
-    print(f"Успешность: {(passed/total)*100:.1f}%")
-    
-    print(f"\n📋 ДЕТАЛЬНЫЕ РЕЗУЛЬТАТЫ:")
-    for test_name, success in results:
-        status = "✅" if success else "❌"
-        print(f"   {status} {test_name}")
-    
-    # Critical findings for deployed version
-    print(f"\n🎯 КРИТИЧЕСКИЕ ВЫВОДЫ ДЛЯ DEPLOYED ВЕРСИИ:")
-    
-    if results[0][1]:  # Connectivity works
-        print("   ✅ Deployed backend доступен и отвечает")
-    
-    if results[2][1]:  # New data detected during monitoring
-        print("   🎉 DEPLOYED ПРИЛОЖЕНИЕ АКТИВНО отправляет данные!")
-        print("   ✅ Мобильное приложение работает корректно")
-    else:
-        print("   ❌ НЕТ новых данных за 30 секунд мониторинга")
-        print("   ❌ Deployed приложение НЕ отправляет данные на сервер")
-    
-    if not results[3][1]:  # No fresh data
-        print("   ⚠️  Нет свежих записей с сегодняшней датой")
-    
-    # Specific recommendations for deployed version
-    print(f"\n🔧 РЕКОМЕНДАЦИИ ДЛЯ DEPLOYED ВЕРСИИ:")
-    
-    if not results[2][1]:  # No new data during monitoring
-        print("   1. 🚀 СДЕЛАТЬ НОВЫЙ DEPLOYMENT с исправлениями:")
-        print("      - Исправить React hooks stale closure bug")
-        print("      - Добавить EventDetector и BatchOfflineManager")
-        print("      - Обновить код до последней версии")
-        print("   2. 📱 Проверить мобильное приложение:")
-        print("      - Убедиться что приложение запущено")
-        print("      - Проверить фоновые задачи")
-        print("      - Начать поездку для генерации данных")
-        print("   3. 🔧 Диагностика проблем:")
-        print("      - Проверить логи мобильного приложения")
-        print("      - Убедиться в правильности URL сервера")
-        print("      - Проверить сетевое подключение")
-    else:
-        print("   ✅ Deployed версия работает корректно!")
-        print("   ✅ Новый deployment не требуется")
-    
-    print(f"\n⏰ Завершение тестирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    return results
+        passed_tests = 0
+        total_tests = len(tests)
+        
+        for test_name, test_func in tests:
+            print(f"\n--- {test_name} ---")
+            try:
+                if test_func():
+                    passed_tests += 1
+            except Exception as e:
+                self.log_test(test_name, False, f"Test execution error: {str(e)}")
+                
+        # Summary
+        print("\n" + "=" * 80)
+        print("🎯 EventDetector & BatchOfflineManager Backend Test Summary")
+        print("=" * 80)
+        
+        success_rate = (passed_tests / total_tests) * 100
+        print(f"Tests Passed: {passed_tests}/{total_tests} ({success_rate:.1f}%)")
+        
+        if success_rate >= 80:
+            print("✅ OVERALL STATUS: BACKEND FUNCTIONALITY WORKING")
+        else:
+            print("❌ OVERALL STATUS: CRITICAL ISSUES FOUND")
+            
+        # Detailed results
+        print("\nDetailed Results:")
+        for result in self.test_results:
+            status = "✅" if result["success"] else "❌"
+            print(f"{status} {result['test']}")
+            if result["details"]:
+                print(f"   {result['details']}")
+                
+        return success_rate >= 80
 
 if __name__ == "__main__":
-    main()
+    tester = EventDetectorTester()
+    success = tester.run_all_tests()
+    sys.exit(0 if success else 1)
