@@ -934,6 +934,30 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 2,
   },
+  eventStatsCard: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
+  },
   locationCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
