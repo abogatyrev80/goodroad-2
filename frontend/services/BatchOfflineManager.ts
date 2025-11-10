@@ -269,23 +269,25 @@ class BatchOfflineManager {
                         'https://roadquality.emergent.host';
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
       
-      // Подготовка payload с compression (минификация)
+      // Подготовка payload в правильном формате для backend
       const payload = {
         deviceId: dataPackage.deviceId,
         sensorData: dataPackage.events.map(event => ({
           type: 'event',
-          eventType: event.eventType,
-          severity: event.severity,
-          roadType: event.roadType,
           timestamp: event.timestamp,
-          location: dataPackage.location,
-          accelerometer: {
-            x: event.accelerometer.x,
-            y: event.accelerometer.y,
-            z: event.accelerometer.z,
-            magnitude: event.accelerometer.magnitude,
-            deltaY: event.accelerometer.deltaY,
-            deltaZ: event.accelerometer.deltaZ,
+          data: {
+            eventType: event.eventType,
+            severity: event.severity,
+            roadType: event.roadType,
+            location: dataPackage.location,
+            accelerometer: {
+              x: event.accelerometer.x,
+              y: event.accelerometer.y,
+              z: event.accelerometer.z,
+              magnitude: event.accelerometer.magnitude,
+              deltaY: event.accelerometer.deltaY,
+              deltaZ: event.accelerometer.deltaZ,
+            }
           }
         }))
       };
