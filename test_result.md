@@ -271,6 +271,30 @@
         - comment: "✅ ADMIN DASHBOARD COMPREHENSIVE TESTING COMPLETE: All 6/6 tests passed successfully! 1) HTML Dashboard: Backend serves complete HTML dashboard correctly on localhost:8001 with all required elements (Leaflet maps, statistics, filters, cleanup functionality). External routing issue identified - /admin/dashboard not properly routed to backend (infrastructure issue, not backend problem). 2) Admin Analytics API: Successfully returns comprehensive statistics (29 total points, 5 verified, 4 hazards, avg quality 0, 5 recent points). 3) Admin Sensor Data API: Successfully retrieves sensor data with proper pagination (10/29 records), all GPS coordinates valid (Moscow area), proper data structure with timestamps, quality scores, speed, accuracy. 4) Cleanup Zero Coordinates API: Successfully executes cleanup operation (0 records deleted as database already clean). 5) Dashboard Integration: Data consistency verified between analytics and sensor data APIs. 6) Map Data Format: All 5 test points have valid GPS coordinates suitable for map display in Moscow area. Backend APIs fully functional, dashboard ready for use via localhost:8001/admin/dashboard."
 
 ## frontend:
+  - task: "EventDetector Integration (Phase 2)"
+    implemented: false
+    working: "NA"
+    file: "/app/frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Integrating EventDetector service for event-driven data collection based on accelerometer events (potholes, braking, vibrations). Service is created and partially wired but not fully integrated with data flow."
+
+  - task: "BatchOfflineManager Integration (Phase 3)"
+    implemented: false
+    working: "NA"
+    file: "/app/frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Integrating BatchOfflineManager service for batching events (up to 10 or 60 sec), offline storage, and retry mechanism. Service is created but not integrated with index.tsx data flow."
+
   - task: "Location Tracking with Background Processing"
     implemented: true
     working: "NA"
