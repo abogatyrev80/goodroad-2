@@ -210,105 +210,24 @@ export default function GoodRoadApp() {
     }
   };
 
-  // Автоматическая отправка данных каждые 10 секунд
+  // МОДЕРНИЗАЦИЯ: Event-driven накопление данных через BatchOfflineManager
+  // Больше НЕ используем периодическую отправку каждые 10 секунд
+  // Теперь отправка происходит только при обнаружении событий EventDetector'ом
   useEffect(() => {
-    console.log('🔍 Проверка условий отправки данных:', {
-      isTracking,
-      platform: Platform.OS,
-      hasSyncService: !!syncService,
-      hasLocation: !!currentLocation
-    });
-
-    // ИСПРАВЛЕНИЕ: Убрана зависимость от syncService - теперь отправляем данные напрямую
+    console.log('🔍 Event-driven режим активен. Данные отправляются только при обнаружении событий.');
+    
     if (!isTracking || Platform.OS === 'web') {
       console.log('⏸️ Отправка данных приостановлена. isTracking:', isTracking, 'Platform:', Platform.OS);
       return;
     }
 
-    console.log('✅ Отправка данных активирована! Будем отправлять каждые 10 секунд.');
-
-    const sendDataToServer = async () => {
-      if (!currentLocation) {
-        console.log('⚠️ Нет данных GPS для отправки');
-        return;
-      }
-      
-      console.log('📤 Начинаем отправку данных на сервер...');
-
-      const deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
-      
-      // Get backend URL from environment or app config
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
-                        Constants.expoConfig?.extra?.backendUrl || 
-                        'https://roadquality.emergent.host';
-      
-      const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
-
-      console.log('📡 Отправка на URL:', apiUrl);
-      console.log('🔧 Backend URL source:', process.env.EXPO_PUBLIC_BACKEND_URL ? 'env' : 'app.json');
-      console.log('📍 GPS:', currentLocation.coords.latitude, currentLocation.coords.longitude);
-      console.log('🏃 Скорость:', currentSpeed, 'км/ч');
-
-      try {
-        const payload = {
-          deviceId: deviceId,
-          sensorData: [
-            {
-              type: 'location',
-              timestamp: Date.now(),
-              data: {
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                speed: currentSpeed,
-                accuracy: gpsAccuracy
-              }
-            },
-            {
-              type: 'accelerometer',
-              timestamp: Date.now(),
-              data: {
-                x: accelerometerData.x,
-                y: accelerometerData.y,
-                z: accelerometerData.z
-              }
-            }
-          ]
-        };
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-          timeout: 10000,
-        });
-
-        if (!response.ok) {
-          console.error('❌ Ошибка отправки данных:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('❌ Детали ошибки:', errorText);
-        } else {
-          const result = await response.json();
-          console.log('✅ Данные успешно отправлены!', result);
-        }
-      } catch (error: any) {
-        console.error('❌ Ошибка сети при отправке:', error.message);
-        console.error('❌ Полная ошибка:', error);
-      }
-    };
-
-    // Отправляем данные каждые 10 секунд
-    const intervalId = setInterval(sendDataToServer, 10000);
+    console.log('✅ Event-driven сбор данных активирован!');
+    console.log('📊 Batch статистика:', batchStats);
     
-    // Первая отправка через 5 секунд после старта
-    const timeoutId = setTimeout(sendDataToServer, 5000);
-
-    return () => {
-      clearInterval(intervalId);
-      clearTimeout(timeoutId);
-    };
-  }, [isTracking, currentLocation, accelerometerData]); // Зависимости включают данные для отправки
+    // В этом режиме отправка происходит автоматически через BatchOfflineManager
+    // когда EventDetector обнаруживает события (см. обработчик accelerometer ниже)
+    
+  }, [isTracking, batchStats]);
 
   // Функции для системы предупреждений
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
