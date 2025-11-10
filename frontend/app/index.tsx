@@ -359,11 +359,48 @@ export default function GoodRoadApp() {
 
       // Запускаем акселерометр (только на мобильных)
       if (Platform.OS !== 'web') {
-        Accelerometer.setUpdateInterval(500); // Обновления каждые 500ms
+        Accelerometer.setUpdateInterval(20); // 50Hz для точной детекции событий
         accelerometerSubscription.current = Accelerometer.addListener(({ x, y, z }) => {
           setAccelerometerData({ x, y, z });
+          
+          // Обработка через EventDetector
+          if (eventDetector && isTracking) {
+            const event = eventDetector.processAccelerometerData({
+              x,
+              y,
+              z,
+              timestamp: Date.now()
+            });
+            
+            if (event) {
+              console.log(`🎯 Событие обнаружено: ${event.eventType}, severity: ${event.severity}`);
+              
+              // Добавить в буфер (максимум 10 событий)
+              setDetectedEvents(prev => [...prev, event].slice(-10));
+              setLastEvent(event);
+              setEventCount(prev => prev + 1);
+              
+              // Обновить тип дороги
+              const roadType = eventDetector.getRoadType();
+              setCurrentRoadType(roadType);
+              
+              // Диалог для критичных событий
+              if (event.shouldNotifyUser && appSettings.audioWarnings !== false) {
+                Alert.alert(
+                  '⚠️ Препятствие!',
+                  `Обнаружено: ${event.eventType === 'pothole' ? 'Яма' : event.eventType === 'braking' ? 'Резкое торможение' : 'Неровность'}`,
+                  [{ text: 'OK' }]
+                );
+                
+                // Вибрация для критичных событий
+                if (vibrationEnabled) {
+                  Vibration.vibrate([0, 200, 100, 200]);
+                }
+              }
+            }
+          }
         });
-        console.log('✅ Мониторинг запущен');
+        console.log('✅ Мониторинг запущен (Event-driven режим, 50Hz)');
       }
 
       setIsTracking(true);
