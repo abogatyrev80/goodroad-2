@@ -103,6 +103,16 @@ export default function GoodRoadApp() {
   const [eventCount, setEventCount] = useState(0); // Счётчик событий
   const [currentRoadType, setCurrentRoadType] = useState<string>('unknown'); // Тип дороги
   
+  // BatchOfflineManager - батчинг и offline хранилище
+  const [batchStats, setBatchStats] = useState<BatchStats>({
+    totalEvents: 0,
+    pendingEvents: 0,
+    offlineQueueSize: 0,
+    successfulSends: 0,
+    failedSends: 0,
+    lastSyncTime: null,
+  });
+  
   // Умная система предупреждений
   const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
   const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
