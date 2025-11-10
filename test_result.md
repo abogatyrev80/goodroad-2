@@ -272,7 +272,7 @@
 
 ## frontend:
   - task: "EventDetector Integration (Phase 2)"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "/app/frontend/app/index.tsx"
     stuck_count: 0
@@ -281,10 +281,10 @@
     status_history:
         - working: "NA"
         - agent: "main"
-        - comment: "Integrating EventDetector service for event-driven data collection based on accelerometer events (potholes, braking, vibrations). Service is created and partially wired but not fully integrated with data flow."
+        - comment: "✅ COMPLETED: EventDetector fully integrated into index.tsx. Accelerometer listener at 50Hz processes data through EventDetector, which classifies events (pothole, braking, vibration, bump) with adaptive thresholds based on road type and vehicle type. Events are detected and stored in UI state (detectedEvents, lastEvent, eventCount). Road type detection is active (asphalt/gravel/dirt). Events flow to BatchOfflineManager for accumulation."
 
   - task: "BatchOfflineManager Integration (Phase 3)"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "/app/frontend/app/index.tsx"
     stuck_count: 0
@@ -293,7 +293,19 @@
     status_history:
         - working: "NA"
         - agent: "main"
-        - comment: "Integrating BatchOfflineManager service for batching events (up to 10 or 60 sec), offline storage, and retry mechanism. Service is created but not integrated with index.tsx data flow."
+        - comment: "✅ COMPLETED: BatchOfflineManager fully integrated into index.tsx. Events from EventDetector are automatically accumulated via addEvent(). Batching logic: sends when 10 events reached OR 60 sec timeout OR immediate for critical events. Offline storage in AsyncStorage (max 1000 records). Retry mechanism (max 3 attempts). Stats displayed in UI with real-time updates. Force sync button added. Network monitoring active (checks every 30 sec). Automatic offline queue processing when network restored."
+
+  - task: "Backend Event Processing Support"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "✅ COMPLETED: Backend updated to process new 'event' type from BatchOfflineManager. POST /api/sensor-data now accepts event_data array. Events are processed to create road_conditions (with event_type, road_type, accelerometer_magnitude) and road_warnings (for severity 1-2). Severity mapping: 1->80, 2->60, 3->40, 4->20, 5->0 condition score. Warning type mapping: pothole->pothole, braking->rough_road, bump->speed_bump, vibration->rough_road. Detailed logging added for event processing."
 
   - task: "Location Tracking with Background Processing"
     implemented: true
