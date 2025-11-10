@@ -375,7 +375,9 @@
 
 ## test_plan:
   current_focus:
-    - "Admin Dashboard Web Interface"
+    - "EventDetector Integration (Phase 2)"
+    - "BatchOfflineManager Integration (Phase 3)"
+    - "Backend Event Processing Support"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
