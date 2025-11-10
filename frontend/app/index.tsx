@@ -746,6 +746,32 @@ export default function GoodRoadApp() {
           </Text>
         </Pressable>
 
+        {/* Force Sync Button - NEW */}
+        <Pressable 
+          style={[styles.testButton, { 
+            backgroundColor: isTracking ? '#2196F3' : '#666' 
+          }]}
+          onPress={async () => {
+            if (!isTracking) {
+              Alert.alert('Синхронизация', 'Включите мониторинг для синхронизации');
+              return;
+            }
+            
+            try {
+              await batchOfflineManager.forceSyncNow(currentLocation, currentSpeed, gpsAccuracy);
+              Alert.alert('✅ Синхронизация', 'Данные отправлены на сервер!');
+            } catch (error) {
+              Alert.alert('❌ Ошибка', 'Не удалось синхронизировать данные');
+            }
+          }}
+          disabled={!isTracking}
+        >
+          <Ionicons name="cloud-upload" size={20} color="white" />
+          <Text style={styles.testButtonText}>
+            🔄 ПРИНУДИТЕЛЬНАЯ СИНХРОНИЗАЦИЯ
+          </Text>
+        </Pressable>
+
         {/* Navigation Buttons */}
         <Pressable 
           style={styles.settingsNavButton}
