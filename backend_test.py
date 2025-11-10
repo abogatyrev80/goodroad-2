@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-СРОЧНАЯ ПРОВЕРКА: Backend Testing for Good Road App
-Проверка поездки пользователя 19.01.2025 с 20:50 до 21:02
+ТЕСТИРОВАНИЕ DEPLOYED ВЕРСИИ: Backend Testing for Good Road App
+Проверка deployed приложения на https://roadquality.emergent.host
 """
 
 import requests
@@ -12,13 +12,13 @@ import os
 import subprocess
 from urllib.parse import urljoin
 
-# Get backend URL from environment
-BACKEND_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://roadquality.preview.emergentagent.com')
-API_BASE = urljoin(BACKEND_URL, '/api')
+# DEPLOYED backend URL as specified in review request
+DEPLOYED_BACKEND_URL = 'https://roadquality.emergent.host'
+API_BASE = urljoin(DEPLOYED_BACKEND_URL, '/api')
 
-print(f"🚨 СРОЧНАЯ ПРОВЕРКА: Good Road Backend Analysis")
-print(f"Проверка поездки пользователя 19.01.2025 с 20:50 до 21:02")
-print(f"Backend URL: {BACKEND_URL}")
+print(f"🚀 ТЕСТИРОВАНИЕ DEPLOYED ВЕРСИИ: Good Road Backend Analysis")
+print(f"Проверка deployed приложения с мониторингом в течение 30 секунд")
+print(f"Deployed Backend URL: {DEPLOYED_BACKEND_URL}")
 print(f"API Base: {API_BASE}")
 print("=" * 80)
 
