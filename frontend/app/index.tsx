@@ -120,11 +120,28 @@ export default function GoodRoadApp() {
     setupAudio();
     requestLocationPermission();
     loadAppSettings();
+    initializeEventDetector();
     
     return () => {
       cleanup();
     };
   }, []);
+
+  const initializeEventDetector = () => {
+    try {
+      // Создаём EventDetector с базовой калибровкой
+      // TODO: загружать калибровку из AsyncStorage
+      const detector = new EventDetector({
+        vehicleType: 'sedan', // По умолчанию легковой
+        baseline: { x: 0, y: 0, z: 9.81, timestamp: Date.now() },
+        thresholdMultiplier: 1.0,
+      });
+      setEventDetector(detector);
+      console.log('✅ EventDetector инициализирован');
+    } catch (error) {
+      console.error('❌ Ошибка инициализации EventDetector:', error);
+    }
+  };
 
   const loadAppSettings = async () => {
     try {
