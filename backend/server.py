@@ -252,9 +252,68 @@ async def upload_sensor_data(batch: SensorDataBatch):
                         }
                         processed_warnings.append(warning_doc)
         
+        # ✨ NEW: Process EventDetector events (modern event-driven approach)
+        if event_data:
+            print(f"🎯 Processing {len(event_data)} EventDetector events...")
+            for event_point in event_data:
+                event_info = event_point.data
+                
+                # Extract location from event
+                location = event_info.get("location", {})
+                lat = location.get("latitude")
+                lon = location.get("longitude")
+                
+                if lat and lon:
+                    # Map event severity (1-5) to condition score (0-100)
+                    # severity 1 = critical = low score (0-20)
+                    # severity 5 = normal = high score (80-100)
+                    severity = event_info.get("severity", 5)
+                    condition_score = 100 - ((severity - 1) * 20)  # 1->80, 2->60, 3->40, 4->20, 5->0
+                    
+                    # Create road condition from event
+                    condition = {
+                        "id": str(uuid.uuid4()),
+                        "latitude": lat,
+                        "longitude": lon,
+                        "condition_score": max(0, min(100, condition_score)),
+                        "severity_level": determine_severity_level(condition_score),
+                        "data_points": 1,
+                        "event_type": event_info.get("eventType"),
+                        "road_type": event_info.get("roadType", "unknown"),
+                        "accelerometer_magnitude": event_info.get("accelerometer", {}).get("magnitude", 0),
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                    processed_conditions.append(condition)
+                    
+                    # Generate warning for critical events
+                    if severity <= 2:  # Critical or high severity
+                        event_type = event_info.get("eventType", "unknown")
+                        warning_type_map = {
+                            "pothole": "pothole",
+                            "braking": "rough_road",
+                            "bump": "speed_bump",
+                            "vibration": "rough_road"
+                        }
+                        
+                        warning_doc = {
+                            "id": str(uuid.uuid4()),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "warning_type": warning_type_map.get(event_type, "rough_road"),
+                            "severity": "high" if severity == 1 else "medium",
+                            "confidence": 0.85,  # High confidence from EventDetector
+                            "event_type": event_type,
+                            "road_type": event_info.get("roadType", "unknown"),
+                            "created_at": datetime.utcnow()
+                        }
+                        processed_warnings.append(warning_doc)
+                        print(f"   ⚠️  Warning generated: {event_type} at ({lat:.6f}, {lon:.6f})")
+        
         # Store processed data
         if processed_conditions:
             await db.road_conditions.insert_many(processed_conditions)
+            print(f"✅ Stored {len(processed_conditions)} road conditions")
         
         if processed_warnings:
             await db.road_warnings.insert_many(processed_warnings)
