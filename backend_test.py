@@ -49,63 +49,71 @@ def test_api_connectivity():
         print_result("API Root Endpoint", False, f"Error: {str(e)}")
         return False
 
-def check_recent_sensor_data():
-    """Check for recent sensor data from today's trip"""
-    print_section("2. ПРОВЕРКА ПОСЛЕДНИХ ДАННЫХ В БАЗЕ")
+def check_current_deployed_state():
+    """Check current state of deployed backend"""
+    print_section("2. ПРОВЕРКА ТЕКУЩЕГО СОСТОЯНИЯ DEPLOYED BACKEND")
     
     try:
-        # Get recent sensor data
-        response = requests.get(f"{API_BASE}/admin/sensor-data?limit=20", timeout=15)
+        # Get analytics first
+        analytics_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
         
-        if response.status_code != 200:
-            print_result("Admin Sensor Data API", False, f"Status: {response.status_code}")
-            return False
+        if analytics_response.status_code != 200:
+            print_result("Admin Analytics API", False, f"Status: {analytics_response.status_code}")
+            return None
         
-        data = response.json()
-        sensor_records = data.get('data', [])
+        analytics = analytics_response.json()
+        print_result("Admin Analytics API", True, "Successfully retrieved analytics")
+        
+        print(f"\n📊 ТЕКУЩЕЕ СОСТОЯНИЕ БАЗЫ ДАННЫХ:")
+        print(f"   Всего точек данных: {analytics.get('total_points', 0)}")
+        print(f"   Проверенных точек: {analytics.get('verified_points', 0)}")
+        print(f"   Точек с препятствиями: {analytics.get('hazard_points', 0)}")
+        print(f"   Средняя оценка дороги: {analytics.get('avg_road_quality', 0)}")
+        print(f"   Активность за 7 дней: {analytics.get('recent_points_7d', 0)}")
+        
+        # Get latest sensor data
+        sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=10", timeout=15)
+        
+        if sensor_response.status_code != 200:
+            print_result("Admin Sensor Data API", False, f"Status: {sensor_response.status_code}")
+            return analytics
+        
+        sensor_data = sensor_response.json()
+        sensor_records = sensor_data.get('data', [])
         
         print_result("Admin Sensor Data API", True, f"Retrieved {len(sensor_records)} records")
         
-        # Check for today's data (2025-01-19)
-        today_str = "2025-01-19"
-        trip_start = "20:50"
-        trip_end = "21:02"
-        
-        today_records = []
-        trip_records = []
-        
-        for record in sensor_records:
-            timestamp = record.get('timestamp', '')
-            if today_str in timestamp:
-                today_records.append(record)
-                
-                # Check if within trip time (20:50 - 21:02)
-                if 'T' in timestamp:
-                    time_part = timestamp.split('T')[1][:5]
-                    if trip_start <= time_part <= trip_end:
-                        trip_records.append(record)
-        
-        print(f"\n📊 АНАЛИЗ ДАННЫХ:")
-        print(f"   Всего записей: {len(sensor_records)}")
-        print(f"   Записей за сегодня ({today_str}): {len(today_records)}")
-        print(f"   Записей во время поездки ({trip_start}-{trip_end}): {len(trip_records)}")
-        
         if sensor_records:
             latest_record = sensor_records[0]  # Most recent first
-            print(f"   Последняя запись: {latest_record.get('timestamp', 'N/A')}")
+            print(f"\n📍 ПОСЛЕДНЯЯ ЗАПИСЬ:")
+            print(f"   Время: {latest_record.get('timestamp', 'N/A')}")
+            print(f"   Device ID: {latest_record.get('deviceId', 'N/A')}")
             print(f"   GPS координаты: ({latest_record.get('latitude', 0)}, {latest_record.get('longitude', 0)})")
+            
+            # Check if today's data exists
+            today = datetime.now().date()
+            today_count = 0
+            for record in sensor_records:
+                try:
+                    record_date = datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00')).date()
+                    if record_date == today:
+                        today_count += 1
+                except:
+                    continue
+            
+            print(f"   Записей за сегодня: {today_count}")
+        else:
+            print(f"\n📍 База данных пуста")
         
-        # Show trip records if any
-        if trip_records:
-            print(f"\n🎯 ЗАПИСИ ВО ВРЕМЯ ПОЕЗДКИ:")
-            for i, record in enumerate(trip_records[:5]):
-                print(f"   {i+1}. {record.get('timestamp', 'N/A')} - GPS: ({record.get('latitude', 0)}, {record.get('longitude', 0)})")
-        
-        return len(trip_records) > 0
+        return {
+            'analytics': analytics,
+            'sensor_data': sensor_data,
+            'latest_record': sensor_records[0] if sensor_records else None
+        }
         
     except Exception as e:
-        print_result("Recent Sensor Data Check", False, f"Error: {str(e)}")
-        return False
+        print_result("Current State Check", False, f"Error: {str(e)}")
+        return None
 
 def check_analytics_data():
     """Check analytics for recent activity"""
