@@ -651,6 +651,44 @@ export default function GoodRoadApp() {
           </View>
         </View>
 
+        {/* Event Statistics - NEW */}
+        <View style={styles.eventStatsCard}>
+          <Text style={styles.locationTitle}>📊 Статистика событий</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{eventCount}</Text>
+              <Text style={styles.statLabel}>Всего событий</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{batchStats.pendingEvents}</Text>
+              <Text style={styles.statLabel}>В batch</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{batchStats.offlineQueueSize}</Text>
+              <Text style={styles.statLabel}>Offline очередь</Text>
+            </View>
+          </View>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#4CAF50' }]}>{batchStats.successfulSends}</Text>
+              <Text style={styles.statLabel}>Успешно</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: '#F44336' }]}>{batchStats.failedSends}</Text>
+              <Text style={styles.statLabel}>Ошибок</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{currentRoadType}</Text>
+              <Text style={styles.statLabel}>Тип дороги</Text>
+            </View>
+          </View>
+          {batchStats.lastSyncTime && (
+            <Text style={styles.locationText}>
+              🕒 Последняя синхронизация: {new Date(batchStats.lastSyncTime).toLocaleTimeString('ru-RU')}
+            </Text>
+          )}
+        </View>
+
         {/* Real-time Location Info */}
         {currentLocation && (
           <View style={styles.locationCard}>
