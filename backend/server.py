@@ -182,9 +182,10 @@ async def root():
 async def upload_sensor_data(batch: SensorDataBatch):
     """Upload batch of sensor data from mobile device"""
     try:
-        # Separate location and accelerometer data
+        # Separate location, accelerometer, and event data
         location_data = [point for point in batch.sensorData if point.type == "location"]
         accel_data = [point for point in batch.sensorData if point.type == "accelerometer"]
+        event_data = [point for point in batch.sensorData if point.type == "event"]  # NEW: EventDetector events
         
         # Store raw sensor data
         sensor_doc = {
