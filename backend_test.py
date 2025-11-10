@@ -13,32 +13,37 @@ import sys
 # Backend URL from frontend/.env
 BACKEND_URL = "https://roadqual-track.preview.emergentagent.com/api"
 
-def print_section(title):
-    print(f"\n{'='*60}")
-    print(f"  {title}")
-    print(f"{'='*60}")
-
-def print_result(test_name, success, details=""):
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status} {test_name}")
-    if details:
-        print(f"   {details}")
-
-def test_api_connectivity():
-    """Test basic API connectivity"""
-    print_section("1. ПРОВЕРКА ПОДКЛЮЧЕНИЯ К API")
-    
-    try:
-        response = requests.get(f"{API_BASE}/", timeout=10)
-        if response.status_code == 200:
-            print_result("API Root Endpoint", True, f"Status: {response.status_code}")
-            return True
-        else:
-            print_result("API Root Endpoint", False, f"Status: {response.status_code}")
+class EventDetectorTester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.test_results = []
+        
+    def log_test(self, test_name, success, details=""):
+        """Log test results"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status}: {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        self.test_results.append({
+            "test": test_name,
+            "success": success,
+            "details": details
+        })
+        
+    def test_api_connectivity(self):
+        """Test basic API connectivity"""
+        try:
+            response = self.session.get(f"{BACKEND_URL}/")
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("API Connectivity", True, f"Message: {data.get('message', 'N/A')}")
+                return True
+            else:
+                self.log_test("API Connectivity", False, f"Status: {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("API Connectivity", False, f"Error: {str(e)}")
             return False
-    except Exception as e:
-        print_result("API Root Endpoint", False, f"Error: {str(e)}")
-        return False
 
 def check_current_deployed_state():
     """Check current state of deployed backend"""
