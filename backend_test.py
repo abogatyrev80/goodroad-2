@@ -430,19 +430,33 @@ def check_road_conditions_and_warnings():
         return False
 
 def main():
-    """Main test execution"""
+    """Main test execution for deployed backend monitoring"""
+    print(f"Начало тестирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
     results = []
     
-    # Run all tests
+    # Step 1: Test connectivity
     results.append(("API Connectivity", test_api_connectivity()))
-    results.append(("Recent Sensor Data", check_recent_sensor_data()))
-    results.append(("Analytics Data", check_analytics_data()))
-    results.append(("Sensor Data Endpoint", test_sensor_data_endpoint()))
-    results.append(("Backend Logs", check_backend_logs()))
-    results.append(("Road Conditions & Warnings", check_road_conditions_and_warnings()))
+    
+    if not results[0][1]:
+        print("\n❌ КРИТИЧЕСКАЯ ОШИБКА: Не удается подключиться к deployed backend")
+        print("Тестирование прервано.")
+        return results
+    
+    # Step 2: Check current state
+    results.append(("Current Deployed State", check_current_deployed_state() is not None))
+    
+    # Step 3: Monitor for 30 seconds
+    results.append(("30-Second Monitoring", monitor_deployed_backend_30_seconds()))
+    
+    # Step 4: Check latest data
+    results.append(("Latest Sensor Data", check_latest_sensor_data()))
+    
+    # Step 5: Final analysis
+    results.append(("Deployed App Analysis", analyze_deployed_app_status()))
     
     # Summary
-    print_section("ИТОГОВЫЙ ОТЧЕТ")
+    print_section("ИТОГОВЫЙ ОТЧЕТ DEPLOYED ВЕРСИИ")
     
     passed = sum(1 for _, success in results if success)
     total = len(results)
@@ -455,27 +469,43 @@ def main():
         status = "✅" if success else "❌"
         print(f"   {status} {test_name}")
     
-    # Critical findings
-    print(f"\n🎯 КРИТИЧЕСКИЕ ВЫВОДЫ:")
+    # Critical findings for deployed version
+    print(f"\n🎯 КРИТИЧЕСКИЕ ВЫВОДЫ ДЛЯ DEPLOYED ВЕРСИИ:")
     
-    if not results[1][1]:  # Recent sensor data check failed
-        print("   ❌ НЕТ данных от поездки 19.01.2025 20:50-21:02")
-        print("   ❌ Мобильное приложение НЕ отправляет данные на сервер")
+    if results[0][1]:  # Connectivity works
+        print("   ✅ Deployed backend доступен и отвечает")
     
-    if results[3][1]:  # Sensor endpoint works
-        print("   ✅ API endpoint /api/sensor-data работает корректно")
-        print("   ✅ Сервер может принимать и обрабатывать данные")
+    if results[2][1]:  # New data detected during monitoring
+        print("   🎉 DEPLOYED ПРИЛОЖЕНИЕ АКТИВНО отправляет данные!")
+        print("   ✅ Мобильное приложение работает корректно")
+    else:
+        print("   ❌ НЕТ новых данных за 30 секунд мониторинга")
+        print("   ❌ Deployed приложение НЕ отправляет данные на сервер")
     
-    if not results[4][1]:  # No backend logs
-        print("   ❌ НЕТ внешних запросов в логах backend")
-        print("   ❌ Проблема в мобильном приложении или сетевом подключении")
+    if not results[3][1]:  # No fresh data
+        print("   ⚠️  Нет свежих записей с сегодняшней датой")
     
-    print(f"\n🔧 РЕКОМЕНДАЦИИ:")
-    print("   1. Проверить настройки URL в мобильном приложении")
-    print("   2. Убедиться что приложение имеет разрешения на GPS и интернет")
-    print("   3. Перезапустить мобильное приложение")
-    print("   4. Проверить фоновые задачи в мобильном приложении")
-    print("   5. Начать новую поездку для тестирования")
+    # Specific recommendations for deployed version
+    print(f"\n🔧 РЕКОМЕНДАЦИИ ДЛЯ DEPLOYED ВЕРСИИ:")
+    
+    if not results[2][1]:  # No new data during monitoring
+        print("   1. 🚀 СДЕЛАТЬ НОВЫЙ DEPLOYMENT с исправлениями:")
+        print("      - Исправить React hooks stale closure bug")
+        print("      - Добавить EventDetector и BatchOfflineManager")
+        print("      - Обновить код до последней версии")
+        print("   2. 📱 Проверить мобильное приложение:")
+        print("      - Убедиться что приложение запущено")
+        print("      - Проверить фоновые задачи")
+        print("      - Начать поездку для генерации данных")
+        print("   3. 🔧 Диагностика проблем:")
+        print("      - Проверить логи мобильного приложения")
+        print("      - Убедиться в правильности URL сервера")
+        print("      - Проверить сетевое подключение")
+    else:
+        print("   ✅ Deployed версия работает корректно!")
+        print("   ✅ Новый deployment не требуется")
+    
+    print(f"\n⏰ Завершение тестирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     return results
 
