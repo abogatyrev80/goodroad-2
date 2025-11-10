@@ -193,10 +193,16 @@ async def upload_sensor_data(batch: SensorDataBatch):
             "timestamp": datetime.utcnow(),
             "locationPoints": len(location_data),
             "accelerometerPoints": len(accel_data),
+            "eventPoints": len(event_data),  # NEW: count of events
             "rawData": [point.dict() for point in batch.sensorData]
         }
         
         await db.sensor_data.insert_one(sensor_doc)
+        
+        print(f"📥 Received batch from {batch.deviceId}:")
+        print(f"   Location points: {len(location_data)}")
+        print(f"   Accelerometer points: {len(accel_data)}")
+        print(f"   Event points: {len(event_data)}")  # NEW: log events
         
         # Process data for road condition analysis
         processed_conditions = []
