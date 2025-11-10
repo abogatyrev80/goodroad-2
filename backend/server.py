@@ -265,10 +265,13 @@ async def upload_sensor_data(batch: SensorDataBatch):
                 
                 if lat and lon:
                     # Map event severity (1-5) to condition score (0-100)
-                    # severity 1 = critical = low score (0-20)
-                    # severity 5 = normal = high score (80-100)
+                    # severity 1 = critical = score 80
+                    # severity 2 = high = score 60
+                    # severity 3 = medium = score 40
+                    # severity 4 = low = score 20
+                    # severity 5 = normal = score 0
                     severity = event_info.get("severity", 5)
-                    condition_score = 100 - ((severity - 1) * 20)  # 1->80, 2->60, 3->40, 4->20, 5->0
+                    condition_score = 100 - (severity * 20)  # 1->80, 2->60, 3->40, 4->20, 5->0
                     
                     # Create road condition from event
                     condition = {
