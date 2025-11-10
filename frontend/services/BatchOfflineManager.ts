@@ -96,6 +96,12 @@ class BatchOfflineManager {
    * Загрузить offline очередь из хранилища
    */
   private async loadOfflineQueue() {
+    // Skip on web to avoid AsyncStorage issues
+    if (IS_WEB) {
+      this.offlineQueue = [];
+      return;
+    }
+    
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
