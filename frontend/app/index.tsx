@@ -325,7 +325,7 @@ export default function GoodRoadApp() {
             if (event) {
               console.log(`🎯 Событие обнаружено: ${event.eventType}, severity: ${event.severity}`);
               
-              // Добавить в буфер (максимум 10 событий)
+              // Добавить в буфер UI (максимум 10 событий)
               setDetectedEvents(prev => [...prev, event].slice(-10));
               setLastEvent(event);
               setEventCount(prev => prev + 1);
@@ -333,6 +333,17 @@ export default function GoodRoadApp() {
               // Обновить тип дороги
               const roadType = eventDetector.getRoadType();
               setCurrentRoadType(roadType);
+              
+              // ✨ НОВОЕ: Отправляем событие в BatchOfflineManager для накопления
+              if (currentLocation) {
+                batchOfflineManager.addEvent(
+                  event,
+                  currentLocation,
+                  currentSpeed,
+                  gpsAccuracy
+                );
+                console.log(`📦 Событие добавлено в BatchOfflineManager`);
+              }
               
               // Диалог для критичных событий
               if (event.shouldNotifyUser && appSettings.audioWarnings !== false) {
@@ -350,7 +361,7 @@ export default function GoodRoadApp() {
             }
           }
         });
-        console.log('✅ Мониторинг запущен (Event-driven режим, 50Hz)');
+        console.log('✅ Мониторинг запущен (Event-driven режим с BatchOfflineManager, 50Hz)');
       }
 
       setIsTracking(true);
