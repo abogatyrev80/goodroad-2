@@ -1,19 +1,35 @@
 <analysis>
-The previous AI engineer effectively established the Good Road application, tackling major issues like persistent  errors on the web, cross-platform compatibility adjustments, and backend API URL corrections for data synchronization. The development followed an iterative path, implementing core features such as a web-based administrative panel with map visualization, device identification, data editing, and an adaptive calibration algorithm. Significant effort was dedicated to debugging frontend-backend communication, ensuring mobile sensor data was correctly sent to the server, and resolving various frontend bundling and logic errors. The process involved meticulous file edits, environment configuration (like ), and continuous testing. The current challenge revolves around resolving an  related bundling error in  and handling missing audio assets, confirming the application's robust yet evolving nature.
+The previous AI engineer successfully initiated the Good Road application, addressing critical  migration issues and backend API connectivity problems. A significant portion of the work revolved around diagnosing and resolving data synchronization failures, which were complicated by a multi-backend environment (preview vs. deployed). The AI engineer meticulously debugged frontend-backend communication, identified a stale closure bug, and unified environment configurations. Concurrently, product enhancements included upgrading the web admin dashboard with a detailed table and map re-integration, and adding a URL copy feature to the mobile admin panel. The latest focus has shifted to a major data collection modernization, with the creation of  (Phase 2) and  (Phase 3) for an event-driven, batched, and offline-capable system, although these components are not yet fully integrated or deployed. The current state reflects ongoing testing of a deployed version that still lacks the most recent fixes and features.
 </analysis>
 
 <product_requirements>
-The Good Road application aims to improve driver safety by monitoring road quality and identifying hazards (potholes, bumps) using accelerometer and GPS data. It provides real-time audio-visual warnings, operating in the background, and can auto-start. The user interface displays speed, satellite count, and GPS accuracy. Users can customize warning thresholds and audio alerts, including custom sounds. An intelligent warning system classifies obstacles and escalates alerts.
+The Good Road application aims to enhance driver safety by monitoring road quality and detecting hazards (potholes, bumps) using accelerometer and GPS data. It provides real-time audio-visual warnings, operates in the background, and supports auto-start. The user interface displays speed, satellite count, and GPS accuracy, with customizable warning thresholds and audio alerts. An intelligent warning system classifies obstacles and escalates alerts.
 
-An administrative web panel is required for visualizing sensor data on an interactive map, supporting filtering by device ID, editing/deleting individual data points, and clearing test data. The system needs an adaptive calibration algorithm (statistical with adaptation) to filter background noise from sensor readings, with calibration profiles stored per device. The mobile application must reliably send sensor data to the server, and the admin panel should reflect real-time data and verification status updates. The application needs to use  for sound features and be optimized for real-data accumulation, reducing excessive logging.
+A web-based administrative panel is required for visualizing sensor data on an interactive map, filtering by device ID, editing/deleting data points, and clearing test data. The system needs an adaptive calibration algorithm, with calibration profiles stored per device. The mobile application must reliably send sensor data to the server, and the admin panel should reflect real-time data and verification status updates. The application needs to use  for sound features and be optimized for real-data accumulation, reducing excessive logging.
+
+Recent explicit requests from the user include:
+1.  **Admin Panel Enhancements**:
+    *   Add a button to delete points based on filters (time, coordinates, acceleration sensor readings).
+    *   Improve the web admin panel with a sortable, editable, and more comprehensive data table.
+    *   Implement a copy-to-clipboard button in the mobile admin panel for the web admin dashboard URL.
+2.  **Advanced Data Collection Mechanism**:
+    *   Accumulate data points when acceleration changes (braking) or when movement (vibration) is detected.
+    *   Extract GPS position and other relevant metrics under these conditions.
+    *   Establish appropriate data levels for statistical analysis on the server.
+    *   Include offline storage for data when no network is available.
+    *   Implement a retry mechanism for failed data uploads.
+    *   Enable batch sending of multiple data points.
+    *   Introduce an adaptive sending interval (more frequent during movement, less during stops).
+    *   Add data compression to reduce payload size.
 </product_requirements>
 
 <key_technical_concepts>
-- **Frontend:** React Native, Expo, Expo Router, TypeScript, , ,  (migrating to ),  (conditional loading).
-- **Backend:** Python (FastAPI), MongoDB, Jinja2.
-- **Mapping:** Leaflet + OpenStreetMap.
-- **Data Synchronization:** Custom , .
-- **UI:** , , .
+-   **Frontend:** React Native, Expo (Expo Router, , , ,  (conditional), ), TypeScript, .
+-   **Backend:** Python (FastAPI), MongoDB, Jinja2.
+-   **Mapping:** Leaflet + OpenStreetMap.
+-   **Data Synchronization:** ,  (event-driven),  (batching, offline storage).
+-   **UI/UX:** , , .
+-   **Environment:** Kubernetes Ingress (proxy redirection), environment variables via   field.
 </key_technical_concepts>
 
 <code_architecture>
@@ -24,49 +40,121 @@ The application features a full-stack architecture with an Expo/React Native fro
 
 -   ****
     -   **Importance:** FastAPI backend, defining all API endpoints for sensor data, analytics, admin functions, and calibration.
-    -   **Changes:** Extended with , , ,  (to serve the HTML admin panel),  endpoints (profile, data, stats, reset),  for PATCH/DELETE, . MongoDB connection uses environment variables, returns  in sensor data.  initialization moved for  fix.
+    -   **Summary of Changes:** Extended with new endpoints for mass data deletion, as well as export/import functionality. New data models were introduced to support these operations. The backend URL configuration was updated to  to standardize with the main deployed environment.
 -   ****
     -   **Importance:** Dedicated web-based administrative dashboard.
-    -   **Changes:** Initialized with Leaflet + OpenStreetMap for map visualization, statistics display (total, hazard, verified points), data table, device ID filtering, date range filtering, buttons for clearing test data, generating test data, and UI for editing/deleting individual data points via modals and JavaScript functions.
+    -   **Summary of Changes:** The file was completely refactored from a backup () to implement a more comprehensive data table with sorting capabilities. UI elements for editing, deleting, and export/import were added. The Leaflet map for data visualization was re-integrated, including its HTML structure, CSS styling, and JavaScript for initialization and data rendering after an initial removal.
 -   ****
-    -   **Importance:** Main application screen, handling sensor data, GPS, UI, and warnings.
-    -   **Changes:** Initially conditionally loaded offline modules. Replaced  with . Road Quality replaced with Direction Indicator. Refactored to collect and send accelerometer data via  with detailed logging. Optimized logging and data sending frequency. Updated for  integration for audio initialization and cleanup, removing old  references.
+    -   **Importance:** Main application screen, handling sensor data collection (accelerometer, GPS), UI, and warnings.
+    -   **Summary of Changes:** Initial fixes involved removing  references for migration to . A critical condition () that was blocking data submission was removed. A stale closure bug in a  hook, which prevented  from being correctly observed, was fixed. Environment variable fallback logic () was introduced. Integration of the new  service was started, including new state management and replacing the direct accelerometer listener with an event-driven approach. The backend URL was updated to .
 -   ****
-    -   **Importance:** User configuration.
-    -   **Changes:**  instances replaced with . Fix for  import. Recently, the import of  was removed, and references to  are being removed.
+    -   **Importance:** User configuration screen.
+    -   **Summary of Changes:** Explicit  imports (like ) were removed along with related functions (, ) to resolve bundling issues and complete the  migration.
 -   ****
-    -   **Importance:** Simplified administrative panel.
-    -   **Changes:** API URLs corrected. Error handling, fallback, timeout for data loading implemented.  to . Fixed . The  error related to Stats request failed was traced back to this file, but deemed non-critical.
+    -   **Importance:** Simplified administrative panel accessible on mobile.
+    -   **Summary of Changes:** Detailed logging was added to diagnose connectivity issues with the backend. A feature allowing users to copy the web admin dashboard URL to their clipboard was implemented using . The application's backend URL configuration was standardized to , including fallback logic.
 -   ****
-    -   **Importance:** Local SQLite data storage.
-    -   **Changes:** Conditionally imports  for mobile only to prevent  errors on web. Null checks added.
+    -   **Importance:** Manages data synchronization with the backend.
+    -   **Summary of Changes:** Corrected API endpoint paths to ensure proper data submission. The backend URL used for API calls was updated to .
+-   **** (New File)
+    -   **Importance:** A new service created as part of the Phase 2 modernization plan. It is responsible for event-driven detection of significant road conditions (e.g., braking, vibrations) based on raw sensor data.
+    -   **Summary of Changes:** Initial creation of the service with core logic for processing accelerometer data and identifying events. Integration with  has begun.
+-   **** (New File)
+    -   **Importance:** A new service created as part of the Phase 3 modernization plan. It handles the batching of sensor data points and manages their storage and synchronization when the device is offline.
+    -   **Summary of Changes:** Initial creation of the service, including comprehensive logic for accumulating, storing, and managing batched data, along with retry mechanisms for failed uploads.
 -   ****
-    -   **Importance:** Manages data synchronization.
-    -   **Changes:** Restored to active  folder. Updated  and fallback URL. Corrected API endpoint from  to  and added missing leading slash to the API URL.
--   **** (New)
-    -   **Importance:** Manages device calibration logic and detailed logging for debugging.
-    -   **Changes:** Initial creation with comprehensive logging for calibration process.
+    -   **Importance:** Stores environment variables for the frontend, including the backend API URL.
+    -   **Summary of Changes:** The  variable was repeatedly adjusted during debugging to switch between  (preview environment) and  (deployed environment), finally settling on .
 -   ****
-    -   **Importance:** Metro bundler configuration.
-    -   **Changes:** Modified to exclude  from web builds to resolve  errors.
+    -   **Importance:** Main configuration file for the Expo application.
+    -   **Summary of Changes:** An  field was added to the 
+  Usage: expo [command] [options]
 
+  Options:
+  
+    -V, --version                     output the version number
+    --non-interactive                 Fail, if an interactive prompt would be required to continue.
+    -h, --help                        output usage information
+  
+  Commands:
+
+    init [name]                       Create a new Expo project
+    start [path]                      Start a local dev server for the app
+    start:web [path]                  Start a Webpack dev server for the web app
+    export [path]                     Export the static files of the app for hosting it on a web server
+    install [packages...]             Install a module or other package to a project
+    run:android [path]                Run the Android app binary locally
+    run:ios [path]                    Run the iOS app binary locally
+    send [path]                       Share the project's URL to an email address
+
+    login                             Login to an Expo account
+    logout                            Logout of an Expo account
+    register                          Sign up for a new Expo account
+    whoami                            Return the currently authenticated account
+
+    client:install:ios                Install Expo Go for iOS on the simulator
+    client:install:android            Install Expo Go for Android on a connected device or emulator
+
+    config [path]                     Show the project config
+    doctor [path]                     Diagnose issues with the project
+    upgrade [sdk-version]             Upgrade the project packages and config for the given SDK version
+
+    customize:web [path]              Eject the default web files for customization
+    prebuild [path]                   Create native iOS and Android project files before building natively.
+                                      Learn more: https://docs.expo.dev/workflow/customizing/
+
+    build:web [path]                  Build the web app for production
+
+    credentials:manager [path]        Superseded by eas credentials in eas-cli
+
+    url [path]                        Log a URL for opening the project in Expo Go
+    url:ipa [path]                    Log the download URL for the standalone iOS binary
+    url:apk [path]                    Log the download URL for the standalone Android binary
+
+    webhooks [path]                   List all webhooks for a project
+    webhooks:add [path]               Add a webhook to a project
+    webhooks:remove [path]            Delete a webhook
+    webhooks:update [path]            Update an existing webhook
+
+    build:ios [path]                  Superseded by eas build in eas-cli
+    build:android [path]              Superseded by eas build in eas-cli
+    build:status [path]               Superseded by eas build:list in eas-cli
+    eject [path]                      Superseded by expo prebuild
+    fetch:ios:certs [path]            Superseded by eas credentials in eas-cli
+    fetch:android:keystore [path]     Superseded by eas credentials in eas-cli
+    fetch:android:hashes [path]       Superseded by eas credentials in eas-cli
+    fetch:android:upload-cert [path]  Superseded by eas credentials in eas-cli
+    publish [path]                    Superseded by eas update in eas-cli
+    publish:set [path]                Superseded by eas update:republish in eas-cli
+    publish:rollback [path]           Superseded by eas update:republish in eas-cli
+    publish:history [path]            Superseded by eas update:list in eas-cli
+    publish:details [path]            Superseded by eas update:view in eas-cli
+    push:android:upload [path]        Superseded by eas credentials in eas-cli
+    push:android:show [path]          Superseded by eas credentials in eas-cli
+    push:android:clear [path]         Superseded by eas credentials in eas-cli
+    upload:android [path]             Superseded by eas submit in eas-cli
+    upload:ios [path]                 Superseded by eas submit in eas-cli
+    client:ios [path]                 Superseded by Expo Dev Clients
+
+[16:21:30]   Run a command with --help for more info 💡
+[16:21:30]     $ expo start --help
+[16:21:30] configuration object. This field now contains a  key set to , ensuring that the correct backend URL is available to the application even in deployed builds via .
 </code_architecture>
 
 <pending_tasks>
-- **Complete  Integration:** Fully integrate  for warnings and custom sounds across the application.
-- **Resolve  Audio Issues:** Address the  file not found error and ensure all audio logic is correctly migrated to  in .
-- **Performance Optimization:** Optimize UI updates and overall frontend performance (explicitly mentioned in original pending tasks, not specifically addressed yet).
-- **Frontend Tests:** Implement automated tests for critical functionalities (explicitly mentioned in original pending tasks, not specifically addressed yet).
+-   **Complete  Integration:** Fully integrate  for all warning and custom sound functionalities across the application.
+-   **Performance Optimization:** Optimize UI updates and overall frontend performance (explicitly mentioned in original pending tasks).
+-   **Frontend Tests:** Implement automated tests for critical functionalities (explicitly mentioned in original pending tasks).
+-   **Finalize Event Detector (Phase 2) Integration**: Complete the full integration of the  service into  and other relevant parts of the application, including handling detected events for data accumulation.
+-   **Integrate BatchOfflineManager (Phase 3)**: Integrate the newly created  service into  to utilize its batching and offline storage capabilities for sensor data synchronization.
 </pending_tasks>
 
 <current_work>
-Immediately before this summary request, the AI engineer was addressing a bundling error (Error 500 on phone) reported by the user. This error was traced to a leftover import of  in  after the user requested to update to .
+The AI engineer has just completed the creation of the  service (Phase 3 of the data modernization plan), which provides capabilities for batching sensor data and managing offline storage. This follows the partial integration of the  (Phase 2), which is designed for event-driven data collection based on accelerometer and GPS changes. The code for  is present in  and its initialization and accelerometer handling have been integrated into . The  is present as  but is not yet integrated into  or the main data flow.
 
-The AI engineer successfully identified and removed the  from line 18 of . Following this fix, two new issues arose: a file not found error and a need to update functions using the old Audio API. The AI engineer has just initiated the process of removing the reference to the nonexistent  file. This is crucial for resolving the bundling issue and ensuring the  migration is complete and clean.
-
-The recent changes in  are to remove old audio library references, while  and  were updated to use  and provide detailed logging for the new calibration feature and sensor data submission. The backend is stable, supporting device identification, data manipulation, and calibration endpoints, with the web admin panel fully functional for data visualization and management.
+Immediately before this summary, the user requested to test the deployed version of the application () after a series of fixes and configuration changes aimed at unifying the backend URL and resolving synchronization issues (including a stale closure bug in ). The AI engineer is currently monitoring the  backend logs and database to verify if data from the user's deployed mobile application is being synchronized. However, current observations from the deployed backend show only 1 total point (a manual test point), indicating that the user's deployed application does not yet contain these latest code changes, including the fixes for data synchronization or the newly created  and  components. The next logical step, as per the user's explicit instruction (выполнить фазу 3, после завершить фазу 2), is to complete the integration of these new services into the main application logic within .
 </current_work>
 
 <optional_next_step>
-Remove the non-existent  reference from .
+Integrate the  (Phase 2) and  (Phase 3) services into  to enable event-driven, batched, and offline-capable data synchronization.
 </optional_next_step>

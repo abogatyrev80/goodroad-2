@@ -21,7 +21,7 @@ export class SyncService {
 
   constructor() {
     // Убедимся что URL всегда заканчивается на /
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
+    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadqual-track.preview.emergentagent.com';
     this.backendUrl = url.endsWith('/') ? url : url + '/';
     console.log('🔗 SyncService backend URL:', this.backendUrl);
   }

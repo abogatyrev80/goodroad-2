@@ -39,7 +39,7 @@ class CalibrationService {
   private readonly MAX_SAMPLES = 100; // Максимум 100 образцов
 
   constructor() {
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadquality.preview.emergentagent.com';
+    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://roadqual-track.preview.emergentagent.com';
     this.backendUrl = url.endsWith('/') ? url : url + '/';
     this.deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
     
