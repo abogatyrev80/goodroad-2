@@ -276,60 +276,108 @@ def check_latest_sensor_data():
         print_result("Latest Sensor Data Check", False, f"Error: {str(e)}")
         return False
 
-def check_backend_logs():
-    """Check backend logs for recent activity"""
-    print_section("5. ПРОВЕРКА ЛОГОВ BACKEND (последние 15 минут)")
+def analyze_deployed_app_status():
+    """Final analysis of deployed application status"""
+    print_section("5. АНАЛИЗ СОСТОЯНИЯ DEPLOYED ПРИЛОЖЕНИЯ")
     
     try:
-        # Check supervisor logs
-        log_files = [
-            "/var/log/supervisor/backend.out.log",
-            "/var/log/supervisor/backend.err.log"
-        ]
+        # Get comprehensive data
+        analytics_response = requests.get(f"{API_BASE}/admin/analytics", timeout=15)
+        sensor_response = requests.get(f"{API_BASE}/admin/sensor-data?limit=20", timeout=15)
         
-        found_requests = []
+        if analytics_response.status_code != 200 or sensor_response.status_code != 200:
+            print_result("Final Analysis APIs", False, "Cannot get required data")
+            return False
         
-        for log_file in log_files:
+        analytics = analytics_response.json()
+        sensor_data = sensor_response.json()
+        records = sensor_data.get('data', [])
+        
+        print_result("Final Analysis APIs", True, "Successfully retrieved all data")
+        
+        # Analyze activity patterns
+        now = datetime.now()
+        activity_periods = {
+            'last_hour': 0,
+            'last_24h': 0,
+            'last_7d': analytics.get('recent_points_7d', 0),
+            'total': analytics.get('total_points', 0)
+        }
+        
+        latest_record_time = None
+        
+        for record in records:
             try:
-                # Get last 100 lines and filter for recent POST requests
-                result = subprocess.run(
-                    ["tail", "-n", "100", log_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
+                record_time = datetime.fromisoformat(record['timestamp'].replace('Z', '+00:00'))
                 
-                if result.returncode == 0:
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if 'POST' in line and '/api/sensor-data' in line:
-                            found_requests.append(line.strip())
-                            
-            except Exception as e:
-                print(f"   Не удалось прочитать {log_file}: {str(e)}")
-        
-        print(f"\n📋 АНАЛИЗ ЛОГОВ:")
-        print(f"   Найдено POST запросов к /api/sensor-data: {len(found_requests)}")
-        
-        if found_requests:
-            print(f"\n🔍 ПОСЛЕДНИЕ ЗАПРОСЫ:")
-            for i, request in enumerate(found_requests[-5:]):  # Show last 5
-                print(f"   {i+1}. {request}")
+                if latest_record_time is None or record_time > latest_record_time:
+                    latest_record_time = record_time
                 
-                # Check for IP addresses
-                if '10.64.' in request:
-                    print(f"      ⚠️  Внутренний IP (10.64.x.x) - тестовый запрос")
-                elif any(ext_ip in request for ext_ip in ['192.168.', '172.', '10.0.']):
-                    print(f"      ⚠️  Локальный IP - возможно тестовый")
-                else:
-                    print(f"      ✅ Возможно внешний запрос от мобильного приложения")
+                hours_ago = (now - record_time).total_seconds() / 3600
+                
+                if hours_ago <= 1:
+                    activity_periods['last_hour'] += 1
+                if hours_ago <= 24:
+                    activity_periods['last_24h'] += 1
+                    
+            except Exception:
+                continue
+        
+        print(f"\n📊 АНАЛИЗ АКТИВНОСТИ DEPLOYED ПРИЛОЖЕНИЯ:")
+        print(f"   Всего точек в базе: {activity_periods['total']}")
+        print(f"   За последний час: {activity_periods['last_hour']}")
+        print(f"   За последние 24 часа: {activity_periods['last_24h']}")
+        print(f"   За последние 7 дней: {activity_periods['last_7d']}")
+        
+        if latest_record_time:
+            age = now - latest_record_time
+            print(f"   Последняя запись: {latest_record_time.strftime('%Y-%m-%d %H:%M:%S')} ({age.days} дней назад)")
+        
+        # Determine status
+        if activity_periods['last_hour'] > 0:
+            status = "🟢 АКТИВНО"
+            description = "Deployed приложение отправляет данные прямо сейчас"
+        elif activity_periods['last_24h'] > 0:
+            status = "🟡 НЕДАВНО АКТИВНО"
+            description = "Приложение отправляло данные в последние 24 часа"
+        elif activity_periods['last_7d'] > 0:
+            status = "🟠 НЕАКТИВНО"
+            description = "Приложение отправляло данные на этой неделе, но не недавно"
         else:
-            print(f"   ❌ НЕТ POST запросов к /api/sensor-data в логах")
+            status = "🔴 СПЯЩИЙ РЕЖИМ"
+            description = "Нет активности в последние 7 дней"
         
-        return len(found_requests) > 0
+        print(f"\n🎯 СТАТУС DEPLOYED ПРИЛОЖЕНИЯ: {status}")
+        print(f"   {description}")
+        
+        # Check for issues
+        print(f"\n🔍 ВОЗМОЖНЫЕ ПРОБЛЕМЫ:")
+        
+        if activity_periods['last_hour'] == 0:
+            print("   ❌ Нет данных в последний час")
+            print("     - Мобильное приложение может не работать")
+            print("     - React hooks stale closure bug (упомянут в задаче)")
+            print("     - Проблемы с фоновыми задачами")
+        
+        if activity_periods['total'] > 0 and activity_periods['last_24h'] == 0:
+            print("   ⚠️  Есть исторические данные, но нет свежих")
+            print("     - Deployed версия использует СТАРЫЙ код")
+            print("     - Нужен новый deployment после исправлений")
+        
+        # Recommendations
+        print(f"\n💡 РЕКОМЕНДАЦИИ:")
+        if activity_periods['last_hour'] == 0:
+            print("   1. Проверить работу мобильного приложения")
+            print("   2. Сделать новый deployment с исправлениями")
+            print("   3. Исправить React hooks stale closure bug")
+            print("   4. Проверить EventDetector и BatchOfflineManager")
+        else:
+            print("   ✅ Deployed приложение работает корректно")
+        
+        return activity_periods['last_hour'] > 0
         
     except Exception as e:
-        print_result("Backend Logs Check", False, f"Error: {str(e)}")
+        print_result("Deployed App Analysis", False, f"Error: {str(e)}")
         return False
 
 def check_road_conditions_and_warnings():
