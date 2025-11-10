@@ -9,6 +9,7 @@
  * - Приоритетная отправка критичных событий
  */
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Network from 'expo-network';
 import Constants from 'expo-constants';
@@ -18,6 +19,9 @@ const STORAGE_KEY = 'good_road_offline_queue';
 const MAX_OFFLINE_RECORDS = 1000;
 const BATCH_SIZE = 10;
 const BATCH_TIMEOUT_MS = 60000; // 60 секунд
+
+// Web compatibility flag
+const IS_WEB = Platform.OS === 'web';
 
 export interface DataPackage {
   id: string;
