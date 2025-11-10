@@ -119,6 +119,11 @@ class BatchOfflineManager {
    * Сохранить offline очередь в хранилище
    */
   private async saveOfflineQueue() {
+    // Skip on web
+    if (IS_WEB) {
+      return;
+    }
+    
     try {
       // Ограничение: максимум MAX_OFFLINE_RECORDS записей
       const queueToSave = this.offlineQueue.slice(-MAX_OFFLINE_RECORDS);
