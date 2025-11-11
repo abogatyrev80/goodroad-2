@@ -325,18 +325,13 @@ export default function AdminPanelSimple() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </Pressable>
         <Text style={styles.headerTitle}>Административная панель</Text>
-        <View style={styles.headerButtons}>
-          <Pressable onPress={copyDashboardUrl} style={styles.headerButton}>
-            <Ionicons name="copy-outline" size={20} color="#ffffff" />
-          </Pressable>
-          <Pressable onPress={handleRefresh} disabled={isRefreshing} style={styles.headerButton}>
-            {isRefreshing ? (
-              <ActivityIndicator size={20} color="#4CAF50" />
-            ) : (
-              <Ionicons name="refresh" size={20} color="#ffffff" />
-            )}
-          </Pressable>
-        </View>
+        <Pressable onPress={handleRefresh} disabled={isRefreshing} style={styles.headerButton}>
+          {isRefreshing ? (
+            <ActivityIndicator size={20} color="#4CAF50" />
+          ) : (
+            <Ionicons name="refresh" size={20} color="#ffffff" />
+          )}
+        </Pressable>
       </View>
 
       <ScrollView style={styles.content}>
