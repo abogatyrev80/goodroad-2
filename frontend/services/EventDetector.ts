@@ -169,6 +169,30 @@ class EventDetector {
   }
   
   /**
+   * Вычислить variance для последних N измерений (НОВОЕ - для ML)
+   * Variance показывает изменчивость accelerometer данных
+   */
+  private calculateVariance(windowSize: number = 20): number {
+    if (this.roadTypeHistory.length < windowSize) {
+      return 0;
+    }
+    
+    // Берём последние windowSize измерений
+    const recentData = this.roadTypeHistory.slice(-windowSize);
+    
+    // Средне значение
+    const mean = recentData.reduce((sum, val) => sum + val, 0) / recentData.length;
+    
+    // Variance = среднее квадратов отклонений от среднего
+    const variance = recentData.reduce((sum, val) => {
+      const diff = val - mean;
+      return sum + (diff * diff);
+    }, 0) / recentData.length;
+    
+    return variance;
+  }
+  
+  /**
    * Автоматическое определение типа дороги
    */
   private detectRoadType() {
