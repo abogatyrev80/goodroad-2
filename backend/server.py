@@ -650,6 +650,16 @@ async def get_all_sensor_data(
                     longitude = location_data.get("longitude", 0)
                     speed = location_data.get("speed", 0)
                     accuracy = location_data.get("accuracy", 0)
+                # Обработка нового формата (event) - НОВОЕ
+                elif item.get("type") == "event" and "data" in item:
+                    event_data_item = item["data"]
+                    # Location находится внутри data.location
+                    location_in_event = event_data_item.get("location", {})
+                    if location_in_event:
+                        latitude = location_in_event.get("latitude", 0)
+                        longitude = location_in_event.get("longitude", 0)
+                        speed = location_in_event.get("speed", 0)
+                        accuracy = location_in_event.get("accuracy", 0)
                 elif item.get("type") == "accelerometer" and "data" in item:
                     accel_data = item["data"]
                     accelerometer = {
