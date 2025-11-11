@@ -1409,6 +1409,7 @@ async def export_sensor_data_csv(
             
             raw_data = document.get("rawData", [])
             for item in raw_data:
+                # Обработка старого формата (location)
                 if item.get("type") == "location" and "data" in item:
                     location_data = item["data"]
                     latitude = location_data.get("latitude", 0)
