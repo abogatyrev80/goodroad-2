@@ -45,6 +45,7 @@ export interface DetectedEvent {
   };
   roadType: RoadType;
   speed?: number; // Скорость движения (НОВОЕ)
+  userReported?: boolean; // НОВОЕ: Пользователь вручную отметил событие
   shouldNotifyUser: boolean; // Показать диалог пользователю
   shouldSendImmediately: boolean; // Отправить немедленно (критичное)
 }
