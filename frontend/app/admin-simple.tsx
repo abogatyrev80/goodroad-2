@@ -363,6 +363,31 @@ export default function AdminPanelSimple() {
           </View>
         </View>
 
+        {/* Sound Settings Button */}
+        <Pressable
+          style={styles.soundSettingsButton}
+          onPress={() => {
+            try {
+              router.push('/sound-settings');
+            } catch (error) {
+              console.error('Navigation error:', error);
+            }
+          }}
+        >
+          <View style={styles.soundSettingsContent}>
+            <View style={styles.soundSettingsLeft}>
+              <Ionicons name="volume-high" size={24} color="#4CAF50" />
+              <View style={styles.soundSettingsText}>
+                <Text style={styles.soundSettingsTitle}>🔊 Звуковые оповещения</Text>
+                <Text style={styles.soundSettingsSubtitle}>
+                  Настройте звуки для разных типов событий
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#888" />
+          </View>
+        </Pressable>
+
         {/* Data Points List */}
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>
