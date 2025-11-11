@@ -276,26 +276,86 @@ async def upload_sensor_data(batch: SensorDataBatch):
                     # Extract accelerometer data
                     accel = event_info.get("accelerometer", {})
                     
-                    # Create road condition from event with ML features
-                    condition = {
-                        "id": str(uuid.uuid4()),
-                        "latitude": lat,
-                        "longitude": lon,
-                        "condition_score": max(0, min(100, condition_score)),
-                        "severity_level": determine_severity_level(condition_score),
-                        "data_points": 1,
-                        "event_type": event_info.get("eventType"),
-                        "road_type": event_info.get("roadType", "unknown"),
-                        "speed": event_info.get("speed", 0),  # НОВОЕ: скорость
-                        "accelerometer_magnitude": accel.get("magnitude", 0),
-                        "accelerometer_variance": accel.get("variance", 0),  # НОВОЕ: variance для ML
-                        "accelerometer_deltaX": accel.get("deltaX", 0),  # НОВОЕ
-                        "accelerometer_deltaY": accel.get("deltaY", 0),
-                        "accelerometer_deltaZ": accel.get("deltaZ", 0),
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    }
-                    processed_conditions.append(condition)
+                    # Проверка пользовательской отметки
+                    user_reported = event_info.get("userReported", False)
+                    event_type = event_info.get("eventType")
+                    
+                    # Механизм устаревания для пользовательских отметок
+                    expires_at = None
+                    if user_reported and event_type == "accident":
+                        # Аварии устаревают через 4 часа
+                        expires_at = datetime.utcnow() + timedelta(hours=4)
+                    elif user_reported:
+                        # Другие пользовательские отметки через 24 часа
+                        expires_at = datetime.utcnow() + timedelta(hours=24)
+                    
+                    # Проверить существующее препятствие поблизости (радиус 50 метров)
+                    existing_obstacle = None
+                    if user_reported:
+                        # Найти существующие препятствия в радиусе 50м
+                        nearby_obstacles = await db.road_conditions.find({
+                            "latitude": {"$gte": lat - 0.0005, "$lte": lat + 0.0005},
+                            "longitude": {"$gte": lon - 0.0005, "$lte": lon + 0.0005},
+                            "event_type": event_type,
+                            "status": {"$ne": "resolved"}
+                        }).to_list(length=10)
+                        
+                        if nearby_obstacles:
+                            # Найти ближайшее
+                            for obstacle in nearby_obstacles:
+                                existing_obstacle = obstacle
+                                break
+                    
+                    if existing_obstacle and user_reported:
+                        # Обновить существующее препятствие (подтверждение)
+                        confirmations = existing_obstacle.get("confirmations", 1) + 1
+                        last_confirmed_at = datetime.utcnow()
+                        
+                        # Продлить срок действия при подтверждении
+                        if event_type == "accident":
+                            new_expires_at = last_confirmed_at + timedelta(hours=4)
+                        else:
+                            new_expires_at = last_confirmed_at + timedelta(hours=24)
+                        
+                        await db.road_conditions.update_one(
+                            {"_id": existing_obstacle["_id"]},
+                            {
+                                "$set": {
+                                    "confirmations": confirmations,
+                                    "last_confirmed_at": last_confirmed_at,
+                                    "expires_at": new_expires_at,
+                                    "updated_at": datetime.utcnow(),
+                                    "status": "active"
+                                }
+                            }
+                        )
+                        print(f"   ✅ Обновлено препятствие: {event_type} (подтверждений: {confirmations})")
+                    else:
+                        # Создать новое препятствие
+                        condition = {
+                            "id": str(uuid.uuid4()),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "condition_score": max(0, min(100, condition_score)),
+                            "severity_level": determine_severity_level(condition_score),
+                            "data_points": 1,
+                            "event_type": event_type,
+                            "road_type": event_info.get("roadType", "unknown"),
+                            "speed": event_info.get("speed", 0),
+                            "accelerometer_magnitude": accel.get("magnitude", 0),
+                            "accelerometer_variance": accel.get("variance", 0),
+                            "accelerometer_deltaX": accel.get("deltaX", 0),
+                            "accelerometer_deltaY": accel.get("deltaY", 0),
+                            "accelerometer_deltaZ": accel.get("deltaZ", 0),
+                            "user_reported": user_reported,  # НОВОЕ: пользовательская отметка
+                            "confirmations": 1,  # НОВОЕ: начальное количество подтверждений
+                            "last_confirmed_at": datetime.utcnow() if user_reported else None,  # НОВОЕ
+                            "expires_at": expires_at,  # НОВОЕ: время устаревания
+                            "status": "active",  # НОВОЕ: active/expired/resolved
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        processed_conditions.append(condition)
                     
                     # Generate warning for critical events
                     if severity <= 2:  # Critical or high severity
