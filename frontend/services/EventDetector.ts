@@ -9,7 +9,17 @@
 
 export type RoadType = 'asphalt' | 'gravel' | 'dirt' | 'unknown';
 export type VehicleType = 'sedan' | 'crossover' | 'suv';
-export type EventType = 'pothole' | 'braking' | 'vibration' | 'bump' | 'normal';
+/**
+ * Типы событий
+ */
+export type EventType = 
+  | 'pothole'     // Яма
+  | 'braking'     // Резкое торможение
+  | 'vibration'   // Вибрация (плохая дорога)
+  | 'bump'        // Кочка/неровность
+  | 'accident'    // Авария (пользовательская отметка) - НОВОЕ
+  | 'normal'      // Нормальное движение
+  | 'test_sync';  // Тестовая синхронизация
 export type SeverityLevel = 1 | 2 | 3 | 4 | 5; // 1=критичный, 5=нормальный
 
 export interface AccelerometerData {
