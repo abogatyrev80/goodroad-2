@@ -327,6 +327,9 @@ class EventDetector {
       return null;
     }
     
+    // Вычислить variance для ML (НОВОЕ)
+    const variance = this.calculateVariance(20);
+    
     return {
       eventType,
       severity,
@@ -338,6 +341,8 @@ class EventDetector {
         magnitude,
         deltaY,
         deltaZ,
+        deltaX, // НОВОЕ
+        variance, // НОВОЕ - для ML анализа
       },
       roadType: this.detectedRoadType,
       shouldNotifyUser,
