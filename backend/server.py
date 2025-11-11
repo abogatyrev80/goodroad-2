@@ -404,6 +404,47 @@ async def upload_sensor_data(batch: SensorDataBatch):
         logging.error(f"Error processing sensor data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing sensor data: {str(e)}")
 
+@api_router.post("/cleanup-expired-obstacles")
+async def cleanup_expired_obstacles():
+    """Очистить устаревшие препятствия (cron-задача)"""
+    try:
+        now = datetime.utcnow()
+        
+        # Найти устаревшие препятствия
+        expired = await db.road_conditions.find({
+            "expires_at": {"$lt": now},
+            "status": "active"
+        }).to_list(length=1000)
+        
+        # Пометить как устаревшие
+        if expired:
+            expired_ids = [e["_id"] for e in expired]
+            result = await db.road_conditions.update_many(
+                {"_id": {"$in": expired_ids}},
+                {
+                    "$set": {
+                        "status": "expired",
+                        "updated_at": now
+                    }
+                }
+            )
+            
+            print(f"🕒 Помечено {result.modified_count} препятствий как устаревшие")
+            
+            return {
+                "message": "Cleanup completed",
+                "expired_count": result.modified_count,
+                "timestamp": now
+            }
+        
+        return {
+            "message": "No expired obstacles found",
+            "expired_count": 0,
+            "timestamp": now
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/ml-statistics")
 async def get_ml_statistics():
     """Get ML-ready statistics with variance, speed, and delta values"""
