@@ -344,6 +344,55 @@ async def upload_sensor_data(batch: SensorDataBatch):
         logging.error(f"Error processing sensor data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing sensor data: {str(e)}")
 
+@api_router.get("/ml-statistics")
+async def get_ml_statistics():
+    """Get ML-ready statistics with variance, speed, and delta values"""
+    try:
+        conditions = await db.road_conditions.find({
+            "event_type": {"$ne": None},
+            "accelerometer_variance": {"$exists": True}
+        }).to_list(length=1000)
+        
+        # Group by event type
+        stats_by_type = {}
+        for condition in conditions:
+            event_type = condition.get("event_type", "unknown")
+            if event_type not in stats_by_type:
+                stats_by_type[event_type] = {
+                    "count": 0,
+                    "avg_magnitude": 0,
+                    "avg_variance": 0,
+                    "avg_speed": 0,
+                    "avg_deltaX": 0,
+                    "avg_deltaY": 0,
+                    "avg_deltaZ": 0,
+                    "magnitudes": [],
+                    "variances": [],
+                    "speeds": []
+                }
+            
+            stats = stats_by_type[event_type]
+            stats["count"] += 1
+            stats["magnitudes"].append(condition.get("accelerometer_magnitude", 0))
+            stats["variances"].append(condition.get("accelerometer_variance", 0))
+            stats["speeds"].append(condition.get("speed", 0))
+        
+        # Calculate averages
+        for event_type, stats in stats_by_type.items():
+            if stats["count"] > 0:
+                stats["avg_magnitude"] = sum(stats["magnitudes"]) / stats["count"]
+                stats["avg_variance"] = sum(stats["variances"]) / stats["count"]
+                stats["avg_speed"] = sum(stats["speeds"]) / stats["count"]
+                del stats["magnitudes"]
+                del stats["variances"]
+                del stats["speeds"]
+        
+        return {
+            "total_events": len(conditions),
+            "stats_by_type": stats_by_type
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @api_router.get("/road-conditions")
 async def get_road_conditions(
     latitude: float,
