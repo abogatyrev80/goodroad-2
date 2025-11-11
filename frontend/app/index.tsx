@@ -1193,4 +1193,20 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 2,
   },
+  accidentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#F44336',
+  },
+  accidentButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
 });
