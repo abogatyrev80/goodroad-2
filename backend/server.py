@@ -273,7 +273,10 @@ async def upload_sensor_data(batch: SensorDataBatch):
                     severity = event_info.get("severity", 5)
                     condition_score = 100 - (severity * 20)  # 1->80, 2->60, 3->40, 4->20, 5->0
                     
-                    # Create road condition from event
+                    # Extract accelerometer data
+                    accel = event_info.get("accelerometer", {})
+                    
+                    # Create road condition from event with ML features
                     condition = {
                         "id": str(uuid.uuid4()),
                         "latitude": lat,
@@ -283,7 +286,12 @@ async def upload_sensor_data(batch: SensorDataBatch):
                         "data_points": 1,
                         "event_type": event_info.get("eventType"),
                         "road_type": event_info.get("roadType", "unknown"),
-                        "accelerometer_magnitude": event_info.get("accelerometer", {}).get("magnitude", 0),
+                        "speed": event_info.get("speed", 0),  # НОВОЕ: скорость
+                        "accelerometer_magnitude": accel.get("magnitude", 0),
+                        "accelerometer_variance": accel.get("variance", 0),  # НОВОЕ: variance для ML
+                        "accelerometer_deltaX": accel.get("deltaX", 0),  # НОВОЕ
+                        "accelerometer_deltaY": accel.get("deltaY", 0),
+                        "accelerometer_deltaZ": accel.get("deltaZ", 0),
                         "created_at": datetime.utcnow(),
                         "updated_at": datetime.utcnow()
                     }
