@@ -291,14 +291,17 @@ class BatchOfflineManager {
             eventType: event.eventType,
             severity: event.severity,
             roadType: event.roadType,
+            speed: event.speed || 0, // НОВОЕ: скорость для ML
             location: dataPackage.location,
             accelerometer: {
               x: event.accelerometer.x,
               y: event.accelerometer.y,
               z: event.accelerometer.z,
               magnitude: event.accelerometer.magnitude,
+              deltaX: event.accelerometer.deltaX, // НОВОЕ
               deltaY: event.accelerometer.deltaY,
               deltaZ: event.accelerometer.deltaZ,
+              variance: event.accelerometer.variance, // НОВОЕ: variance для ML
             }
           }
         }))
