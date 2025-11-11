@@ -622,6 +622,40 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '70%',
   },
+  soundSettingsButton: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    marginBottom: 16,
+    marginHorizontal: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  soundSettingsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  soundSettingsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  soundSettingsText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  soundSettingsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  soundSettingsSubtitle: {
+    fontSize: 13,
+    color: '#888',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
