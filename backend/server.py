@@ -643,6 +643,7 @@ async def get_all_sensor_data(
             
             raw_data = document.get("rawData", [])
             for item in raw_data:
+                # Обработка старого формата (location)
                 if item.get("type") == "location" and "data" in item:
                     location_data = item["data"]
                     latitude = location_data.get("latitude", 0)
