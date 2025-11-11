@@ -1543,6 +1543,7 @@ async def cleanup_zero_coordinates():
             raw_data = document.get("rawData", [])
             
             for item in raw_data:
+                # Обработка старого формата (location)
                 if item.get("type") == "location" and "data" in item:
                     location_data = item["data"]
                     lat = location_data.get("latitude", 0)
