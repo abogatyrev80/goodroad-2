@@ -9,10 +9,10 @@
 **База данных:** 241 точка (тестовые + ваши данные)
 
 ### Production/Deployed Environment
-**URL:** `https://roadquality.emergent.host`
+**URL:** `https://roadqual-track.emergent.host`
 **Использование:** Production deployment, мобильные приложения (iOS/Android)
 **Конфигурация:** `frontend/app.json` → `extra.backendUrl`
-**База данных:** 1 точка (отдельная production база)
+**База данных:** 243 точки (production база)
 
 ## 🔧 Как работает логика выбора URL
 
