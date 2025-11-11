@@ -470,6 +470,72 @@ export default function GoodRoadApp() {
     );
   };
 
+  // НОВОЕ: Сообщить об аварии (ручная отметка пользователем)
+  const reportAccident = () => {
+    if (!currentLocation) {
+      Alert.alert('Ошибка', 'GPS координаты недоступны');
+      return;
+    }
+
+    try {
+      // Создать событие аварии вручную
+      const accidentEvent: DetectedEvent = {
+        eventType: 'accident',
+        severity: 1, // Критичная важность
+        timestamp: Date.now(),
+        accelerometer: {
+          x: accelerometerData.x,
+          y: accelerometerData.y,
+          z: accelerometerData.z,
+          magnitude: 0, // Нет физического удара
+          deltaX: 0,
+          deltaY: 0,
+          deltaZ: 0,
+          variance: 0,
+        },
+        roadType: currentRoadType as RoadType || 'unknown',
+        speed: currentSpeed,
+        userReported: true, // ВАЖНО: Отмечаем как пользовательскую отметку
+        shouldNotifyUser: false,
+        shouldSendImmediately: true, // Отправить немедленно
+      };
+
+      // Добавить в BatchOfflineManager для отправки
+      batchOfflineManager.addEvent(
+        accidentEvent,
+        currentLocation,
+        currentSpeed,
+        gpsAccuracy
+      );
+
+      // Обновить счётчик событий
+      setEventCount(prev => prev + 1);
+      setLastEvent(accidentEvent);
+      setDetectedEvents(prev => [...prev, accidentEvent].slice(-10));
+
+      // Визуальная обратная связь
+      if (vibrationEnabled) {
+        Vibration.vibrate([0, 300, 100, 300, 100, 300]); // Тройная вибрация
+      }
+
+      Alert.alert(
+        '✅ Авария отмечена',
+        `Координаты: ${currentLocation.coords.latitude.toFixed(6)}, ${currentLocation.coords.longitude.toFixed(6)}\n\nДругие водители будут предупреждены об аварии в этом месте.`,
+        [{ text: 'OK' }]
+      );
+
+      console.log('🚨 Пользователь отметил аварию:', {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        speed: currentSpeed,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('❌ Ошибка при отметке аварии:', error);
+      Alert.alert('Ошибка', 'Не удалось отметить аварию');
+    }
+  };
+
   const getRoadConditionColor = (score: number) => {
     if (score >= 80) return '#4CAF50';
     if (score >= 60) return '#FF9800';
