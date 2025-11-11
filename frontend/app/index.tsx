@@ -25,7 +25,7 @@ import Constants from 'expo-constants';
 import { AppSettings, SoundOption } from './settings';
 
 // Импортируем Event Detector для умной детекции событий
-import EventDetector, { DetectedEvent, CalibrationProfile } from '../services/EventDetector';
+import EventDetector, { DetectedEvent, CalibrationProfile, RoadType } from '../services/EventDetector';
 
 // Импортируем BatchOfflineManager для батчинга и offline поддержки
 import { batchOfflineManager, BatchStats } from '../services/BatchOfflineManager';
