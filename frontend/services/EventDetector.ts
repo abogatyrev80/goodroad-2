@@ -30,8 +30,11 @@ export interface DetectedEvent {
     magnitude: number;
     deltaY: number; // Вертикальное изменение
     deltaZ: number; // Продольное изменение (торможение/разгон)
+    deltaX: number; // Боковое изменение (НОВОЕ)
+    variance: number; // Variance для ML (НОВОЕ)
   };
   roadType: RoadType;
+  speed?: number; // Скорость движения (НОВОЕ)
   shouldNotifyUser: boolean; // Показать диалог пользователю
   shouldSendImmediately: boolean; // Отправить немедленно (критичное)
 }
