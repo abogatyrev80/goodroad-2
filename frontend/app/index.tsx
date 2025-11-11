@@ -323,7 +323,10 @@ export default function GoodRoadApp() {
             });
             
             if (event) {
-              console.log(`🎯 Событие обнаружено: ${event.eventType}, severity: ${event.severity}`);
+              // ✨ УЛУЧШЕНИЕ: Добавляем скорость в событие для ML анализа
+              event.speed = currentSpeed;
+              
+              console.log(`🎯 Событие обнаружено: ${event.eventType}, severity: ${event.severity}, speed: ${currentSpeed} km/h, variance: ${event.accelerometer.variance.toFixed(3)}`);
               
               // Добавить в буфер UI (максимум 10 событий)
               setDetectedEvents(prev => [...prev, event].slice(-10));
@@ -342,7 +345,7 @@ export default function GoodRoadApp() {
                   currentSpeed,
                   gpsAccuracy
                 );
-                console.log(`📦 Событие добавлено в BatchOfflineManager`);
+                console.log(`📦 Событие добавлено в BatchOfflineManager (variance: ${event.accelerometer.variance.toFixed(3)})`);
               }
               
               // Диалог для критичных событий
