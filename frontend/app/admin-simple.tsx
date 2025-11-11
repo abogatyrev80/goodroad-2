@@ -308,7 +308,28 @@ export default function AdminPanelSimple() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable 
+          onPress={() => {
+            try {
+              console.log('🔙 Попытка выхода из админ панели...');
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                console.log('📍 История пуста, переход на главную...');
+                router.push('/');
+              }
+            } catch (error) {
+              console.error('❌ Ошибка при выходе:', error);
+              // Fallback: попытка перейти на главную страницу
+              try {
+                router.push('/');
+              } catch (fallbackError) {
+                console.error('❌ Fallback не сработал:', fallbackError);
+              }
+            }
+          }}
+          style={styles.headerButton}
+        >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </Pressable>
         <Text style={styles.headerTitle}>Административная панель</Text>
