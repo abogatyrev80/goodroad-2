@@ -258,10 +258,16 @@ async def upload_sensor_data(batch: SensorDataBatch):
             for event_point in event_data:
                 event_info = event_point.data
                 
+                # Логирование для отладки
+                print(f"   📍 Debug - event_info structure: {list(event_info.keys())}")
+                print(f"   📍 Debug - location field: {event_info.get('location')}")
+                
                 # Extract location from event
                 location = event_info.get("location", {})
                 lat = location.get("latitude")
                 lon = location.get("longitude")
+                
+                print(f"   📍 Debug - extracted lat: {lat}, lon: {lon}")
                 
                 if lat and lon:
                     # Map event severity (1-5) to condition score (0-100)
