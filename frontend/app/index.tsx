@@ -841,44 +841,6 @@ export default function GoodRoadApp() {
           </Text>
         </Pressable>
 
-        {/* Report Accident Button - NEW */}
-        <Pressable 
-          style={[styles.accidentButton, { 
-            backgroundColor: isTracking ? '#F44336' : '#666',
-            opacity: isTracking ? 1 : 0.5,
-          }]}
-          onPress={() => {
-            if (!isTracking) {
-              Alert.alert('⚠️ Мониторинг выключен', 'Включите мониторинг для отметки аварий');
-              return;
-            }
-            
-            if (!currentLocation) {
-              Alert.alert('⚠️ GPS недоступен', 'Ожидание GPS сигнала...');
-              return;
-            }
-
-            Alert.alert(
-              '🚨 Сообщить об аварии',
-              'Вы уверены, что хотите отметить аварию на этом месте? Другие водители увидят предупреждение.',
-              [
-                { text: 'Отмена', style: 'cancel' },
-                {
-                  text: 'Подтвердить',
-                  style: 'destructive',
-                  onPress: () => reportAccident(),
-                },
-              ]
-            );
-          }}
-          disabled={!isTracking}
-        >
-          <Ionicons name="warning" size={24} color="white" />
-          <Text style={styles.accidentButtonText}>
-            🚨 СООБЩИТЬ ОБ АВАРИИ
-          </Text>
-        </Pressable>
-
         {/* Navigation Buttons */}
         <Pressable 
           style={styles.settingsNavButton}
