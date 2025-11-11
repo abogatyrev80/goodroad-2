@@ -1573,6 +1573,19 @@ async def cleanup_zero_coordinates():
                     if lat != 0.0 and lng != 0.0:
                         has_valid_gps = True
                         break
+                # Обработка нового формата (event) - НОВОЕ
+                elif item.get("type") == "event" and "data" in item:
+                    event_data_item = item["data"]
+                    # Location находится внутри data.location
+                    location_in_event = event_data_item.get("location", {})
+                    if location_in_event:
+                        lat = location_in_event.get("latitude", 0)
+                        lng = location_in_event.get("longitude", 0)
+                        
+                        # If we found non-zero coordinates, this record is valid
+                        if lat != 0.0 and lng != 0.0:
+                            has_valid_gps = True
+                            break
             
             # If no valid GPS data found, mark for deletion
             if not has_valid_gps:
