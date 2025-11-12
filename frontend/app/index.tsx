@@ -126,6 +126,7 @@ export default function GoodRoadApp() {
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const accelerometerSubscription = useRef<any>(null);
   const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const periodicDataTimerRef = useRef<NodeJS.Timeout | null>(null); // Таймер для периодической отправки сырых данных
   
   // Audio player будет инициализирован позже при необходимости
 
