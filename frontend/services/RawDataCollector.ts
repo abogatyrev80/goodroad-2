@@ -313,6 +313,23 @@ class RawDataCollector {
   }
   
   /**
+   * Вычислить интервал сбора данных на основе скорости
+   */
+  public getCollectionInterval(speed: number): number {
+    if (speed < 10) {
+      return this.SPEED_INTERVALS.STATIONARY;
+    } else if (speed < 30) {
+      return this.SPEED_INTERVALS.SLOW;
+    } else if (speed < 60) {
+      return this.SPEED_INTERVALS.MEDIUM;
+    } else if (speed < 90) {
+      return this.SPEED_INTERVALS.FAST;
+    } else {
+      return this.SPEED_INTERVALS.VERY_FAST;
+    }
+  }
+  
+  /**
    * Получить статистику
    */
   public getStats() {
