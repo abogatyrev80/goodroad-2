@@ -64,6 +64,15 @@ class RawDataCollector {
   private readonly MAX_BUFFER_SIZE = 50; // Максимум в буфере
   private readonly OFFLINE_STORAGE_KEY = 'raw_data_offline_queue';
   
+  // Динамическая частота сбора в зависимости от скорости
+  private readonly SPEED_INTERVALS = {
+    STATIONARY: 5000,    // 0-10 км/ч - каждые 5 секунд
+    SLOW: 3000,          // 10-30 км/ч - каждые 3 секунды
+    MEDIUM: 2000,        // 30-60 км/ч - каждые 2 секунды
+    FAST: 1000,          // 60-90 км/ч - каждую 1 секунду
+    VERY_FAST: 500,      // 90+ км/ч - каждые 0.5 секунды
+  };
+  
   // Колбэки
   private onWarningsReceived?: (warnings: Warning[]) => void;
   
