@@ -233,6 +233,74 @@ export default function GoodRoadApp() {
     
   }, [isTracking, batchStats]);
 
+  // 🆕 ПЕРИОДИЧЕСКАЯ ОТПРАВКА СЫРЫХ ДАННЫХ для адаптации устройств
+  // Отправляем "normal" события каждые 30 секунд, даже если EventDetector не обнаружил событий
+  // Это позволяет собирать базовые GPS-треки и сырые данные акселерометра для ML анализа
+  useEffect(() => {
+    if (!isTracking || Platform.OS === 'web') {
+      // Очистить таймер при остановке отслеживания
+      if (periodicDataTimerRef.current) {
+        clearInterval(periodicDataTimerRef.current);
+        periodicDataTimerRef.current = null;
+      }
+      return;
+    }
+
+    console.log('🕐 Запуск периодической отправки сырых данных (каждые 30 секунд)');
+    
+    // Создаём таймер для периодической отправки
+    periodicDataTimerRef.current = setInterval(() => {
+      if (!isTracking || !currentLocation) {
+        console.log('⏸️ Пропуск периодической отправки: отслеживание остановлено или нет GPS');
+        return;
+      }
+
+      // Создаём синтетическое "normal" событие с текущими сырыми данными
+      const normalEvent: DetectedEvent = {
+        eventType: 'normal',
+        severity: 5,
+        timestamp: Date.now(),
+        accelerometer: {
+          x: accelerometerData.x,
+          y: accelerometerData.y,
+          z: accelerometerData.z,
+          magnitude: Math.sqrt(
+            accelerometerData.x ** 2 + 
+            accelerometerData.y ** 2 + 
+            accelerometerData.z ** 2
+          ),
+          deltaY: 0, // Для normal событий дельта не вычисляется
+          deltaZ: 0,
+          deltaX: 0,
+          variance: 0,
+        },
+        roadType: (eventDetector?.getRoadType() || 'unknown') as RoadType,
+        speed: currentSpeed,
+        shouldNotifyUser: false,
+        shouldSendImmediately: false,
+      };
+
+      console.log(`📡 Периодическая отправка сырых данных: GPS (${currentLocation.coords.latitude.toFixed(6)}, ${currentLocation.coords.longitude.toFixed(6)}), Speed: ${currentSpeed.toFixed(1)} km/h, Accel: (${accelerometerData.x.toFixed(2)}, ${accelerometerData.y.toFixed(2)}, ${accelerometerData.z.toFixed(2)})`);
+      
+      // Отправляем через BatchOfflineManager
+      batchOfflineManager.addEvent(
+        normalEvent,
+        currentLocation,
+        currentSpeed,
+        gpsAccuracy
+      );
+      
+    }, 30000); // 30 секунд
+
+    // Cleanup при размонтировании или изменении зависимостей
+    return () => {
+      if (periodicDataTimerRef.current) {
+        clearInterval(periodicDataTimerRef.current);
+        periodicDataTimerRef.current = null;
+      }
+    };
+  }, [isTracking, currentLocation, currentSpeed, gpsAccuracy, accelerometerData, eventDetector]);
+
   // Функции для системы предупреждений
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371000; // Радиус Земли в метрах
