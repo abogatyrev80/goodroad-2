@@ -209,6 +209,9 @@ export default function GoodRoadApp() {
     if (warningIntervalRef.current) {
       clearInterval(warningIntervalRef.current);
     }
+    if (periodicDataTimerRef.current) {
+      clearInterval(periodicDataTimerRef.current);
+    }
   };
 
   // МОДЕРНИЗАЦИЯ: Event-driven накопление данных через BatchOfflineManager
