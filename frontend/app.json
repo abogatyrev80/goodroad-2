@@ -50,6 +50,10 @@
     "extra": {
       "backendUrl": "https://potholefinder.preview.emergentagent.com"
     },
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
+    },
     "plugins": [
       "expo-router"
     ],
