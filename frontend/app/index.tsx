@@ -151,13 +151,22 @@ export default function GoodRoadApp() {
         setAccelerometerData(data);
       });
       
-      // Запуск периодического сбора данных (каждые 2 секунды)
-      dataCollectionInterval.current = setInterval(() => {
+      // Запуск динамического сбора данных (частота зависит от скорости)
+      const startDynamicCollection = () => {
         if (currentLocation && rawDataCollector.current) {
           rawDataCollector.current.addDataPoint(currentLocation, accelerometerData);
           setDataPointsCollected(prev => prev + 1);
+          
+          // Вычисляем новый интервал на основе текущей скорости
+          const nextInterval = rawDataCollector.current.getCollectionInterval(currentSpeed);
+          
+          // Перезапускаем таймер с новым интервалом
+          dataCollectionInterval.current = setTimeout(startDynamicCollection, nextInterval);
         }
-      }, 2000);
+      };
+      
+      // Запускаем первый цикл
+      startDynamicCollection();
       
       setIsTracking(true);
       console.log('✅ Отслеживание запущено');
