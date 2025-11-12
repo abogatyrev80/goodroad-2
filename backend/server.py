@@ -545,6 +545,188 @@ async def get_ml_statistics():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==============================================================================
+# НОВАЯ АРХИТЕКТУРА: Избыточный сбор данных + серверная классификация
+# ==============================================================================
+
+from ml_processor import EventClassifier, WarningGenerator
+
+# Инициализация ML процессоров
+event_classifier = EventClassifier()
+warning_generator = WarningGenerator()
+
+@api_router.post("/raw-data")
+async def process_raw_data(batch: RawDataBatch):
+    """
+    Новый endpoint для приема сырых данных с устройств
+    Сервер анализирует данные и классифицирует события
+    """
+    try:
+        device_id = batch.deviceId
+        raw_count = len(batch.data)
+        
+        print(f"📥 Получен батч сырых данных от {device_id}: {raw_count} точек")
+        
+        # Сохраняем сырые данные для истории и ML обучения
+        raw_documents = []
+        processed_events = []
+        user_warnings = []
+        
+        for data_point in batch.data:
+            # Извлекаем данные
+            timestamp = datetime.fromtimestamp(data_point.timestamp / 1000)
+            gps = data_point.gps
+            accel = data_point.accelerometer
+            
+            # Сохраняем сырые данные
+            raw_doc = {
+                "deviceId": device_id,
+                "timestamp": timestamp,
+                "latitude": gps.get("latitude"),
+                "longitude": gps.get("longitude"),
+                "speed": gps.get("speed", 0),
+                "accuracy": gps.get("accuracy", 0),
+                "altitude": gps.get("altitude"),
+                "accelerometer_x": accel.get("x"),
+                "accelerometer_y": accel.get("y"),
+                "accelerometer_z": accel.get("z"),
+                "created_at": datetime.utcnow()
+            }
+            raw_documents.append(raw_doc)
+            
+            # Классифицируем событие через ML процессор
+            event = event_classifier.analyze_data_point(
+                device_id=device_id,
+                accel_x=accel.get("x", 0),
+                accel_y=accel.get("y", 0),
+                accel_z=accel.get("z", 0),
+                speed=gps.get("speed", 0)
+            )
+            
+            if event:
+                # Событие обнаружено - сохраняем
+                processed_event = {
+                    "id": str(uuid.uuid4()),
+                    "deviceId": device_id,
+                    "timestamp": timestamp,
+                    "eventType": event['eventType'],
+                    "severity": event['severity'],
+                    "confidence": event['confidence'],
+                    "latitude": gps.get("latitude"),
+                    "longitude": gps.get("longitude"),
+                    "speed": gps.get("speed", 0),
+                    "accelerometer_x": event['accelerometer']['x'],
+                    "accelerometer_y": event['accelerometer']['y'],
+                    "accelerometer_z": event['accelerometer']['z'],
+                    "accelerometer_magnitude": event['accelerometer']['magnitude'],
+                    "accelerometer_deltaX": event['accelerometer']['deltaX'],
+                    "accelerometer_deltaY": event['accelerometer']['deltaY'],
+                    "accelerometer_deltaZ": event['accelerometer']['deltaZ'],
+                    "accelerometer_variance": event['accelerometer']['variance'],
+                    "roadType": event['roadType'],
+                    "created_at": datetime.utcnow()
+                }
+                processed_events.append(processed_event)
+                
+                # Проверяем нужно ли предупредить пользователя
+                should_warn, distance = warning_generator.should_warn_user(
+                    user_lat=gps.get("latitude"),
+                    user_lng=gps.get("longitude"),
+                    event_lat=gps.get("latitude"),
+                    event_lng=gps.get("longitude"),
+                    event_type=event['eventType'],
+                    severity=event['severity']
+                )
+                
+                if should_warn:
+                    warning_message = warning_generator.create_warning_message(
+                        event['eventType'],
+                        event['severity'],
+                        distance
+                    )
+                    
+                    warning_doc = {
+                        "id": str(uuid.uuid4()),
+                        "deviceId": device_id,
+                        "eventType": event['eventType'],
+                        "severity": event['severity'],
+                        "latitude": gps.get("latitude"),
+                        "longitude": gps.get("longitude"),
+                        "distance": distance,
+                        "message": warning_message,
+                        "expiresAt": datetime.utcnow() + timedelta(minutes=5),
+                        "created_at": datetime.utcnow()
+                    }
+                    user_warnings.append(warning_doc)
+                    print(f"   ⚠️  Предупреждение: {warning_message}")
+        
+        # Сохраняем в базу данных
+        if raw_documents:
+            await db.raw_sensor_data.insert_many(raw_documents)
+            print(f"✅ Сохранено {len(raw_documents)} сырых записей")
+        
+        if processed_events:
+            await db.processed_events.insert_many(processed_events)
+            print(f"✅ Классифицировано {len(processed_events)} событий")
+        
+        if user_warnings:
+            await db.user_warnings.insert_many(user_warnings)
+            print(f"✅ Создано {len(user_warnings)} предупреждений")
+        
+        return {
+            "message": "Raw data processed successfully",
+            "rawDataSaved": len(raw_documents),
+            "eventsDetected": len(processed_events),
+            "warningsGenerated": len(user_warnings),
+            "warnings": user_warnings  # Возвращаем предупреждения клиенту
+        }
+        
+    except Exception as e:
+        logging.error(f"Error processing raw data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing raw data: {str(e)}")
+
+@api_router.get("/warnings/{device_id}")
+async def get_active_warnings(device_id: str):
+    """
+    Получить активные предупреждения для устройства
+    """
+    try:
+        now = datetime.utcnow()
+        
+        # Находим активные предупреждения (не истекшие)
+        warnings = await db.user_warnings.find({
+            "deviceId": device_id,
+            "expiresAt": {"$gt": now}
+        }).sort("created_at", -1).to_list(length=10)
+        
+        # Преобразуем ObjectId в строку
+        for warning in warnings:
+            warning["_id"] = str(warning["_id"])
+        
+        return {
+            "deviceId": device_id,
+            "count": len(warnings),
+            "warnings": warnings
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/warnings/{warning_id}")
+async def dismiss_warning(warning_id: str):
+    """
+    Удалить/отклонить предупреждение
+    """
+    try:
+        result = await db.user_warnings.delete_one({"id": warning_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Warning not found")
+        
+        return {"message": "Warning dismissed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/road-conditions")
 async def get_road_conditions(
     latitude: float,
