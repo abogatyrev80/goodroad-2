@@ -5,9 +5,19 @@
  */
 
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Audio } from 'expo-av';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
 import type { Warning } from '../services/RawDataCollector';
+
+// Условный импорт Audio для web совместимости
+let Audio: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const ExpoAV = require('expo-av');
+    Audio = ExpoAV.Audio;
+  } catch (error) {
+    console.warn('⚠️ expo-av not available:', error);
+  }
+}
 
 interface WarningAlertProps {
   warning: Warning;
