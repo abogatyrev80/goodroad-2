@@ -48,7 +48,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "extra": {
-      "backendUrl": "https://roadqual-track.emergent.host"
+      "backendUrl": "https://potholefinder.preview.emergentagent.com"
     },
     "plugins": [
       "expo-router"
