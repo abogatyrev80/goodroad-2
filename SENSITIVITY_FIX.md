@@ -211,7 +211,7 @@ Deployed мобильное приложение может использова
 
 Убедиться, что мобильное приложение подключается к правильному backend:
 - Production: `https://roadqual-track.emergent.host`
-- Не к preview: `https://roadqual-track.preview.emergentagent.com`
+- Не к preview: `https://potholefinder.preview.emergentagent.com`
 
 **Как проверить:**
 Открыть app.json и убедиться:

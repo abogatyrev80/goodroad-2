@@ -254,7 +254,7 @@ Calibration mode: ACTIVE
 Samples count: 20
 Speed: 30 km/h
 📦 Payload размер: 2456 bytes
-🌐 Отправка на: https://roadqual-track.preview.emergentagent.com/api/calibration/submit
+🌐 Отправка на: https://potholefinder.preview.emergentagent.com/api/calibration/submit
 📡 Response status: 200
 ✅ Профиль получен от сервера:
    Baseline: x=0.114, y=0.213, z=9.805

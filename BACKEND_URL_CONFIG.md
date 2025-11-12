@@ -3,7 +3,7 @@
 ## ✅ Текущая конфигурация (правильная)
 
 ### Development/Preview Environment
-**URL:** `https://roadqual-track.preview.emergentagent.com`
+**URL:** `https://potholefinder.preview.emergentagent.com`
 **Использование:** Только для разработки и тестирования в preview режиме
 **Конфигурация:** `frontend/.env` → `EXPO_PUBLIC_BACKEND_URL`
 **База данных:** 241 точка (тестовые + ваши данные)
@@ -26,7 +26,7 @@ const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ||
 **Приоритет:**
 1. **Development:** `process.env.EXPO_PUBLIC_BACKEND_URL` (из .env)
    - Используется при `expo start --tunnel`
-   - Preview URL: `https://roadqual-track.preview.emergentagent.com`
+   - Preview URL: `https://potholefinder.preview.emergentagent.com`
 
 2. **Production:** `Constants.expoConfig.extra.backendUrl` (из app.json)
    - Используется в deployed builds (EAS, app stores)
@@ -39,7 +39,7 @@ const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ||
 
 ### Preview Backend
 ```bash
-curl https://roadqual-track.preview.emergentagent.com/api/
+curl https://potholefinder.preview.emergentagent.com/api/
 # Response: {"message": "Good Road API - Smart Road Monitoring System"}
 # Total points: 241
 ```
