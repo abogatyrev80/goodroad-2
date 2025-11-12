@@ -394,6 +394,14 @@ export default function GoodRoadApp() {
               <Text style={styles.statValue}>{dataPointsCollected}</Text>
             </View>
             <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Частота сбора:</Text>
+              <Text style={styles.statValue}>
+                {rawDataCollector.current 
+                  ? `${(rawDataCollector.current.getCollectionInterval(currentSpeed) / 1000).toFixed(1)}с`
+                  : '-'}
+              </Text>
+            </View>
+            <View style={styles.statRow}>
               <Text style={styles.statLabel}>Сеть:</Text>
               <View style={styles.networkStatus}>
                 <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
