@@ -201,7 +201,7 @@ export default function GoodRoadApp() {
       }
       
       if (dataCollectionInterval.current) {
-        clearInterval(dataCollectionInterval.current);
+        clearTimeout(dataCollectionInterval.current);
         dataCollectionInterval.current = null;
       }
       
