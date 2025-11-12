@@ -55,6 +55,11 @@ const WarningAlert: React.FC<WarningAlertProps> = ({ warning, onDismiss }) => {
   }, []);
   
   const playWarningSound = async (severity: number) => {
+    if (!Audio || Platform.OS === 'web') {
+      console.log('⚠️  Audio недоступен на web платформе');
+      return;
+    }
+    
     try {
       const { sound } = await Audio.Sound.createAsync(
         severity <= 2 
