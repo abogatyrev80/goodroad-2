@@ -68,7 +68,11 @@ async def cleanup_database():
     ).limit(5).to_list(length=5)
     
     for record in real_samples:
-        print(f"  - Device: {record['deviceId'][:30]}... GPS: ({record['latitude']:.6f}, {record['longitude']:.6f}) Time: {record.get('timestamp', 'N/A')}")
+        lat = record.get('latitude', 0.0)
+        lng = record.get('longitude', 0.0)
+        device = record.get('deviceId', 'unknown')[:30]
+        timestamp = record.get('timestamp', 'N/A')
+        print(f"  - Device: {device}... GPS: ({lat:.6f}, {lng:.6f}) Time: {timestamp}")
     
     # Подтверждение удаления
     print(f"\n⚠️  ВНИМАНИЕ! Будет удалено {test_count + zero_coords_count} записей:")
