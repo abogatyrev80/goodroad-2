@@ -263,6 +263,7 @@ class EventDetector {
         critical: BASE_THRESHOLDS.magnitude.critical * totalMultiplier,
         high: BASE_THRESHOLDS.magnitude.high * totalMultiplier,
         medium: BASE_THRESHOLDS.magnitude.medium * totalMultiplier,
+        low: BASE_THRESHOLDS.magnitude.low * totalMultiplier,
       }
     };
   }
