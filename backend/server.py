@@ -348,6 +348,10 @@ async def upload_sensor_data(batch: SensorDataBatch):
                             "event_type": event_type,
                             "road_type": event_info.get("roadType", "unknown"),
                             "speed": event_info.get("speed", 0),
+                            # Сырые данные акселерометра для ML анализа и адаптации устройств
+                            "accelerometer_x": accel.get("x", 0),
+                            "accelerometer_y": accel.get("y", 0),
+                            "accelerometer_z": accel.get("z", 0),
                             "accelerometer_magnitude": accel.get("magnitude", 0),
                             "accelerometer_variance": accel.get("variance", 0),
                             "accelerometer_deltaX": accel.get("deltaX", 0),
