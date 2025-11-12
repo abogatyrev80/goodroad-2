@@ -1,3 +1,9 @@
+/**
+ * Good Road App - Новая архитектура
+ * 
+ * Избыточный сбор данных + серверная классификация
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -6,9 +12,6 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
-  Switch,
-  Alert,
-  Vibration,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -17,980 +20,415 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
-import { useAudioPlayer } from 'expo-audio';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import * as Network from 'expo-network';
 
-// Импортируем типы из настроек (без offline зависимостей)
-import { AppSettings, SoundOption } from './settings';
-
-// Импортируем Event Detector для умной детекции событий
-import EventDetector, { DetectedEvent, CalibrationProfile, RoadType } from '../services/EventDetector';
-
-// Импортируем BatchOfflineManager для батчинга и offline поддержки
-import { batchOfflineManager, BatchStats } from '../services/BatchOfflineManager';
-
-// IMPORTANT: Conditional imports for web compatibility
-// On web, we skip SQLite-dependent services to avoid WASM loading errors
-let syncService: any = null;
-if (Platform.OS !== 'web') {
-  // Only import sync service on mobile platforms
-  try {
-    const SyncModule = require('../services/SyncService');
-    syncService = SyncModule.syncService;
-  } catch (error) {
-    console.warn('⚠️ Sync service not available:', error);
-  }
-}
-
-// Типы препятствий и предупреждений
-export interface RoadHazard {
-  id: string;
-  type: 'pothole' | 'speed_bump' | 'road_defect' | 'pedestrian_crossing' | 'railway_crossing' | 'construction' | 'unpaved_road';
-  latitude: number;
-  longitude: number;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  distance?: number;
-}
-
-export interface WarningState {
-  hazard: RoadHazard;
-  distanceToHazard: number;
-  timeToHazard: number;
-  currentSpeed: number;
-  warningLevel: 'initial' | 'caution' | 'urgent' | 'critical';
-  hasUserReacted: boolean;
-  initialSpeed: number;
-  lastWarningTime: number;
-}
-
-const HAZARD_NAMES: Record<string, string> = {
-  pothole: 'яма',
-  speed_bump: 'лежачий полицейский', 
-  road_defect: 'дефект покрытия',
-  pedestrian_crossing: 'пешеходный переход',
-  railway_crossing: 'железнодорожный переезд',
-  construction: 'дорожные работы',
-  unpaved_road: 'грунтовая дорога'
-};
+// Новые сервисы
+import RawDataCollector, { Warning } from '../services/RawDataCollector';
+import WarningAlert from '../components/WarningAlert';
 
 export default function GoodRoadApp() {
   // Состояние приложения
   const [isTracking, setIsTracking] = useState(false);
-  const [roadConditionScore, setRoadConditionScore] = useState<number>(75);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [gpsAccuracy, setGpsAccuracy] = useState(0);
+  const [accelerometerData, setAccelerometerData] = useState({ x: 0, y: 0, z: 0 });
+  const [isOnline, setIsOnline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Настройки звука
-  const [appSettings, setAppSettings] = useState<Partial<AppSettings>>({});
-  
-  // GPS и локация данные
-  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
-  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
-  const [gpsAccuracy, setGpsAccuracy] = useState<number>(0);
-  const [satelliteCount, setSatelliteCount] = useState<number>(0);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  
-  // Акселерометр
-  const [accelerometerData, setAccelerometerData] = useState({ x: 0, y: 0, z: 0 });
-  
-  // EventDetector - умная детекция событий
-  const [eventDetector, setEventDetector] = useState<EventDetector | null>(null);
-  const [detectedEvents, setDetectedEvents] = useState<DetectedEvent[]>([]); // Буфер событий
-  const [lastEvent, setLastEvent] = useState<DetectedEvent | null>(null); // Последнее событие
-  const [eventCount, setEventCount] = useState(0); // Счётчик событий
-  const [currentRoadType, setCurrentRoadType] = useState<string>('unknown'); // Тип дороги
-  
-  // BatchOfflineManager - батчинг и offline хранилище
-  const [batchStats, setBatchStats] = useState<BatchStats>({
-    totalEvents: 0,
-    pendingEvents: 0,
-    offlineQueueSize: 0,
-    successfulSends: 0,
-    failedSends: 0,
-    lastSyncTime: null,
-  });
-  
-  // Умная система предупреждений
-  const [activeWarnings, setActiveWarnings] = useState<WarningState[]>([]);
-  const [nearbyHazards, setNearbyHazards] = useState<RoadHazard[]>([]);
-  const [speedHistory, setSpeedHistory] = useState<number[]>([]);
-  const [lastHazardCheck, setLastHazardCheck] = useState<number>(0);
-  
-  // Направление к ближайшему препятствию
-  const [warningDirection, setWarningDirection] = useState<number>(0);
+  // Статистика
+  const [dataPointsCollected, setDataPointsCollected] = useState(0);
+  const [warnings, setWarnings] = useState<Warning[]>([]);
   
   // Refs для управления ресурсами
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const accelerometerSubscription = useRef<any>(null);
-  const warningIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const periodicDataTimerRef = useRef<NodeJS.Timeout | null>(null); // Таймер для периодической отправки сырых данных
+  const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
+  const rawDataCollector = useRef<RawDataCollector | null>(null);
   
-  // Audio player будет инициализирован позже при необходимости
-
+  // Backend URL
+  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
+                     Constants.expoConfig?.extra?.backendUrl ||
+                     'https://potholefinder.preview.emergentagent.com';
+  
+  // Device ID
+  const deviceId = `mobile-app-${Date.now()}`;
+  
+  // Проверка сети
   useEffect(() => {
-    setupAudio();
-    requestLocationPermission();
-    loadAppSettings();
-    initializeEventDetector();
-    initializeBatchManager();
-    
-    return () => {
-      cleanup();
+    const checkNetwork = async () => {
+      try {
+        const networkState = await Network.getNetworkStateAsync();
+        setIsOnline(networkState.isConnected || false);
+      } catch (error) {
+        console.error('Network check error:', error);
+      }
     };
+    
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 5000);
+    return () => clearInterval(interval);
   }, []);
-
-  const initializeBatchManager = () => {
-    try {
-      // Настроить callback для обновления статистики в UI
-      batchOfflineManager.setStatsCallback((stats) => {
-        setBatchStats(stats);
-        console.log('📊 Batch stats updated:', stats);
-      });
-      
-      // Получить начальную статистику
-      setBatchStats(batchOfflineManager.getStats());
-      
-      console.log('✅ BatchOfflineManager инициализирован');
-    } catch (error) {
-      console.error('❌ Ошибка инициализации BatchOfflineManager:', error);
-    }
-  };
-
-  const initializeEventDetector = () => {
-    try {
-      // Создаём EventDetector с базовой калибровкой
-      // TODO: загружать калибровку из AsyncStorage
-      const detector = new EventDetector({
-        vehicleType: 'sedan', // По умолчанию легковой
-        baseline: { x: 0, y: 0, z: 9.81, timestamp: Date.now() },
-        thresholdMultiplier: 1.0,
-      });
-      setEventDetector(detector);
-      console.log('✅ EventDetector инициализирован');
-    } catch (error) {
-      console.error('❌ Ошибка инициализации EventDetector:', error);
-    }
-  };
-
-  const loadAppSettings = async () => {
-    try {
-      const stored = await AsyncStorage.getItem('good_road_settings');
-      if (stored) {
-        const settings = JSON.parse(stored) as AppSettings;
-        setAppSettings(settings);
-        setAudioEnabled(settings.audioWarnings);
-        setVibrationEnabled(settings.vibrationWarnings);
-      }
-    } catch (error) {
-      console.error('Error loading app settings:', error);
-    }
-  };
-
-  const setupAudio = async () => {
-    try {
-      // expo-audio автоматически настраивает режим аудио
-      console.log('🔊 Audio system initialized');
-    } catch (error) {
-      console.error('Audio setup error:', error);
-    }
-  };
-
-  const cleanup = async () => {
-    if (locationSubscription.current) {
-      locationSubscription.current.remove();
-    }
-    if (accelerometerSubscription.current) {
-      accelerometerSubscription.current.remove();
-    }
-    // expo-audio автоматически управляет ресурсами
-    if (warningIntervalRef.current) {
-      clearInterval(warningIntervalRef.current);
-    }
-    if (periodicDataTimerRef.current) {
-      clearInterval(periodicDataTimerRef.current);
-    }
-  };
-
-  // МОДЕРНИЗАЦИЯ: Event-driven накопление данных через BatchOfflineManager
-  // Больше НЕ используем периодическую отправку каждые 10 секунд
-  // Теперь отправка происходит только при обнаружении событий EventDetector'ом
+  
+  // Инициализация RawDataCollector
   useEffect(() => {
-    console.log('🔍 Event-driven режим активен. Данные отправляются только при обнаружении событий.');
-    
-    if (!isTracking || Platform.OS === 'web') {
-      console.log('⏸️ Отправка данных приостановлена. isTracking:', isTracking, 'Platform:', Platform.OS);
-      return;
-    }
-
-    console.log('✅ Event-driven сбор данных активирован!');
-    console.log('📊 Batch статистика:', batchStats);
-    
-    // В этом режиме отправка происходит автоматически через BatchOfflineManager
-    // когда EventDetector обнаруживает события (см. обработчик accelerometer ниже)
-    
-  }, [isTracking, batchStats]);
-
-  // 🆕 ПЕРИОДИЧЕСКАЯ ОТПРАВКА СЫРЫХ ДАННЫХ для адаптации устройств
-  // Отправляем "normal" события каждые 30 секунд, даже если EventDetector не обнаружил событий
-  // Это позволяет собирать базовые GPS-треки и сырые данные акселерометра для ML анализа
-  useEffect(() => {
-    if (!isTracking || Platform.OS === 'web') {
-      // Очистить таймер при остановке отслеживания
-      if (periodicDataTimerRef.current) {
-        clearInterval(periodicDataTimerRef.current);
-        periodicDataTimerRef.current = null;
-      }
-      return;
-    }
-
-    console.log('🕐 Запуск периодической отправки сырых данных (каждые 30 секунд)');
-    
-    // Создаём таймер для периодической отправки
-    periodicDataTimerRef.current = setInterval(() => {
-      if (!isTracking || !currentLocation) {
-        console.log('⏸️ Пропуск периодической отправки: отслеживание остановлено или нет GPS');
-        return;
-      }
-
-      // Создаём синтетическое "normal" событие с текущими сырыми данными
-      const normalEvent: DetectedEvent = {
-        eventType: 'normal',
-        severity: 5,
-        timestamp: Date.now(),
-        accelerometer: {
-          x: accelerometerData.x,
-          y: accelerometerData.y,
-          z: accelerometerData.z,
-          magnitude: Math.sqrt(
-            accelerometerData.x ** 2 + 
-            accelerometerData.y ** 2 + 
-            accelerometerData.z ** 2
-          ),
-          deltaY: 0, // Для normal событий дельта не вычисляется
-          deltaZ: 0,
-          deltaX: 0,
-          variance: 0,
-        },
-        roadType: (eventDetector?.getRoadType() || 'unknown') as RoadType,
-        speed: currentSpeed,
-        shouldNotifyUser: false,
-        shouldSendImmediately: false,
-      };
-
-      console.log(`📡 Периодическая отправка сырых данных: GPS (${currentLocation.coords.latitude.toFixed(6)}, ${currentLocation.coords.longitude.toFixed(6)}), Speed: ${currentSpeed.toFixed(1)} km/h, Accel: (${accelerometerData.x.toFixed(2)}, ${accelerometerData.y.toFixed(2)}, ${accelerometerData.z.toFixed(2)})`);
-      
-      // Отправляем через BatchOfflineManager
-      batchOfflineManager.addEvent(
-        normalEvent,
-        currentLocation,
-        currentSpeed,
-        gpsAccuracy
+    if (!rawDataCollector.current) {
+      rawDataCollector.current = new RawDataCollector(
+        deviceId,
+        backendUrl,
+        handleWarningsReceived
       );
-      
-    }, 30000); // 30 секунд
-
-    // Cleanup при размонтировании или изменении зависимостей
-    return () => {
-      if (periodicDataTimerRef.current) {
-        clearInterval(periodicDataTimerRef.current);
-        periodicDataTimerRef.current = null;
-      }
-    };
-  }, [isTracking, currentLocation, currentSpeed, gpsAccuracy, accelerometerData, eventDetector]);
-
-  // Функции для системы предупреждений
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371000; // Радиус Земли в метрах
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+    }
+  }, []);
+  
+  // Обработка предупреждений от сервера
+  const handleWarningsReceived = (newWarnings: Warning[]) => {
+    console.log(`⚠️  Получены предупреждения: ${newWarnings.length}`);
+    setWarnings(prev => [...prev, ...newWarnings]);
   };
-
-  const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
+  
+  // Отклонение предупреждения
+  const handleDismissWarning = async (warningId: string) => {
+    setWarnings(prev => prev.filter(w => w.id !== warningId));
     
-    const y = Math.sin(dLon) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
-              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-    
-    const bearing = Math.atan2(y, x) * 180 / Math.PI;
-    return (bearing + 360) % 360; // Нормализуем к 0-360 градусов
+    if (rawDataCollector.current) {
+      await rawDataCollector.current.dismissWarning(warningId);
+    }
   };
-
-  const requestLocationPermission = async () => {
+  
+  // Запрос разрешений
+  const requestPermissions = async () => {
     try {
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       
-      if (foregroundStatus !== 'granted') {
-        setLocationError('Разрешение на геолокацию отклонено');
-        Alert.alert(
-          'Разрешение на геолокацию',
-          'Для работы приложения необходимо разрешение на определение местоположения',
-          [{ text: 'OK' }]
-        );
-        return;
+      if (status !== 'granted') {
+        alert('Для работы приложения необходим доступ к геолокации');
+        return false;
       }
-
-      console.log('✅ Location permissions granted');
-      setLocationError(null);
       
+      console.log('✅ Location permissions granted');
+      return true;
     } catch (error) {
       console.error('Permission request error:', error);
-      setLocationError('Ошибка запроса разрешений');
+      return false;
     }
   };
-
+  
+  // Старт отслеживания
   const startTracking = async () => {
-    if (locationError) {
-      Alert.alert('Ошибка', 'Сначала необходимо предоставить разрешение на геолокацию');
+    if (Platform.OS === 'web') {
+      alert('Мобильные сенсоры недоступны в веб-версии');
       return;
     }
-
+    
     setIsLoading(true);
     
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) {
+      setIsLoading(false);
+      return;
+    }
+    
     try {
-      // Проверяем доступность GPS
-      const isLocationEnabled = await Location.hasServicesEnabledAsync();
-      if (!isLocationEnabled) {
-        Alert.alert('GPS отключен', 'Включите GPS для работы приложения');
-        setIsLoading(false);
-        return;
-      }
-
-      // Запускаем отслеживание геолокации
+      // Подписка на GPS
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000, // Обновления каждую секунду
-          distanceInterval: 1, // Обновления каждый метр
+          timeInterval: 1000,
+          distanceInterval: 1,
         },
         (location) => {
-          updateLocationData(location);
+          setCurrentLocation(location);
+          setCurrentSpeed(location.coords.speed ? location.coords.speed * 3.6 : 0);
+          setGpsAccuracy(location.coords.accuracy || 0);
         }
       );
-
-      // Запускаем акселерометр (только на мобильных)
-      if (Platform.OS !== 'web') {
-        Accelerometer.setUpdateInterval(20); // 50Hz для точной детекции событий
-        accelerometerSubscription.current = Accelerometer.addListener(({ x, y, z }) => {
-          setAccelerometerData({ x, y, z });
-          
-          // Обработка через EventDetector
-          if (eventDetector && isTracking) {
-            const event = eventDetector.processAccelerometerData({
-              x,
-              y,
-              z,
-              timestamp: Date.now()
-            });
-            
-            if (event) {
-              // ✨ УЛУЧШЕНИЕ: Добавляем скорость в событие для ML анализа
-              event.speed = currentSpeed;
-              
-              console.log(`🎯 Событие обнаружено: ${event.eventType}, severity: ${event.severity}, speed: ${currentSpeed} km/h, variance: ${event.accelerometer.variance.toFixed(3)}`);
-              
-              // Добавить в буфер UI (максимум 10 событий)
-              setDetectedEvents(prev => [...prev, event].slice(-10));
-              setLastEvent(event);
-              setEventCount(prev => prev + 1);
-              
-              // Обновить тип дороги
-              const roadType = eventDetector.getRoadType();
-              setCurrentRoadType(roadType);
-              
-              // ✨ НОВОЕ: Отправляем событие в BatchOfflineManager для накопления
-              if (currentLocation) {
-                batchOfflineManager.addEvent(
-                  event,
-                  currentLocation,
-                  currentSpeed,
-                  gpsAccuracy
-                );
-                console.log(`📦 Событие добавлено в BatchOfflineManager (variance: ${event.accelerometer.variance.toFixed(3)})`);
-              }
-              
-              // Диалог для критичных событий
-              if (event.shouldNotifyUser && appSettings.audioWarnings !== false) {
-                Alert.alert(
-                  '⚠️ Препятствие!',
-                  `Обнаружено: ${event.eventType === 'pothole' ? 'Яма' : event.eventType === 'braking' ? 'Резкое торможение' : 'Неровность'}`,
-                  [{ text: 'OK' }]
-                );
-                
-                // Вибрация для критичных событий
-                if (vibrationEnabled) {
-                  Vibration.vibrate([0, 200, 100, 200]);
-                }
-              }
-            }
-          }
-        });
-        console.log('✅ Мониторинг запущен (Event-driven режим с BatchOfflineManager, 50Hz)');
-      }
-
+      
+      // Подписка на акселерометр
+      Accelerometer.setUpdateInterval(100); // 10 Hz
+      accelerometerSubscription.current = Accelerometer.addListener((data) => {
+        setAccelerometerData(data);
+      });
+      
+      // Запуск периодического сбора данных (каждые 2 секунды)
+      dataCollectionInterval.current = setInterval(() => {
+        if (currentLocation && rawDataCollector.current) {
+          rawDataCollector.current.addDataPoint(currentLocation, accelerometerData);
+          setDataPointsCollected(prev => prev + 1);
+        }
+      }, 2000);
+      
       setIsTracking(true);
+      console.log('✅ Отслеживание запущено');
       
     } catch (error) {
-      console.error('❌ Ошибка запуска:', error);
-      Alert.alert('Ошибка GPS', 'Не удалось запустить отслеживание GPS');
+      console.error('Error starting tracking:', error);
+      alert('Ошибка запуска отслеживания');
     } finally {
       setIsLoading(false);
     }
   };
-
-  const stopTracking = () => {
-    if (locationSubscription.current) {
-      locationSubscription.current.remove();
-      locationSubscription.current = null;
-    }
+  
+  // Остановка отслеживания
+  const stopTracking = async () => {
+    setIsLoading(true);
     
-    // Останавливаем акселерометр
-    if (accelerometerSubscription.current) {
-      accelerometerSubscription.current.remove();
-      accelerometerSubscription.current = null;
-    }
-    
-    setIsTracking(false);
-    setCurrentSpeed(0);
-  };
-
-  const updateLocationData = (location: Location.LocationObject) => {
-    setCurrentLocation(location);
-    
-    // Обновляем скорость (конвертируем м/с в км/ч)
-    const speedKmh = (location.coords.speed || 0) * 3.6;
-    setCurrentSpeed(speedKmh);
-    
-    // Обновляем точность GPS
-    setGpsAccuracy(location.coords.accuracy || 0);
-    
-    // Симулируем количество спутников на основе точности
-    const estimatedSatellites = Math.max(4, Math.min(12, Math.round(20 - (location.coords.accuracy || 50) / 5)));
-    setSatelliteCount(estimatedSatellites);
-    
-    // Обновляем направление к ближайшему препятствию
-    if (nearbyHazards.length > 0) {
-      const closestHazard = nearbyHazards[0];
-      const bearing = calculateBearing(
-        location.coords.latitude,
-        location.coords.longitude,
-        closestHazard.latitude,
-        closestHazard.longitude
-      );
-      setWarningDirection(bearing);
+    try {
+      // Принудительная отправка данных
+      if (rawDataCollector.current) {
+        await rawDataCollector.current.forceSend();
+      }
       
-      console.log(`🧭 Direction to hazard: ${bearing.toFixed(0)}° (${HAZARD_NAMES[closestHazard.type] || closestHazard.type})`);
+      // Остановка подписок
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
+      
+      if (accelerometerSubscription.current) {
+        accelerometerSubscription.current.remove();
+        accelerometerSubscription.current = null;
+      }
+      
+      if (dataCollectionInterval.current) {
+        clearInterval(dataCollectionInterval.current);
+        dataCollectionInterval.current = null;
+      }
+      
+      setIsTracking(false);
+      console.log('✅ Отслеживание остановлено');
+      
+    } catch (error) {
+      console.error('Error stopping tracking:', error);
+    } finally {
+      setIsLoading(false);
     }
-    
-    console.log(`📍 Location: ${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`);
-    console.log(`🚗 Speed: ${speedKmh.toFixed(1)} km/h`);
-    console.log(`📡 Accuracy: ±${(location.coords.accuracy || 0).toFixed(1)}m`);
   };
-
-  const handleTrackingToggle = () => {
-    if (isTracking) {
-      stopTracking();
-    } else {
-      startTracking();
-    }
-  };
-
-  const testWarning = async () => {
-    console.log('🚨 Testing warning system...');
-    
-    // Добавляем тестовое препятствие для демонстрации стрелки направления
-    const testHazard: RoadHazard = {
-      id: 'test_hazard',
-      type: 'pothole',
-      latitude: 55.7568, // Фиксированные координаты для веб-демо
-      longitude: 37.6186,
-      severity: 'high',
-      description: 'Тестовая яма для демонстрации',
-      distance: 150
+  
+  // Cleanup при размонтировании
+  useEffect(() => {
+    return () => {
+      if (isTracking) {
+        stopTracking();
+      }
     };
-    
-    if (nearbyHazards.length === 0) {
-      setNearbyHazards([testHazard]);
-      console.log('📍 Добавлено тестовое препятствие для демонстрации стрелки');
-      
-      // Устанавливаем направление (северо-восток, 45 градусов) для демо
-      setWarningDirection(45);
-      console.log('🧭 Direction set to 45° (northeast) for demo');
-    } else {
-      setNearbyHazards([]);
-      setWarningDirection(0);
-      console.log('🧹 Убрано тестовое препятствие');
-    }
-    
-    Alert.alert(
-      '🚨 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ',
-      nearbyHazards.length === 0 ? 
-        'Добавлено тестовое препятствие! Стрелка теперь красная и указывает направление (северо-восток).' :
-        'Убрано тестовое препятствие. Стрелка снова зеленая с галочкой.',
-      [{ text: 'OK' }]
-    );
-  };
-
-  // НОВОЕ: Сообщить об аварии (ручная отметка пользователем)
-  const reportAccident = () => {
+  }, []);
+  
+  // Кнопка сообщить об аварии
+  const reportAccident = async () => {
     if (!currentLocation) {
-      Alert.alert('Ошибка', 'GPS координаты недоступны');
+      alert('GPS данные недоступны');
       return;
     }
-
+    
     try {
-      // Создать событие аварии вручную
-      const accidentEvent: DetectedEvent = {
-        eventType: 'accident',
-        severity: 1, // Критичная важность
-        timestamp: Date.now(),
-        accelerometer: {
-          x: accelerometerData.x,
-          y: accelerometerData.y,
-          z: accelerometerData.z,
-          magnitude: 0, // Нет физического удара
-          deltaX: 0,
-          deltaY: 0,
-          deltaZ: 0,
-          variance: 0,
-        },
-        roadType: currentRoadType as RoadType || 'unknown',
-        speed: currentSpeed,
-        userReported: true, // ВАЖНО: Отмечаем как пользовательскую отметку
-        shouldNotifyUser: false,
-        shouldSendImmediately: true, // Отправить немедленно
-      };
-
-      // Добавить в BatchOfflineManager для отправки
-      batchOfflineManager.addEvent(
-        accidentEvent,
-        currentLocation,
-        currentSpeed,
-        gpsAccuracy
-      );
-
-      // Обновить счётчик событий
-      setEventCount(prev => prev + 1);
-      setLastEvent(accidentEvent);
-      setDetectedEvents(prev => [...prev, accidentEvent].slice(-10));
-
-      // Визуальная обратная связь
-      if (vibrationEnabled) {
-        Vibration.vibrate([0, 300, 100, 300, 100, 300]); // Тройная вибрация
-      }
-
-      Alert.alert(
-        '✅ Авария отмечена',
-        `Координаты: ${currentLocation.coords.latitude.toFixed(6)}, ${currentLocation.coords.longitude.toFixed(6)}\n\nДругие водители будут предупреждены об аварии в этом месте.`,
-        [{ text: 'OK' }]
-      );
-
-      console.log('🚨 Пользователь отметил аварию:', {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        speed: currentSpeed,
-        timestamp: new Date().toISOString(),
+      const response = await fetch(`${backendUrl}/api/sensor-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: deviceId,
+          sensorData: [{
+            type: 'event',
+            timestamp: Date.now(),
+            data: {
+              eventType: 'accident',
+              severity: 1,
+              roadType: 'unknown',
+              speed: currentSpeed,
+              location: {
+                latitude: currentLocation.coords.latitude,
+                longitude: currentLocation.coords.longitude,
+                speed: currentSpeed,
+                accuracy: gpsAccuracy,
+              },
+              accelerometer: {
+                x: accelerometerData.x,
+                y: accelerometerData.y,
+                z: accelerometerData.z,
+                magnitude: Math.sqrt(
+                  accelerometerData.x ** 2 + 
+                  accelerometerData.y ** 2 + 
+                  accelerometerData.z ** 2
+                ),
+              },
+              userReported: true,
+            }
+          }]
+        }),
       });
+      
+      if (response.ok) {
+        alert('✅ Авария зарегистрирована');
+      } else {
+        alert('❌ Ошибка отправки');
+      }
     } catch (error) {
-      console.error('❌ Ошибка при отметке аварии:', error);
-      Alert.alert('Ошибка', 'Не удалось отметить аварию');
+      console.error('Error reporting accident:', error);
+      alert('❌ Ошибка соединения');
     }
   };
-
-  const getRoadConditionColor = (score: number) => {
-    if (score >= 80) return '#4CAF50';
-    if (score >= 60) return '#FF9800';
-    if (score >= 40) return '#FF5722';
-    return '#F44336';
-  };
-
-  const getRoadConditionText = (score: number) => {
-    if (score >= 80) return 'Отличная дорога';
-    if (score >= 60) return 'Хорошая дорога';
-    if (score >= 40) return 'Удовлетворительная';
-    return 'Плохая дорога';
-  };
-
-  const getGPSStatusColor = () => {
-    if (!isTracking) return '#888';
-    if (gpsAccuracy <= 5) return '#4CAF50';
-    if (gpsAccuracy <= 15) return '#FF9800';
-    return '#F44336';
-  };
-
-  const getGPSStatusText = () => {
-    if (locationError) return 'Ошибка GPS';
-    if (!isTracking) return 'GPS выключен';
-    if (gpsAccuracy <= 5) return 'Отличный сигнал';
-    if (gpsAccuracy <= 15) return 'Хороший сигнал';
-    return 'Слабый сигнал';
-  };
-
+  
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <Ionicons name="car-sport" size={32} color="#4CAF50" />
-        <Text style={styles.title}>Good Road</Text>
-        <Pressable 
-          onPress={() => {
-            console.log('Navigating to settings from header...');
-            try {
-              router.push('/settings');
-            } catch (error) {
-              console.error('Header navigation error:', error);
-              if (Platform.OS === 'web') {
-                window.location.href = '/settings';
-              }
-            }
-          }}
-          style={styles.settingsButton}
-        >
-          <Ionicons name="settings" size={24} color="#ffffff" />
-        </Pressable>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Web Notice */}
-        {Platform.OS === 'web' && (
-          <View style={styles.webNotice}>
-            <Ionicons name="information-circle" size={20} color="#FF9800" />
-            <Text style={styles.webNoticeText}>
-              Веб-версия для демонстрации. Полный функционал доступен в мобильном приложении.
-            </Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoIcon}>🛣️</Text>
           </View>
-        )}
-        
-        {/* GPS Status Banner */}
-        <View style={[styles.statusBanner, { borderLeftColor: getGPSStatusColor() }]}>
-          <Ionicons name="radio" size={24} color={getGPSStatusColor()} />
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>GPS Статус: {getGPSStatusText()}</Text>
-            <Text style={styles.bannerText}>
-              {isTracking ? (
-                `📡 ${satelliteCount} спутников • Точность: ±${gpsAccuracy.toFixed(1)}м`
-              ) : (
-                'Нажмите "Начать мониторинг" для активации GPS'
-              )}
-            </Text>
+          <View>
+            <Text style={styles.headerTitle}>Good Road</Text>
+            <Text style={styles.headerSubtitle}>Новая архитектура</Text>
           </View>
         </View>
-
-        {/* Report Accident Button - TOP PRIORITY */}
-        <Pressable 
-          style={[styles.accidentButton, { 
-            backgroundColor: isTracking ? '#F44336' : '#666',
-            opacity: isTracking ? 1 : 0.5,
-          }]}
-          onPress={() => {
-            if (!isTracking) {
-              Alert.alert('⚠️ Мониторинг выключен', 'Включите мониторинг для отметки аварий');
-              return;
-            }
-            
-            if (!currentLocation) {
-              Alert.alert('⚠️ GPS недоступен', 'Ожидание GPS сигнала...');
-              return;
-            }
-
-            Alert.alert(
-              '🚨 Сообщить об аварии',
-              'Вы уверены, что хотите отметить аварию на этом месте? Другие водители увидят предупреждение.',
-              [
-                { text: 'Отмена', style: 'cancel' },
-                {
-                  text: 'Подтвердить',
-                  style: 'destructive',
-                  onPress: () => reportAccident(),
-                },
-              ]
-            );
-          }}
-          disabled={!isTracking}
-        >
-          <Ionicons name="warning" size={24} color="white" />
-          <Text style={styles.accidentButtonText}>
-            🚨 СООБЩИТЬ ОБ АВАРИИ
-          </Text>
-        </Pressable>
-
-        {/* Direction Indicator to Nearest Hazard */}
-        <View style={styles.conditionCard}>
-          <View style={styles.directionContainer}>
-            <View style={[styles.compassBackground, { 
-              backgroundColor: nearbyHazards.length > 0 ? '#FF5722' : '#4CAF50' 
-            }]}>
-              {nearbyHazards.length > 0 ? (
-                <View 
-                  style={[
-                    styles.directionArrowLarge,
-                    { 
-                      transform: [{ rotate: `${warningDirection}deg` }],
-                    }
-                  ]}
-                >
-                  <Ionicons name="arrow-up" size={32} color="white" />
-                </View>
-              ) : (
-                <Ionicons name="checkmark-circle" size={32} color="white" />
-              )}
-            </View>
-          </View>
-          <View style={styles.conditionInfo}>
-            <Text style={styles.conditionTitle}>Вектор направления</Text>
-            {nearbyHazards.length > 0 ? (
-              <View style={styles.hazardDetails}>
-                <Text style={[styles.conditionText, { color: '#FF5722' }]}>
-                  {HAZARD_NAMES[nearbyHazards[0]?.type] || 'Препятствие'}
-                </Text>
-                <Text style={styles.distanceText}>
-                  {nearbyHazards[0]?.distance < 1000 ? 
-                    `${Math.round(nearbyHazards[0]?.distance)}м` : 
-                    `${(nearbyHazards[0]?.distance/1000).toFixed(1)}км`}
-                </Text>
-                <Text style={styles.directionText}>
-                  {warningDirection.toFixed(0)}° от севера
-                </Text>
-              </View>
-            ) : (
-              <Text style={[styles.conditionText, { color: '#4CAF50' }]}>
-                Препятствий не обнаружено
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Tracking Control */}
-        <View style={styles.controlCard}>
-          <Pressable
-            style={[styles.trackingButton, { 
-              backgroundColor: isTracking ? '#F44336' : '#4CAF50',
-              opacity: isLoading ? 0.7 : 1 
-            }]}
-            onPress={handleTrackingToggle}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons 
-                name={isTracking ? "stop" : "play"} 
-                size={24} 
-                color="white" 
-              />
-            )}
-            <Text style={styles.buttonText}>
-              {isLoading ? 'Подключение к GPS...' : 
-               isTracking ? 'Остановить мониторинг' : 'Начать мониторинг'}
-            </Text>
+        
+        <View style={styles.headerRight}>
+          <Pressable onPress={() => router.push('/settings')} style={styles.iconButton}>
+            <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+          </Pressable>
+          <Pressable onPress={() => router.push('/admin-simple')} style={styles.iconButton}>
+            <Ionicons name="analytics-outline" size={24} color="#FFFFFF" />
           </Pressable>
         </View>
-
-        {/* Status Cards */}
-        <View style={styles.statusGrid}>
-          {/* GPS Card */}
-          <View style={styles.statusCard}>
-            <Ionicons name="location" size={24} color={getGPSStatusColor()} />
-            <Text style={styles.statusTitle}>GPS</Text>
-            <Text style={[styles.statusValue, { color: getGPSStatusColor() }]}>
-              {getGPSStatusText()}
-            </Text>
-            <Text style={styles.statusSubtitle}>
-              {isTracking ? `${satelliteCount} спутников` : 'Неактивен'}
-            </Text>
-          </View>
-
-          {/* Speed Card */}
-          <View style={styles.statusCard}>
-            <Ionicons name="speedometer" size={24} color="#2196F3" />
-            <Text style={styles.statusTitle}>Скорость</Text>
-            <Text style={[styles.statusValue, { 
-              color: currentSpeed > 0 ? '#4CAF50' : '#888',
-              fontSize: 18
-            }]}>
-              {currentSpeed.toFixed(1)} км/ч
-            </Text>
-            <Text style={styles.statusSubtitle}>
-              {currentSpeed > 0 ? 'В движении' : 'Стоим'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Event Statistics - NEW */}
-        <View style={styles.eventStatsCard}>
-          <Text style={styles.locationTitle}>📊 Статистика событий</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{eventCount}</Text>
-              <Text style={styles.statLabel}>Всего событий</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{batchStats.pendingEvents}</Text>
-              <Text style={styles.statLabel}>В batch</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{batchStats.offlineQueueSize}</Text>
-              <Text style={styles.statLabel}>Offline очередь</Text>
-            </View>
-          </View>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#4CAF50' }]}>{batchStats.successfulSends}</Text>
-              <Text style={styles.statLabel}>Успешно</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#F44336' }]}>{batchStats.failedSends}</Text>
-              <Text style={styles.statLabel}>Ошибок</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{currentRoadType}</Text>
-              <Text style={styles.statLabel}>Тип дороги</Text>
-            </View>
-          </View>
-          {batchStats.lastSyncTime && (
-            <Text style={styles.locationText}>
-              🕒 Последняя синхронизация: {new Date(batchStats.lastSyncTime).toLocaleTimeString('ru-RU')}
-            </Text>
-          )}
-        </View>
-
-        {/* Real-time Location Info */}
-        {currentLocation && (
-          <View style={styles.locationCard}>
-            <Text style={styles.locationTitle}>📍 Текущая позиция</Text>
-            <Text style={styles.locationText}>
-              Широта: {currentLocation.coords.latitude.toFixed(6)}°
-            </Text>
-            <Text style={styles.locationText}>
-              Долгота: {currentLocation.coords.longitude.toFixed(6)}°
-            </Text>
-            <Text style={styles.locationText}>
-              Высота: {(currentLocation.coords.altitude || 0).toFixed(1)} м
-            </Text>
-            <Text style={styles.locationText}>
-              Направление: {(currentLocation.coords.heading || 0).toFixed(0)}°
-            </Text>
+      </View>
+      
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        
+        {/* Предупреждения */}
+        {warnings.length > 0 && (
+          <View style={styles.warningsContainer}>
+            {warnings.map(warning => (
+              <WarningAlert
+                key={warning.id}
+                warning={warning}
+                onDismiss={handleDismissWarning}
+              />
+            ))}
           </View>
         )}
-
-        {/* Audio Settings */}
-        <View style={styles.quickSettingsCard}>
-          <Text style={styles.settingsTitle}>🔊 Звуковые настройки</Text>
-          
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Звуковые предупреждения</Text>
-            <Switch
-              value={audioEnabled}
-              onValueChange={setAudioEnabled}
-              thumbColor={audioEnabled ? '#4CAF50' : '#888'}
-              trackColor={{ false: '#333', true: '#4CAF5050' }}
-            />
+        
+        {/* Кнопка "Сообщить об аварии" */}
+        <Pressable
+          style={[styles.accidentButton, !currentLocation && styles.buttonDisabled]}
+          onPress={reportAccident}
+          disabled={!currentLocation}
+        >
+          <Ionicons name="warning" size={24} color="#FFFFFF" />
+          <Text style={styles.accidentButtonText}>Сообщить об аварии</Text>
+        </Pressable>
+        
+        {/* GPS Status */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="location" size={24} color="#4CAF50" />
+            <Text style={styles.cardTitle}>GPS Статус</Text>
           </View>
-
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Вибрация</Text>
-            <Switch
-              value={vibrationEnabled}
-              onValueChange={setVibrationEnabled}
-              thumbColor={vibrationEnabled ? '#4CAF50' : '#888'}
-              trackColor={{ false: '#333', true: '#4CAF5050' }}
-            />
+          
+          {currentLocation ? (
+            <View style={styles.cardContent}>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Координаты:</Text>
+                <Text style={styles.statValue}>
+                  {currentLocation.coords.latitude.toFixed(6)}, {currentLocation.coords.longitude.toFixed(6)}
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Скорость:</Text>
+                <Text style={styles.statValue}>{currentSpeed.toFixed(1)} км/ч</Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Точность:</Text>
+                <Text style={styles.statValue}>±{gpsAccuracy.toFixed(1)}м</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.noDataText}>Ожидание GPS сигнала...</Text>
+          )}
+        </View>
+        
+        {/* Акселерометр */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="speedometer" size={24} color="#2196F3" />
+            <Text style={styles.cardTitle}>Акселерометр</Text>
+          </View>
+          
+          <View style={styles.cardContent}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>X:</Text>
+              <Text style={styles.statValue}>{accelerometerData.x.toFixed(3)}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Y:</Text>
+              <Text style={styles.statValue}>{accelerometerData.y.toFixed(3)}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Z:</Text>
+              <Text style={styles.statValue}>{accelerometerData.z.toFixed(3)}</Text>
+            </View>
           </View>
         </View>
-
-        {/* Test Warning Button */}
-        <Pressable 
-          style={[styles.testButton, { 
-            backgroundColor: audioEnabled ? '#FF5722' : '#666' 
-          }]}
-          onPress={testWarning}
-        >
-          <Ionicons name="volume-high" size={20} color="white" />
-          <Text style={styles.testButtonText}>
-            🚨 ТЕСТОВОЕ ПРЕДУПРЕЖДЕНИЕ
-          </Text>
-        </Pressable>
-
-        {/* Force Sync Button - NEW */}
-        <Pressable 
-          style={[styles.testButton, { 
-            backgroundColor: isTracking ? '#2196F3' : '#666' 
-          }]}
-          onPress={async () => {
-            if (!isTracking) {
-              Alert.alert('Синхронизация', 'Включите мониторинг для синхронизации');
-              return;
-            }
-            
-            try {
-              await batchOfflineManager.forceSyncNow(currentLocation, currentSpeed, gpsAccuracy);
-              Alert.alert('✅ Синхронизация', 'Данные отправлены на сервер!');
-            } catch (error) {
-              Alert.alert('❌ Ошибка', 'Не удалось синхронизировать данные');
-            }
-          }}
-          disabled={!isTracking}
-        >
-          <Ionicons name="cloud-upload" size={20} color="white" />
-          <Text style={styles.testButtonText}>
-            🔄 ПРИНУДИТЕЛЬНАЯ СИНХРОНИЗАЦИЯ
-          </Text>
-        </Pressable>
-
-        {/* Navigation Buttons */}
-        <Pressable 
-          style={styles.settingsNavButton}
-          onPress={() => {
-            console.log('Navigating to settings...');
-            try {
-              router.push('/settings');
-            } catch (error) {
-              console.error('Navigation error:', error);
-              if (Platform.OS === 'web') {
-                window.location.href = '/settings';
-              }
-            }
-          }}
-        >
-          <Ionicons name="settings-outline" size={20} color="white" />
-          <Text style={styles.settingsNavText}>Подробные настройки предупреждений</Text>
-          <Ionicons name="chevron-forward" size={20} color="#888" />
-        </Pressable>
-
-        {/* Admin Panel Navigation */}
-        <Pressable 
-          style={[styles.settingsNavButton, { backgroundColor: '#FF9800' }]}
-          onPress={() => {
-            console.log('Navigating to admin panel...');
-            try {
-              router.push('/admin-simple');
-            } catch (error) {
-              console.error('Admin navigation error:', error);
-              if (Platform.OS === 'web') {
-                window.location.href = '/admin-simple';
-              }
-            }
-          }}
-        >
-          <Ionicons name="analytics" size={20} color="white" />
-          <Text style={styles.settingsNavText}>Административная панель</Text>
-          <Ionicons name="chevron-forward" size={20} color="white" />
-        </Pressable>
+        
+        {/* Статистика сбора данных */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="stats-chart" size={24} color="#FF9800" />
+            <Text style={styles.cardTitle}>Сбор данных</Text>
+          </View>
+          
+          <View style={styles.cardContent}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Собрано точек:</Text>
+              <Text style={styles.statValue}>{dataPointsCollected}</Text>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Сеть:</Text>
+              <View style={styles.networkStatus}>
+                <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
+                <Text style={styles.statValue}>{isOnline ? 'Online' : 'Offline'}</Text>
+              </View>
+            </View>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>Буфер:</Text>
+              <Text style={styles.statValue}>
+                {rawDataCollector.current?.getStats().bufferSize || 0} / 5
+              </Text>
+            </View>
+          </View>
+        </View>
+        
       </ScrollView>
+      
+      {/* Главная кнопка */}
+      <View style={styles.footer}>
+        <Pressable
+          style={[
+            styles.mainButton,
+            isTracking && styles.mainButtonActive,
+            isLoading && styles.buttonDisabled,
+          ]}
+          onPress={isTracking ? stopTracking : startTracking}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons
+                name={isTracking ? 'stop-circle' : 'play-circle'}
+                size={32}
+                color="#FFFFFF"
+              />
+              <Text style={styles.mainButtonText}>
+                {isTracking ? 'Остановить мониторинг' : 'Начать мониторинг'}
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -998,287 +436,174 @@ export default function GoodRoadApp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 12,
+    backgroundColor: '#1E1E1E',
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#333333',
   },
-  title: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2C2C2C',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoIcon: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    flex: 1,
-    textAlign: 'center',
   },
-  settingsButton: {
-    padding: 8,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#888888',
+    marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2C2C2C',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
-  webNotice: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
+  warningsContainer: {
     marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-  },
-  webNoticeText: {
-    color: '#FF9800',
-    fontSize: 14,
-    marginLeft: 8,
-    flex: 1,
-  },
-  statusBanner: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderLeftWidth: 4,
-  },
-  bannerContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  bannerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  bannerText: {
-    fontSize: 14,
-    color: '#888',
-  },
-  conditionCard: {
-    flexDirection: 'row',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  conditionIndicator: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  conditionScore: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  conditionInfo: {
-    flex: 1,
-  },
-  conditionTitle: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  conditionText: {
-    fontSize: 16,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  controlCard: {
-    marginBottom: 16,
-  },
-  trackingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusCard: {
-    flex: 0.48,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  statusTitle: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 8,
-  },
-  statusValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  statusSubtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
-  eventStatsCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
-  },
-  locationCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  locationTitle: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 4,
-  },
-  quickSettingsCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  settingsTitle: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  settingLabel: {
-    fontSize: 14,
-    color: '#ffffff',
-    flex: 1,
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  testButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  settingsNavButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  settingsNavText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-    flex: 1,
-    marginLeft: 8,
-  },
-  // Новые стили для стрелки направления
-  directionContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  compassBackground: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  directionArrowLarge: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hazardDetails: {
-    marginTop: 4,
-  },
-  distanceText: {
-    fontSize: 14,
-    color: '#FF9800',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  directionText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
   },
   accidentButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    borderRadius: 12,
+    gap: 12,
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#F44336',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   accidentButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  card: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  cardContent: {
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#AAAAAA',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  networkStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusOnline: {
+    backgroundColor: '#4CAF50',
+  },
+  statusOffline: {
+    backgroundColor: '#FF5252',
+  },
+  noDataText: {
+    color: '#888888',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  footer: {
+    padding: 16,
+    paddingBottom: 24,
+    backgroundColor: '#1E1E1E',
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+  },
+  mainButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  mainButtonActive: {
+    backgroundColor: '#FF5252',
+    shadowColor: '#FF5252',
+  },
+  mainButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
     fontWeight: '700',
-    marginLeft: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });
