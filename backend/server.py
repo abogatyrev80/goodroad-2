@@ -79,6 +79,47 @@ class LocationQuery(BaseModel):
     longitude: float
     radius: float = 1000  # meters
 
+# НОВЫЕ МОДЕЛИ ДЛЯ ИЗБЫТОЧНОГО СБОРА ДАННЫХ
+class RawSensorData(BaseModel):
+    """Сырые данные с устройства для серверного анализа"""
+    deviceId: str
+    timestamp: int  # Unix timestamp в миллисекундах
+    gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
+    accelerometer: Dict[str, float]  # {x, y, z}
+    
+class RawDataBatch(BaseModel):
+    """Батч сырых данных"""
+    deviceId: str
+    data: List[RawSensorData]
+
+class ProcessedEvent(BaseModel):
+    """Событие, классифицированное сервером"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deviceId: str
+    timestamp: datetime
+    eventType: str  # 'pothole', 'braking', 'bump', 'vibration', 'normal'
+    severity: int  # 1-5
+    confidence: float  # 0-1
+    latitude: float
+    longitude: float
+    speed: float
+    accelerometer_data: Dict[str, float]  # {x, y, z, magnitude, deltaY, deltaZ, variance}
+    roadType: str  # 'asphalt', 'gravel', 'dirt', 'unknown'
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserWarning(BaseModel):
+    """Предупреждение для пользователя"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deviceId: str
+    eventType: str
+    severity: int
+    latitude: float
+    longitude: float
+    distance: float  # Расстояние до события в метрах
+    message: str
+    expiresAt: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 
 # Helper Functions
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
