@@ -52,7 +52,9 @@
     },
     "updates": {
       "enabled": false,
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": null,
+      "checkAutomatically": "never"
     },
     "plugins": [
       "expo-router"
