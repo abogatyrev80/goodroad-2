@@ -2037,6 +2037,12 @@ async def admin_dashboard_v2(request: Request):
     """Serve the NEW admin dashboard v2 for new architecture"""
     return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
 
+# ВАЖНО: Также добавляем в api_router для доступа через /api/admin/dashboard/v2
+@api_router.get("/admin/dashboard/v2", response_class=HTMLResponse)
+async def admin_dashboard_v2_api(request: Request):
+    """Serve the NEW admin dashboard v2 through /api route (for deployment)"""
+    return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
+
 # Include the router in the main app
 app.include_router(api_router)
 
