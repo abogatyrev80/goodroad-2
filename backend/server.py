@@ -752,6 +752,143 @@ async def dismiss_warning(warning_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==============================================================================
+# НОВЫЕ ADMIN ENDPOINTS ДЛЯ НОВОЙ АРХИТЕКТУРЫ
+# ==============================================================================
+
+@api_router.get("/admin/v2/analytics")
+async def get_v2_analytics():
+    """
+    Новая аналитика для новой архитектуры
+    Работает с коллекциями: raw_sensor_data, processed_events, user_warnings
+    """
+    try:
+        # Подсчет сырых данных
+        raw_data_count = await db.raw_sensor_data.count_documents({})
+        
+        # Подсчет обработанных событий
+        processed_events_count = await db.processed_events.count_documents({})
+        
+        # Подсчет предупреждений
+        warnings_count = await db.user_warnings.count_documents({})
+        
+        # Статистика по типам событий
+        event_pipeline = [
+            {"$group": {
+                "_id": "$eventType",
+                "count": {"$sum": 1},
+                "avg_severity": {"$avg": "$severity"},
+                "avg_confidence": {"$avg": "$confidence"}
+            }}
+        ]
+        event_stats = await db.processed_events.aggregate(event_pipeline).to_list(100)
+        
+        # Статистика по устройствам
+        device_pipeline = [
+            {"$group": {
+                "_id": "$deviceId",
+                "raw_points": {"$sum": 1}
+            }},
+            {"$limit": 10}
+        ]
+        device_stats = await db.raw_sensor_data.aggregate(device_pipeline).to_list(10)
+        
+        # Последние события
+        recent_events = await db.processed_events.find(
+            {},
+            {"_id": 0}
+        ).sort("timestamp", -1).limit(10).to_list(10)
+        
+        return {
+            "summary": {
+                "raw_data_points": raw_data_count,
+                "processed_events": processed_events_count,
+                "active_warnings": warnings_count
+            },
+            "event_statistics": event_stats,
+            "top_devices": device_stats,
+            "recent_events": recent_events
+        }
+    except Exception as e:
+        logging.error(f"Error in v2 analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving v2 analytics: {str(e)}")
+
+@api_router.get("/admin/v2/raw-data")
+async def get_raw_data(limit: int = 100, skip: int = 0):
+    """Получить сырые данные из коллекции raw_sensor_data"""
+    try:
+        total = await db.raw_sensor_data.count_documents({})
+        
+        data = await db.raw_sensor_data.find(
+            {},
+            {"_id": 0}
+        ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
+        
+        return {
+            "total": total,
+            "limit": limit,
+            "skip": skip,
+            "returned": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving raw data: {str(e)}")
+
+@api_router.get("/admin/v2/events")
+async def get_processed_events(
+    limit: int = 100,
+    skip: int = 0,
+    event_type: str = None
+):
+    """Получить обработанные события из коллекции processed_events"""
+    try:
+        query = {}
+        if event_type:
+            query["eventType"] = event_type
+        
+        total = await db.processed_events.count_documents(query)
+        
+        events = await db.processed_events.find(
+            query,
+            {"_id": 0}
+        ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
+        
+        return {
+            "total": total,
+            "limit": limit,
+            "skip": skip,
+            "returned": len(events),
+            "events": events
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving events: {str(e)}")
+
+@api_router.get("/admin/v2/heatmap")
+async def get_heatmap_data():
+    """Получить данные для heatmap из processed_events"""
+    try:
+        events = await db.processed_events.find(
+            {"latitude": {"$ne": None}, "longitude": {"$ne": None}},
+            {"_id": 0, "latitude": 1, "longitude": 1, "eventType": 1, "severity": 1}
+        ).to_list(5000)
+        
+        # Форматируем для heatmap
+        heatmap_data = []
+        for event in events:
+            heatmap_data.append({
+                "lat": event.get("latitude"),
+                "lng": event.get("longitude"),
+                "intensity": (6 - event.get("severity", 5)) / 5,  # Инвертируем severity для intensity
+                "type": event.get("eventType", "unknown")
+            })
+        
+        return {
+            "points": heatmap_data,
+            "total": len(heatmap_data)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving heatmap data: {str(e)}")
+
 @api_router.get("/road-conditions")
 async def get_road_conditions(
     latitude: float,
