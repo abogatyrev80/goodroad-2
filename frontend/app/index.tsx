@@ -232,45 +232,47 @@ export default function GoodRoadApp() {
     }
     
     try {
-      const response = await fetch(`${backendUrl}/api/sensor-data`, {
+      // Отправляем через новый endpoint /api/raw-data с меткой userReported
+      const accidentData = {
+        deviceId: deviceId,
+        data: [{
+          deviceId: deviceId,
+          timestamp: Date.now(),
+          gps: {
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+            speed: currentSpeed,
+            accuracy: gpsAccuracy,
+            altitude: currentLocation.coords.altitude,
+          },
+          accelerometer: {
+            x: accelerometerData.x,
+            y: accelerometerData.y,
+            z: accelerometerData.z,
+          },
+          // Специальная метка для аварии
+          userReported: true,
+          eventType: 'accident',
+          severity: 1,
+        }]
+      };
+      
+      console.log('📢 Отправка сообщения об аварии...');
+      
+      const response = await fetch(`${backendUrl}/api/raw-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId: deviceId,
-          sensorData: [{
-            type: 'event',
-            timestamp: Date.now(),
-            data: {
-              eventType: 'accident',
-              severity: 1,
-              roadType: 'unknown',
-              speed: currentSpeed,
-              location: {
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                speed: currentSpeed,
-                accuracy: gpsAccuracy,
-              },
-              accelerometer: {
-                x: accelerometerData.x,
-                y: accelerometerData.y,
-                z: accelerometerData.z,
-                magnitude: Math.sqrt(
-                  accelerometerData.x ** 2 + 
-                  accelerometerData.y ** 2 + 
-                  accelerometerData.z ** 2
-                ),
-              },
-              userReported: true,
-            }
-          }]
-        }),
+        body: JSON.stringify(accidentData),
       });
       
       if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Авария зарегистрирована:', result);
         alert('✅ Авария зарегистрирована');
       } else {
-        alert('❌ Ошибка отправки');
+        const errorText = await response.text();
+        console.error('❌ Ошибка отправки:', response.status, errorText);
+        alert(`❌ Ошибка отправки: ${response.status}`);
       }
     } catch (error) {
       console.error('Error reporting accident:', error);
