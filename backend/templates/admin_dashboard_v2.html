@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road Admin v2</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #1e293b;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #60a5fa;
+        }
+
+        .header .subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #60a5fa;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: #1e293b;
+            border-left: 2px solid #334155;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .filter-group {
+            margin-bottom: 1rem;
+        }
+
+        .filter-group label {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .filter-group label:hover {
+            background: #334155;
+        }
+
+        .filter-group input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .event-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            background: #334155;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .event-type {
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 0.25rem;
+        }
+
+        .event-details {
+            color: #94a3b8;
+            font-size: 0.75rem;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .severity-1 { background: #dc2626; color: white; }
+        .severity-2 { background: #ea580c; color: white; }
+        .severity-3 { background: #f59e0b; color: white; }
+        .severity-4 { background: #84cc16; color: white; }
+        .severity-5 { background: #22c55e; color: white; }
+
+        /* Leaflet marker colors */
+        .marker-pothole { background-color: #dc2626; }
+        .marker-braking { background-color: #ea580c; }
+        .marker-bump { background-color: #f59e0b; }
+        .marker-vibration { background-color: #a855f7; }
+        .marker-accident { background-color: #ff0000; }
+        .marker-normal { background-color: #22c55e; }
+
+        .refresh-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .refresh-btn:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🛣️ Good Road Admin v2</h1>
+            <div class="subtitle">Новая архитектура - ML классификация</div>
+        </div>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="raw-count">0</div>
+                <div class="stat-label">Сырых данных</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="event-count">0</div>
+                <div class="stat-label">Событий</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="warning-count">0</div>
+                <div class="stat-label">Предупреждений</div>
+            </div>
+            <button class="refresh-btn" onclick="loadData()">🔄 Обновить</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <div class="section">
+                <div class="section-title">Фильтры</div>
+                <div class="filter-group">
+                    <label>
+                        <input type="checkbox" id="filter-pothole" checked onchange="filterEvents()">
+                        <span>🕳️ Ямы</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-braking" checked onchange="filterEvents()">
+                        <span>🚨 Торможения</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-bump" checked onchange="filterEvents()">
+                        <span>⚠️ Неровности</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-vibration" checked onchange="filterEvents()">
+                        <span>〰️ Вибрации</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-accident" checked onchange="filterEvents()">
+                        <span>🚨 Аварии</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-normal" checked onchange="filterEvents()">
+                        <span>✅ Нормальные</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Последние события</div>
+                <div class="event-list" id="event-list">
+                    <!-- События загружаются динамически -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let allEvents = [];
+
+        // Инициализация карты
+        function initMap() {
+            map = L.map('map').setView([55.7558, 37.6173], 12);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Получить цвет маркера по типу события
+        function getMarkerColor(eventType) {
+            const colors = {
+                'pothole': '#dc2626',
+                'braking': '#ea580c',
+                'bump': '#f59e0b',
+                'vibration': '#a855f7',
+                'accident': '#ff0000',
+                'normal': '#22c55e'
+            };
+            return colors[eventType] || '#94a3b8';
+        }
+
+        // Получить иконку по типу события
+        function getEventIcon(eventType) {
+            const icons = {
+                'pothole': '🕳️',
+                'braking': '🚨',
+                'bump': '⚠️',
+                'vibration': '〰️',
+                'accident': '🚨',
+                'normal': '✅'
+            };
+            return icons[eventType] || '📍';
+        }
+
+        // Загрузить данные
+        async function loadData() {
+            try {
+                // Загрузка аналитики
+                const analyticsRes = await fetch('/api/admin/v2/analytics');
+                const analytics = await analyticsRes.json();
+
+                document.getElementById('raw-count').textContent = analytics.summary.raw_data_points || 0;
+                document.getElementById('event-count').textContent = analytics.summary.processed_events || 0;
+                document.getElementById('warning-count').textContent = analytics.summary.active_warnings || 0;
+
+                // Загрузка событий
+                const eventsRes = await fetch('/api/admin/v2/events?limit=500');
+                const eventsData = await eventsRes.json();
+                allEvents = eventsData.events || [];
+
+                // Отображение событий
+                displayEvents();
+                displayMarkers();
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Ошибка загрузки данных: ' + error.message);
+            }
+        }
+
+        // Отобразить маркеры на карте
+        function displayMarkers() {
+            // Очистить существующие маркеры
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            // Фильтровать события
+            const filteredEvents = allEvents.filter(event => {
+                const checkbox = document.getElementById(`filter-${event.eventType}`);
+                return checkbox ? checkbox.checked : true;
+            });
+
+            // Добавить новые маркеры
+            filteredEvents.forEach(event => {
+                if (event.latitude && event.longitude) {
+                    const color = getMarkerColor(event.eventType);
+                    const icon = getEventIcon(event.eventType);
+                    
+                    const marker = L.circleMarker([event.latitude, event.longitude], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+
+                    const timestamp = new Date(event.timestamp).toLocaleString('ru-RU');
+                    
+                    marker.bindPopup(`
+                        <div style="color: #1e293b;">
+                            <h3>${icon} ${event.eventType}</h3>
+                            <p><strong>Severity:</strong> ${event.severity}</p>
+                            <p><strong>Confidence:</strong> ${(event.confidence * 100).toFixed(0)}%</p>
+                            <p><strong>Speed:</strong> ${event.speed?.toFixed(1) || 0} км/ч</p>
+                            <p><strong>Time:</strong> ${timestamp}</p>
+                            <p><strong>GPS:</strong> ${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}</p>
+                        </div>
+                    `);
+
+                    markers.push(marker);
+                }
+            });
+
+            // Центрировать карту на маркерах
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Отобразить список событий
+        function displayEvents() {
+            const eventList = document.getElementById('event-list');
+            
+            const filteredEvents = allEvents.filter(event => {
+                const checkbox = document.getElementById(`filter-${event.eventType}`);
+                return checkbox ? checkbox.checked : true;
+            }).slice(0, 20);
+
+            eventList.innerHTML = filteredEvents.map(event => {
+                const timestamp = new Date(event.timestamp).toLocaleString('ru-RU');
+                const icon = getEventIcon(event.eventType);
+                
+                return `
+                    <div class="event-item">
+                        <div class="event-type">
+                            ${icon} ${event.eventType}
+                            <span class="severity-badge severity-${event.severity}">S${event.severity}</span>
+                        </div>
+                        <div class="event-details">
+                            <div>Уверенность: ${(event.confidence * 100).toFixed(0)}%</div>
+                            <div>Скорость: ${event.speed?.toFixed(1) || 0} км/ч</div>
+                            <div>${timestamp}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Фильтровать события
+        function filterEvents() {
+            displayEvents();
+            displayMarkers();
+        }
+
+        // Инициализация
+        initMap();
+        loadData();
+
+        // Автообновление каждые 30 секунд
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
