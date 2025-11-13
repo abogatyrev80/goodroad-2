@@ -1,0 +1,76 @@
+# Environment Variables для Production Deployment
+# Скопируйте эти переменные в Deployment Settings → Environment Variables
+
+# ============================================
+# BACKEND VARIABLES (КРИТИЧНО!)
+# ============================================
+
+# MongoDB Connection String
+# ВАЖНО: Замените username, password и cluster на ваши реальные данные из MongoDB Atlas
+MONGO_URL=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
+
+# Имя базы данных для production
+DB_NAME=good_road_production
+
+# ============================================
+# FRONTEND VARIABLES
+# ============================================
+
+# Backend URL - будет установлен автоматически после deployment
+# Замените на ваш реальный deployment URL
+EXPO_PUBLIC_BACKEND_URL=https://roadqual-track.emergent.host
+
+# ============================================
+# ПЕРЕМЕННЫЕ ДЛЯ УДАЛЕНИЯ
+# ============================================
+
+# Удалите эти переменные если они есть в Deployment:
+# - REACT_APP_BACKEND_URL (не используется в новой архитектуре)
+# - DB_NAME=roadqual-track-test_database (старое значение)
+
+# ============================================
+# КАК ПОЛУЧИТЬ MONGO_URL:
+# ============================================
+
+# 1. Зайдите на https://www.mongodb.com/cloud/atlas/register
+# 2. Создайте аккаунт (бесплатно)
+# 3. Создайте новый кластер (выберите Free tier M0)
+# 4. Подождите ~5 минут пока кластер создается
+# 5. Настройте Network Access:
+#    - Зайдите в Network Access
+#    - Add IP Address
+#    - Выберите "Allow access from anywhere" (0.0.0.0/0)
+#    - Confirm
+# 6. Создайте Database User:
+#    - Зайдите в Database Access
+#    - Add New Database User
+#    - Username: goodroad_user
+#    - Password: (создайте сложный пароль, сохраните его!)
+#    - Database User Privileges: Read and write to any database
+#    - Add User
+# 7. Получите Connection String:
+#    - Зайдите в Clusters → Connect
+#    - Choose "Connect your application"
+#    - Driver: Python, Version: 3.12 or later
+#    - Скопируйте connection string
+#    - Замените <password> на ваш реальный пароль
+#    - Пример: mongodb+srv://goodroad_user:MyP@ssw0rd@cluster0.abc123.mongodb.net/?retryWrites=true&w=majority
+
+# ============================================
+# АЛЬТЕРНАТИВА: Railway.app
+# ============================================
+
+# Если не хотите использовать MongoDB Atlas, можете использовать Railway.app:
+# 1. Зайдите на https://railway.app/
+# 2. Создайте аккаунт через GitHub
+# 3. New Project → Deploy MongoDB
+# 4. Получите connection string из Variables
+# 5. Стоимость: $5/месяц
+
+# ============================================
+# АЛЬТЕРНАТИВА: Своя MongoDB
+# ============================================
+
+# Если у вас есть свой VPS/VDS с MongoDB:
+# MONGO_URL=mongodb://username:password@your-server-ip:27017/good_road_production
+# DB_NAME=good_road_production
