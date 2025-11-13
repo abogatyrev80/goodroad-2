@@ -595,14 +595,39 @@ async def process_raw_data(batch: RawDataBatch):
             }
             raw_documents.append(raw_doc)
             
-            # Классифицируем событие через ML процессор
-            event = event_classifier.analyze_data_point(
-                device_id=device_id,
-                accel_x=accel.get("x", 0),
-                accel_y=accel.get("y", 0),
-                accel_z=accel.get("z", 0),
-                speed=gps.get("speed", 0)
-            )
+            # Проверяем является ли это пользовательским сообщением об аварии
+            is_user_reported = getattr(data_point, 'userReported', False)
+            manual_event_type = getattr(data_point, 'eventType', None)
+            manual_severity = getattr(data_point, 'severity', None)
+            
+            # Если пользователь вручную сообщил об аварии - используем его данные
+            if is_user_reported and manual_event_type:
+                event = {
+                    'eventType': manual_event_type,
+                    'severity': manual_severity or 1,
+                    'confidence': 1.0,  # Максимальная уверенность для ручных отчетов
+                    'roadType': 'unknown',
+                    'accelerometer': {
+                        'x': accel.get("x", 0),
+                        'y': accel.get("y", 0),
+                        'z': accel.get("z", 0),
+                        'magnitude': 0,
+                        'deltaX': 0,
+                        'deltaY': 0,
+                        'deltaZ': 0,
+                        'variance': 0,
+                    }
+                }
+                print(f"   🚨 Пользовательский отчет: {manual_event_type} от {device_id}")
+            else:
+                # Классифицируем событие через ML процессор
+                event = event_classifier.analyze_data_point(
+                    device_id=device_id,
+                    accel_x=accel.get("x", 0),
+                    accel_y=accel.get("y", 0),
+                    accel_z=accel.get("z", 0),
+                    speed=gps.get("speed", 0)
+                )
             
             if event:
                 # Событие обнаружено - сохраняем
