@@ -2032,6 +2032,11 @@ async def admin_dashboard(request: Request):
     """Serve the admin dashboard web interface (local access)"""
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
+@app.get("/admin/dashboard/v2", response_class=HTMLResponse)
+async def admin_dashboard_v2(request: Request):
+    """Serve the NEW admin dashboard v2 for new architecture"""
+    return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
+
 # Include the router in the main app
 app.include_router(api_router)
 
