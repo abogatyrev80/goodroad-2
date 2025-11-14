@@ -302,10 +302,49 @@ def detect_road_issues(analysis: Dict[str, float]) -> List[RoadWarning]:
     return warnings
 
 
+# Health Check Endpoints (for Kubernetes probes)
+@app.get("/health")
+async def health_check():
+    """
+    Basic health check - returns 200 if service is running
+    Used for liveness probe
+    """
+    return {
+        "status": "healthy",
+        "service": "Good Road API",
+        "version": "2.0.0"
+    }
+
+@app.get("/ready")
+async def readiness_check():
+    """
+    Readiness check - returns 200 only if all dependencies are ready
+    Used for readiness probe
+    """
+    if not mongodb_connected:
+        raise HTTPException(status_code=503, detail="MongoDB not connected")
+    
+    try:
+        # Quick ping to verify MongoDB is still responsive
+        await client.admin.command('ping')
+        return {
+            "status": "ready",
+            "mongodb": "connected",
+            "database": db_name
+        }
+    except Exception as e:
+        logger.error(f"Readiness check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Database check failed: {str(e)}")
+
 # API Endpoints
 @api_router.get("/")
 async def root():
-    return {"message": "Good Road API - Smart Road Monitoring System"}
+    return {
+        "message": "Good Road API - Smart Road Monitoring System",
+        "version": "2.0.0",
+        "status": "operational",
+        "mongodb_connected": mongodb_connected
+    }
 
 @api_router.post("/sensor-data")
 async def upload_sensor_data(batch: SensorDataBatch):
