@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 
 # Backend URL
-BACKEND_URL = "https://potholefinder.preview.emergentagent.com/api"
+BACKEND_URL = "https://road-monitor-4.preview.emergentagent.com/api"
 
 def test_latest_5_records():
     """GET /api/admin/sensor-data?limit=5 - получить последние 5 записей"""
