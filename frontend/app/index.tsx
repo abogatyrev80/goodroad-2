@@ -50,7 +50,7 @@ export default function GoodRoadApp() {
   // Backend URL
   const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                      Constants.expoConfig?.extra?.backendUrl ||
-                     'https://potholefinder.preview.emergentagent.com';
+                     'https://road-monitor-4.preview.emergentagent.com';
   
   // Device ID
   const deviceId = `mobile-app-${Date.now()}`;
