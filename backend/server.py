@@ -43,8 +43,91 @@ mongodb_connected = False
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
 
+# MongoDB connection helper
+async def connect_to_mongodb(max_retries=5, retry_delay=5):
+    """
+    Connect to MongoDB with retry logic for production deployment
+    """
+    global client, db, mongodb_connected
+    
+    logger.info(f"Attempting to connect to MongoDB database: {db_name}")
+    logger.info(f"MongoDB URL pattern: {mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost'}")
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            # Create MongoDB client with proper timeout settings
+            client_options = {
+                'serverSelectionTimeoutMS': 5000,
+                'connectTimeoutMS': 10000,
+                'socketTimeoutMS': 10000,
+            }
+            
+            # Add SSL/TLS settings for MongoDB Atlas
+            if 'mongodb+srv://' in mongo_url or 'mongodb.net' in mongo_url:
+                client_options['tls'] = True
+                client_options['tlsAllowInvalidCertificates'] = False
+                logger.info("Using MongoDB Atlas with SSL/TLS enabled")
+            
+            client = AsyncIOMotorClient(mongo_url, **client_options)
+            db = client[db_name]
+            
+            # Test connection
+            await client.admin.command('ping')
+            
+            mongodb_connected = True
+            logger.info(f"✅ Successfully connected to MongoDB database: {db_name}")
+            return
+            
+        except Exception as e:
+            logger.error(f"❌ MongoDB connection attempt {attempt}/{max_retries} failed: {str(e)}")
+            
+            if attempt < max_retries:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.critical(f"Failed to connect to MongoDB after {max_retries} attempts")
+                raise Exception(f"MongoDB connection failed: {str(e)}")
+
+async def close_mongodb_connection():
+    """
+    Close MongoDB connection gracefully
+    """
+    global client, mongodb_connected
+    
+    if client:
+        logger.info("Closing MongoDB connection...")
+        client.close()
+        mongodb_connected = False
+        logger.info("✅ MongoDB connection closed")
+
 # Create the main app without a prefix
-app = FastAPI(title="Good Road API", description="Smart Road Monitoring System")
+app = FastAPI(
+    title="Good Road API",
+    description="Smart Road Monitoring System",
+    version="2.0.0"
+)
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Initialize services on startup
+    """
+    logger.info("🚀 Starting Good Road API...")
+    try:
+        await connect_to_mongodb()
+        logger.info("✅ All services initialized successfully")
+    except Exception as e:
+        logger.critical(f"❌ Failed to initialize services: {str(e)}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Cleanup on shutdown
+    """
+    logger.info("🛑 Shutting down Good Road API...")
+    await close_mongodb_connection()
+    logger.info("✅ Shutdown complete")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
