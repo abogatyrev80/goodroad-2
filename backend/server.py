@@ -19,21 +19,26 @@ import statistics
 import csv
 import io
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection with fallback for production
+# MongoDB connection configuration with fallback for production
 mongo_url = os.environ.get('MONGO_URL') or os.environ.get('MONGODB_URI', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME') or os.environ.get('MONGODB_DB_NAME', 'good_road_db')
 
-# Create MongoDB client
-client = AsyncIOMotorClient(mongo_url)
-db = client[db_name]
+# Global MongoDB client (will be initialized in startup event)
+client = None
+db = None
 
-# Log connection info (without sensitive data)
-print(f"Connecting to MongoDB database: {db_name}")
-print(f"MongoDB URL pattern: {mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost'}")
+# Connection state
+mongodb_connected = False
 
 # Setup Jinja2 templates
 templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
