@@ -47,15 +47,6 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "extra": {
-      "backendUrl": "https://roadqual-track.emergent.host"
-    },
-    "updates": {
-      "enabled": false,
-      "fallbackToCacheTimeout": 0,
-      "url": null,
-      "checkAutomatically": "never"
-    },
     "plugins": [
       "expo-router"
     ],
