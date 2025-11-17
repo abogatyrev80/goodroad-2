@@ -174,6 +174,10 @@ class RawSensorData(BaseModel):
     timestamp: int  # Unix timestamp в миллисекундах
     gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
     accelerometer: Dict[str, float]  # {x, y, z}
+    # Опциональные поля для пользовательских отчетов
+    userReported: Optional[bool] = False
+    eventType: Optional[str] = None
+    severity: Optional[int] = None
     
 class RawDataBatch(BaseModel):
     """Батч сырых данных"""
