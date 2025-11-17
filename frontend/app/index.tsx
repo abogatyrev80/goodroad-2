@@ -162,11 +162,15 @@ export default function GoodRoadApp() {
           
           // Перезапускаем таймер с новым интервалом
           dataCollectionInterval.current = setTimeout(startDynamicCollection, nextInterval);
+        } else {
+          // Если GPS еще не готов, повторяем попытку через 1 секунду
+          console.log('⏳ Ожидание GPS сигнала...');
+          dataCollectionInterval.current = setTimeout(startDynamicCollection, 1000);
         }
       };
       
-      // Запускаем первый цикл
-      startDynamicCollection();
+      // Запускаем первый цикл с задержкой, чтобы дать GPS время инициализироваться
+      dataCollectionInterval.current = setTimeout(startDynamicCollection, 2000);
       
       setIsTracking(true);
       console.log('✅ Отслеживание запущено');
