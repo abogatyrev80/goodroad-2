@@ -71,6 +71,12 @@ export default function GoodRoadApp() {
     return () => clearInterval(interval);
   }, []);
   
+  // Обработка предупреждений от сервера (определяем ДО useEffect)
+  const handleWarningsReceived = (newWarnings: Warning[]) => {
+    console.log(`⚠️  Получены предупреждения: ${newWarnings.length}`);
+    setWarnings(prev => [...prev, ...newWarnings]);
+  };
+  
   // Инициализация RawDataCollector
   useEffect(() => {
     if (!rawDataCollector.current) {
@@ -81,12 +87,6 @@ export default function GoodRoadApp() {
       );
     }
   }, []);
-  
-  // Обработка предупреждений от сервера
-  const handleWarningsReceived = (newWarnings: Warning[]) => {
-    console.log(`⚠️  Получены предупреждения: ${newWarnings.length}`);
-    setWarnings(prev => [...prev, ...newWarnings]);
-  };
   
   // Отклонение предупреждения
   const handleDismissWarning = async (warningId: string) => {
