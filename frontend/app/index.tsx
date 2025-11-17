@@ -305,7 +305,7 @@ export default function GoodRoadApp() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Good Road</Text>
-            <Text style={styles.headerSubtitle}>Новая архитектура</Text>
+            <Text style={styles.headerSubtitle}>v2.0.0 · Серверная обработка</Text>
           </View>
         </View>
         
