@@ -830,12 +830,23 @@ async def process_raw_data(batch: RawDataBatch):
             await db.user_warnings.insert_many(user_warnings)
             print(f"✅ Создано {len(user_warnings)} предупреждений")
         
+        # Конвертируем warnings для JSON response
+        warnings_json = []
+        for warning in user_warnings:
+            warning_copy = warning.copy()
+            # Конвертируем datetime в ISO string
+            if 'expiresAt' in warning_copy and isinstance(warning_copy['expiresAt'], datetime):
+                warning_copy['expiresAt'] = warning_copy['expiresAt'].isoformat()
+            if 'created_at' in warning_copy and isinstance(warning_copy['created_at'], datetime):
+                warning_copy['created_at'] = warning_copy['created_at'].isoformat()
+            warnings_json.append(warning_copy)
+        
         return {
             "message": "Raw data processed successfully",
             "rawDataSaved": len(raw_documents),
             "eventsDetected": len(processed_events),
             "warningsGenerated": len(user_warnings),
-            "warnings": user_warnings  # Возвращаем предупреждения клиенту
+            "warnings": warnings_json  # Возвращаем предупреждения клиенту
         }
         
     except Exception as e:
