@@ -52,6 +52,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "backendUrl": "https://roadqual-track.emergent.host"
     }
   }
 }
