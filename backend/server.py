@@ -173,15 +173,17 @@ class AccelerometerReading(BaseModel):
     x: float
     y: float
     z: float
-    timestamp: int
+    timestamp: Optional[int] = None
 
 class RawSensorData(BaseModel):
     """Сырые данные с устройства для серверного анализа"""
     deviceId: str
     timestamp: int  # Unix timestamp в миллисекундах
     gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
-    # 🆕 Массив высокочастотных данных акселерометра (10 Hz, ~50 значений за 5 сек)
-    accelerometer: List[AccelerometerReading]
+    # 🆕 Поддержка двух форматов для обратной совместимости:
+    # - Новый: массив высокочастотных данных [{x, y, z, timestamp}, ...]
+    # - Старый: один объект {x, y, z}
+    accelerometer: Union[List[AccelerometerReading], Dict[str, float]]
     # Опциональные поля для пользовательских отчетов
     userReported: Optional[bool] = False
     eventType: Optional[str] = None
