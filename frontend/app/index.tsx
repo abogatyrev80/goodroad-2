@@ -183,7 +183,15 @@ export default function GoodRoadApp() {
       // Запуск динамического сбора данных (частота зависит от скорости)
       const startDynamicCollection = () => {
         if (currentLocation && rawDataCollector.current) {
-          rawDataCollector.current.addDataPoint(currentLocation, accelerometerData);
+          // 🆕 Передаем весь буфер накопленных данных акселерометра
+          const accelerometerSnapshot = [...accelerometerBuffer.current];
+          
+          // Очищаем буфер после snapshot
+          accelerometerBuffer.current = [];
+          
+          console.log(`📊 Собрано ${accelerometerSnapshot.length} значений акселерометра`);
+          
+          rawDataCollector.current.addDataPoint(currentLocation, accelerometerSnapshot);
           setDataPointsCollected(prev => prev + 1);
           
           // Вычисляем новый интервал на основе текущей скорости
