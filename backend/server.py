@@ -168,12 +168,20 @@ class LocationQuery(BaseModel):
     radius: float = 1000  # meters
 
 # НОВЫЕ МОДЕЛИ ДЛЯ ИЗБЫТОЧНОГО СБОРА ДАННЫХ
+class AccelerometerReading(BaseModel):
+    """Одно значение акселерометра с timestamp"""
+    x: float
+    y: float
+    z: float
+    timestamp: int
+
 class RawSensorData(BaseModel):
     """Сырые данные с устройства для серверного анализа"""
     deviceId: str
     timestamp: int  # Unix timestamp в миллисекундах
     gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
-    accelerometer: Dict[str, float]  # {x, y, z}
+    # 🆕 Массив высокочастотных данных акселерометра (10 Hz, ~50 значений за 5 сек)
+    accelerometer: List[AccelerometerReading]
     # Опциональные поля для пользовательских отчетов
     userReported: Optional[bool] = False
     eventType: Optional[str] = None
