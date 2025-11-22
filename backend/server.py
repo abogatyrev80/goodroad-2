@@ -1163,6 +1163,110 @@ class AdminAnalytics(BaseModel):
     avg_road_quality: float
     date_range: str
 
+
+# 🆕 ML Configuration Models
+class MLThresholdsUpdate(BaseModel):
+    """Модель для обновления порогов ML классификатора"""
+    pothole: Optional[Dict[str, float]] = None
+    braking: Optional[Dict[str, float]] = None
+    bump: Optional[Dict[str, float]] = None
+    vibration: Optional[Dict[str, float]] = None
+
+# 🆕 API для управления порогами ML
+@api_router.get("/admin/v2/ml-thresholds")
+async def get_ml_thresholds():
+    """Получить текущие пороги ML классификатора"""
+    try:
+        thresholds = event_classifier.get_thresholds()
+        return {
+            "thresholds": thresholds,
+            "description": {
+                "pothole": "Порог для обнаружения ям (deltaY, deltaZ, magnitude)",
+                "braking": "Порог для обнаружения резкого торможения (deltaY, magnitude)",
+                "bump": "Порог для обнаружения неровностей (deltaZ, magnitude)",
+                "vibration": "Порог для обнаружения вибраций (variance, magnitude)"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/admin/v2/ml-thresholds")
+async def update_ml_thresholds(update: MLThresholdsUpdate):
+    """Обновить пороги ML классификатора"""
+    try:
+        # Подготовка данных для обновления
+        new_thresholds = {}
+        if update.pothole:
+            new_thresholds['pothole'] = update.pothole
+        if update.braking:
+            new_thresholds['braking'] = update.braking
+        if update.bump:
+            new_thresholds['bump'] = update.bump
+        if update.vibration:
+            new_thresholds['vibration'] = update.vibration
+        
+        # Обновляем пороги
+        event_classifier.update_thresholds(new_thresholds)
+        
+        return {
+            "message": "Пороги успешно обновлены",
+            "updated_thresholds": new_thresholds,
+            "current_thresholds": event_classifier.get_thresholds()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🆕 API для редактирования событий
+@api_router.put("/admin/v2/events/{event_id}")
+async def update_event(event_id: str, update_data: Dict):
+    """Обновить событие по ID"""
+    try:
+        result = await db.processed_events.update_one(
+            {"id": event_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Событие не найдено")
+        
+        return {"message": "Событие обновлено", "modified_count": result.modified_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/admin/v2/events/{event_id}")
+async def delete_event(event_id: str):
+    """Удалить событие по ID"""
+    try:
+        result = await db.processed_events.delete_one({"id": event_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Событие не найдено")
+        
+        return {"message": "Событие удалено", "deleted_count": result.deleted_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🆕 API для редактирования raw data
+@api_router.delete("/admin/v2/raw-data/{data_id}")
+async def delete_raw_data(data_id: str):
+    """Удалить raw data по ID"""
+    try:
+        from bson import ObjectId
+        result = await db.raw_sensor_data.delete_one({"_id": ObjectId(data_id)})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Данные не найдены")
+        
+        return {"message": "Данные удалены", "deleted_count": result.deleted_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/admin/sensor-data")
 async def get_all_sensor_data(
     limit: int = Query(1000, description="Maximum number of records to return"),
