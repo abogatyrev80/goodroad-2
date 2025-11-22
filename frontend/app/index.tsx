@@ -47,6 +47,9 @@ export default function GoodRoadApp() {
   const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
   const rawDataCollector = useRef<RawDataCollector | null>(null);
   
+  // 🆕 Буфер для накопления высокочастотных данных акселерометра
+  const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
+  
   // Backend URL
   // Preview: использует .env (EXPO_PUBLIC_BACKEND_URL)
   // Production: использует app.json (extra.backendUrl)
