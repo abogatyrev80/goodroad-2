@@ -718,18 +718,27 @@ async def process_raw_data(batch: RawDataBatch):
             # Извлекаем данные
             timestamp = datetime.fromtimestamp(data_point.timestamp / 1000)
             gps = data_point.gps
-            accel_array = data_point.accelerometer  # 🆕 Теперь это массив!
+            accel_raw = data_point.accelerometer
             
-            # Для обратной совместимости берем последнее значение для сохранения в raw_doc
-            if accel_array and len(accel_array) > 0:
-                # Вычисляем средние значения массива для хранения
+            # 🆕 Обратная совместимость: поддержка обоих форматов
+            if isinstance(accel_raw, list):
+                # Новый формат: массив значений
+                accel_array = accel_raw
                 accel_summary = {
-                    "x": sum(a.x for a in accel_array) / len(accel_array),
-                    "y": sum(a.y for a in accel_array) / len(accel_array),
-                    "z": sum(a.z for a in accel_array) / len(accel_array),
+                    "x": sum(a.x for a in accel_array) / len(accel_array) if accel_array else 0,
+                    "y": sum(a.y for a in accel_array) / len(accel_array) if accel_array else 0,
+                    "z": sum(a.z for a in accel_array) / len(accel_array) if accel_array else 0,
                 }
+                print(f"   📊 Получен массив: {len(accel_array)} значений акселерометра")
             else:
-                accel_summary = {"x": 0, "y": 0, "z": 0}
+                # Старый формат: один объект {x, y, z}
+                accel_array = []
+                accel_summary = {
+                    "x": accel_raw.get("x", 0),
+                    "y": accel_raw.get("y", 0),
+                    "z": accel_raw.get("z", 0),
+                }
+                print(f"   📊 Получен старый формат: одно значение акселерометра")
             
             # Сохраняем сырые данные (summary для backward compatibility)
             raw_doc = {
