@@ -759,9 +759,9 @@ async def process_raw_data(batch: RawDataBatch):
                     'confidence': 1.0,  # Максимальная уверенность для ручных отчетов
                     'roadType': 'unknown',
                     'accelerometer': {
-                        'x': accel.get("x", 0),
-                        'y': accel.get("y", 0),
-                        'z': accel.get("z", 0),
+                        'x': accel_summary["x"],
+                        'y': accel_summary["y"],
+                        'z': accel_summary["z"],
                         'magnitude': 0,
                         'deltaX': 0,
                         'deltaY': 0,
@@ -771,14 +771,34 @@ async def process_raw_data(batch: RawDataBatch):
                 }
                 print(f"   🚨 Пользовательский отчет: {manual_event_type} от {device_id}")
             else:
-                # Классифицируем событие через ML процессор
-                event = event_classifier.analyze_data_point(
-                    device_id=device_id,
-                    accel_x=accel.get("x", 0),
-                    accel_y=accel.get("y", 0),
-                    accel_z=accel.get("z", 0),
-                    speed=gps.get("speed", 0)
-                )
+                # 🆕 Классифицируем событие через ML процессор с массивом данных
+                if accel_array and len(accel_array) > 0:
+                    # Конвертируем AccelerometerReading объекты в dict для ML процессора
+                    accel_dict_array = [
+                        {"x": a.x, "y": a.y, "z": a.z, "timestamp": a.timestamp}
+                        for a in accel_array
+                    ]
+                    event = event_classifier.analyze_accelerometer_array(
+                        device_id=device_id,
+                        accelerometer_data=accel_dict_array,
+                        speed=gps.get("speed", 0)
+                    )
+                else:
+                    event = None
+                
+                # Если событие обнаружено, добавляем accelerometer данные для обратной совместимости
+                if event:
+                    event['roadType'] = 'unknown'  # TODO: определить тип дороги
+                    event['accelerometer'] = {
+                        'x': accel_summary["x"],
+                        'y': accel_summary["y"],
+                        'z': accel_summary["z"],
+                        'magnitude': event.get('magnitude', 0),
+                        'deltaX': 0,
+                        'deltaY': event.get('delta_y', 0),
+                        'deltaZ': event.get('delta_z', 0),
+                        'variance': event.get('variance', 0),
+                    }
             
             if event:
                 # Событие обнаружено - сохраняем
