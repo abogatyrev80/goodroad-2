@@ -160,9 +160,24 @@ export default function GoodRoadApp() {
       );
       
       // Подписка на акселерометр
-      Accelerometer.setUpdateInterval(100); // 10 Hz
+      // Настройка акселерометра для высокочастотного сбора
+      Accelerometer.setUpdateInterval(100); // 10 Hz (каждые 100мс)
       accelerometerSubscription.current = Accelerometer.addListener((data) => {
+        // Обновляем UI (последнее значение для отображения)
         setAccelerometerData(data);
+        
+        // 🆕 Накапливаем данные в буфер с временной меткой
+        accelerometerBuffer.current.push({
+          x: data.x,
+          y: data.y,
+          z: data.z,
+          timestamp: Date.now()
+        });
+        
+        // Ограничиваем размер буфера (максимум 100 значений = 10 секунд при 10Hz)
+        if (accelerometerBuffer.current.length > 100) {
+          accelerometerBuffer.current.shift(); // Удаляем самое старое значение
+        }
       });
       
       // Запуск динамического сбора данных (частота зависит от скорости)
