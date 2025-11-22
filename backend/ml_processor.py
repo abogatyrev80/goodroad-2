@@ -326,10 +326,16 @@ class EventClassifier:
         
         return None
     
-    def update_thresholds(self, device_id: str, new_thresholds: Dict):
-        """Обновляет пороги для конкретного устройства (адаптация)"""
-        # TODO: Реализовать персональные пороги для устройств
-        pass
+    def get_thresholds(self) -> Dict:
+        """Возвращает текущие пороги чувствительности"""
+        return self.thresholds.copy()
+    
+    def update_thresholds(self, new_thresholds: Dict):
+        """Обновляет пороги чувствительности"""
+        for event_type, thresholds in new_thresholds.items():
+            if event_type in self.thresholds:
+                self.thresholds[event_type].update(thresholds)
+        print(f"✅ Пороги обновлены: {self.thresholds}")
 
 
 class WarningGenerator:
