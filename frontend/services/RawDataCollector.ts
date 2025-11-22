@@ -93,12 +93,14 @@ class RawDataCollector {
   }
   
   /**
-   * Добавить точку данных
+   * Добавить точку данных с массивом высокочастотных данных акселерометра
    */
   public async addDataPoint(
     location: Location.LocationObject,
-    accelerometer: { x: number; y: number; z: number }
+    accelerometerBuffer: Array<{ x: number; y: number; z: number; timestamp: number }>
   ): Promise<void> {
+    console.log(`📊 Добавление точки с ${accelerometerBuffer.length} значениями акселерометра`);
+    
     const dataPoint: RawSensorDataPoint = {
       deviceId: this.deviceId,
       timestamp: Date.now(),
@@ -109,11 +111,8 @@ class RawDataCollector {
         accuracy: location.coords.accuracy || 0,
         altitude: location.coords.altitude || undefined,
       },
-      accelerometer: {
-        x: accelerometer.x,
-        y: accelerometer.y,
-        z: accelerometer.z,
-      },
+      // 🆕 Передаем весь массив накопленных данных
+      accelerometer: accelerometerBuffer,
     };
     
     this.dataBuffer.push(dataPoint);
