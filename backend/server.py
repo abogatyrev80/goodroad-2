@@ -716,9 +716,20 @@ async def process_raw_data(batch: RawDataBatch):
             # Извлекаем данные
             timestamp = datetime.fromtimestamp(data_point.timestamp / 1000)
             gps = data_point.gps
-            accel = data_point.accelerometer
+            accel_array = data_point.accelerometer  # 🆕 Теперь это массив!
             
-            # Сохраняем сырые данные
+            # Для обратной совместимости берем последнее значение для сохранения в raw_doc
+            if accel_array and len(accel_array) > 0:
+                # Вычисляем средние значения массива для хранения
+                accel_summary = {
+                    "x": sum(a.x for a in accel_array) / len(accel_array),
+                    "y": sum(a.y for a in accel_array) / len(accel_array),
+                    "z": sum(a.z for a in accel_array) / len(accel_array),
+                }
+            else:
+                accel_summary = {"x": 0, "y": 0, "z": 0}
+            
+            # Сохраняем сырые данные (summary для backward compatibility)
             raw_doc = {
                 "deviceId": device_id,
                 "timestamp": timestamp,
@@ -727,9 +738,10 @@ async def process_raw_data(batch: RawDataBatch):
                 "speed": gps.get("speed", 0),
                 "accuracy": gps.get("accuracy", 0),
                 "altitude": gps.get("altitude"),
-                "accelerometer_x": accel.get("x"),
-                "accelerometer_y": accel.get("y"),
-                "accelerometer_z": accel.get("z"),
+                "accelerometer_x": accel_summary["x"],
+                "accelerometer_y": accel_summary["y"],
+                "accelerometer_z": accel_summary["z"],
+                "accelerometer_count": len(accel_array),  # 🆕 Сколько значений в массиве
                 "created_at": datetime.utcnow()
             }
             raw_documents.append(raw_doc)
