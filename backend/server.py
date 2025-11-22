@@ -10,7 +10,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import uuid
 from datetime import datetime, timedelta
 import asyncio
