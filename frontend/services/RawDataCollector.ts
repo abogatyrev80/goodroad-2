@@ -20,11 +20,13 @@ export interface RawSensorDataPoint {
     accuracy: number;
     altitude?: number;
   };
-  accelerometer: {
+  // 🆕 Массив высокочастотных данных акселерометра (10 Hz, ~50 значений за 5 сек)
+  accelerometer: Array<{
     x: number;
     y: number;
     z: number;
-  };
+    timestamp: number;
+  }>;
 }
 
 export interface RawDataBatch {
