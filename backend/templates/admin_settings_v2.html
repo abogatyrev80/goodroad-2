@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road Admin - Настройки ML</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: #60a5fa;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #94a3b8;
+        }
+
+        .section {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+        }
+
+        .section h2 {
+            font-size: 1.5rem;
+            color: #60a5fa;
+            margin-bottom: 1.5rem;
+        }
+
+        .threshold-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .threshold-card {
+            background: #0f172a;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .threshold-card h3 {
+            color: #60a5fa;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .param-group {
+            margin-bottom: 1rem;
+        }
+
+        .param-group label {
+            display: block;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .param-group input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        .param-group input:focus {
+            outline: none;
+            border-color: #60a5fa;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .message.success {
+            background: #10b981;
+            color: white;
+            display: block;
+        }
+
+        .message.error {
+            background: #ef4444;
+            color: white;
+            display: block;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #60a5fa;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .description {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #60a5fa;
+            margin-bottom: 1.5rem;
+        }
+
+        .description p {
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 0.5rem;
+        }
+
+        .description code {
+            background: #1e293b;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/api/admin/dashboard/v2" class="back-link">← Вернуться к дашборду</a>
+
+        <div class="header">
+            <h1>⚙️ Настройки ML Классификатора</h1>
+            <p>Настройте пороги чувствительности для обнаружения дорожных событий</p>
+        </div>
+
+        <div class="section">
+            <h2>📊 Пороги Обнаружения</h2>
+            
+            <div class="description">
+                <p><strong>Как это работает:</strong></p>
+                <p>• <code>deltaY/deltaZ</code> - изменение ускорения по осям (выше = менее чувствительно)</p>
+                <p>• <code>magnitude</code> - общая величина ускорения (выше = менее чувствительно)</p>
+                <p>• <code>variance</code> - вариативность для вибраций (выше = менее чувствительно)</p>
+            </div>
+
+            <div class="threshold-grid">
+                <!-- Pothole Card -->
+                <div class="threshold-card">
+                    <h3>🕳️ Яма (Pothole)</h3>
+                    <div class="param-group">
+                        <label>deltaY - порог Y оси:</label>
+                        <input type="number" step="0.1" id="pothole-deltaY" value="3.0">
+                    </div>
+                    <div class="param-group">
+                        <label>deltaZ - порог Z оси:</label>
+                        <input type="number" step="0.1" id="pothole-deltaZ" value="2.5">
+                    </div>
+                    <div class="param-group">
+                        <label>magnitude - общая величина:</label>
+                        <input type="number" step="0.1" id="pothole-magnitude" value="12.0">
+                    </div>
+                </div>
+
+                <!-- Braking Card -->
+                <div class="threshold-card">
+                    <h3>🚗 Торможение (Braking)</h3>
+                    <div class="param-group">
+                        <label>deltaY - порог Y оси:</label>
+                        <input type="number" step="0.1" id="braking-deltaY" value="2.0">
+                    </div>
+                    <div class="param-group">
+                        <label>magnitude - общая величина:</label>
+                        <input type="number" step="0.1" id="braking-magnitude" value="11.0">
+                    </div>
+                </div>
+
+                <!-- Bump Card -->
+                <div class="threshold-card">
+                    <h3>⛰️ Неровность (Bump)</h3>
+                    <div class="param-group">
+                        <label>deltaZ - порог Z оси:</label>
+                        <input type="number" step="0.1" id="bump-deltaZ" value="2.0">
+                    </div>
+                    <div class="param-group">
+                        <label>magnitude - общая величина:</label>
+                        <input type="number" step="0.1" id="bump-magnitude" value="11.5">
+                    </div>
+                </div>
+
+                <!-- Vibration Card -->
+                <div class="threshold-card">
+                    <h3>〰️ Вибрации (Vibration)</h3>
+                    <div class="param-group">
+                        <label>variance - вариативность:</label>
+                        <input type="number" step="0.1" id="vibration-variance" value="0.8">
+                    </div>
+                    <div class="param-group">
+                        <label>magnitude - общая величина:</label>
+                        <input type="number" step="0.1" id="vibration-magnitude" value="10.5">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="saveThresholds()">💾 Сохранить изменения</button>
+                <button class="btn btn-secondary" onclick="loadThresholds()">🔄 Сбросить</button>
+            </div>
+
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <script>
+        // Загрузка текущих порогов
+        async function loadThresholds() {
+            try {
+                const response = await fetch('/api/admin/v2/ml-thresholds');
+                const data = await response.json();
+                const thresholds = data.thresholds;
+
+                // Pothole
+                document.getElementById('pothole-deltaY').value = thresholds.pothole.deltaY;
+                document.getElementById('pothole-deltaZ').value = thresholds.pothole.deltaZ;
+                document.getElementById('pothole-magnitude').value = thresholds.pothole.magnitude;
+
+                // Braking
+                document.getElementById('braking-deltaY').value = thresholds.braking.deltaY;
+                document.getElementById('braking-magnitude').value = thresholds.braking.magnitude;
+
+                // Bump
+                document.getElementById('bump-deltaZ').value = thresholds.bump.deltaZ;
+                document.getElementById('bump-magnitude').value = thresholds.bump.magnitude;
+
+                // Vibration
+                document.getElementById('vibration-variance').value = thresholds.vibration.variance;
+                document.getElementById('vibration-magnitude').value = thresholds.vibration.magnitude;
+
+                showMessage('Пороги загружены', 'success');
+            } catch (error) {
+                showMessage('Ошибка загрузки: ' + error.message, 'error');
+            }
+        }
+
+        // Сохранение порогов
+        async function saveThresholds() {
+            try {
+                const newThresholds = {
+                    pothole: {
+                        deltaY: parseFloat(document.getElementById('pothole-deltaY').value),
+                        deltaZ: parseFloat(document.getElementById('pothole-deltaZ').value),
+                        magnitude: parseFloat(document.getElementById('pothole-magnitude').value)
+                    },
+                    braking: {
+                        deltaY: parseFloat(document.getElementById('braking-deltaY').value),
+                        magnitude: parseFloat(document.getElementById('braking-magnitude').value)
+                    },
+                    bump: {
+                        deltaZ: parseFloat(document.getElementById('bump-deltaZ').value),
+                        magnitude: parseFloat(document.getElementById('bump-magnitude').value)
+                    },
+                    vibration: {
+                        variance: parseFloat(document.getElementById('vibration-variance').value),
+                        magnitude: parseFloat(document.getElementById('vibration-magnitude').value)
+                    }
+                };
+
+                const response = await fetch('/api/admin/v2/ml-thresholds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newThresholds)
+                });
+
+                const data = await response.json();
+                showMessage('✅ Пороги успешно обновлены!', 'success');
+                console.log('Updated thresholds:', data.current_thresholds);
+            } catch (error) {
+                showMessage('❌ Ошибка сохранения: ' + error.message, 'error');
+            }
+        }
+
+        // Показать сообщение
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = 'message ' + type;
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+
+        // Загрузка при старте страницы
+        loadThresholds();
+    </script>
+</body>
+</html>
