@@ -48,9 +48,11 @@ export default function GoodRoadApp() {
   const rawDataCollector = useRef<RawDataCollector | null>(null);
   
   // Backend URL
+  // Preview: использует .env (EXPO_PUBLIC_BACKEND_URL)
+  // Production: использует app.json (extra.backendUrl)
   const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                      Constants.expoConfig?.extra?.backendUrl ||
-                     'https://road-monitor-4.preview.emergentagent.com';
+                     'https://roadqual-track.emergent.host';
   
   // Device ID
   const deviceId = `mobile-app-${Date.now()}`;
