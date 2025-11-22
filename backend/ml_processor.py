@@ -175,6 +175,157 @@ class EventClassifier:
         else:
             return 'unknown'
     
+    def analyze_accelerometer_array(
+        self,
+        device_id: str,
+        accelerometer_data: List[Dict],
+        speed: float
+    ) -> Optional[Dict]:
+        """
+        🆕 Анализирует массив высокочастотных данных акселерометра
+        
+        Args:
+            device_id: ID устройства
+            accelerometer_data: Массив значений [{x, y, z, timestamp}, ...]
+            speed: Скорость движения
+            
+        Returns:
+            Dict с событием или None если событие не обнаружено
+        """
+        if not accelerometer_data or len(accelerometer_data) == 0:
+            return None
+        
+        # Извлекаем массивы x, y, z
+        x_values = [d['x'] for d in accelerometer_data]
+        y_values = [d['y'] for d in accelerometer_data]
+        z_values = [d['z'] for d in accelerometer_data]
+        
+        # Вычисляем агрегированные показатели
+        stats = self._compute_accelerometer_stats(x_values, y_values, z_values)
+        
+        # Определяем тип события на основе статистики
+        event = self._classify_from_stats(stats, speed)
+        
+        if event:
+            event['device_id'] = device_id
+            event['sample_count'] = len(accelerometer_data)
+            event['duration_ms'] = accelerometer_data[-1]['timestamp'] - accelerometer_data[0]['timestamp']
+        
+        return event
+    
+    def _compute_accelerometer_stats(
+        self,
+        x_values: List[float],
+        y_values: List[float],
+        z_values: List[float]
+    ) -> Dict:
+        """Вычисляет статистику для массива значений акселерометра"""
+        
+        # Вычисление magnitude для каждого значения
+        magnitudes = [
+            math.sqrt(x**2 + y**2 + z**2)
+            for x, y, z in zip(x_values, y_values, z_values)
+        ]
+        
+        # Статистика
+        stats = {
+            # Средние значения
+            'mean_x': sum(x_values) / len(x_values),
+            'mean_y': sum(y_values) / len(y_values),
+            'mean_z': sum(z_values) / len(z_values),
+            'mean_magnitude': sum(magnitudes) / len(magnitudes),
+            
+            # Максимумы и минимумы
+            'max_x': max(x_values),
+            'min_x': min(x_values),
+            'max_y': max(y_values),
+            'min_y': min(y_values),
+            'max_z': max(z_values),
+            'min_z': min(z_values),
+            'max_magnitude': max(magnitudes),
+            'min_magnitude': min(magnitudes),
+            
+            # Диапазоны (размах)
+            'range_x': max(x_values) - min(x_values),
+            'range_y': max(y_values) - min(y_values),
+            'range_z': max(z_values) - min(z_values),
+            'range_magnitude': max(magnitudes) - min(magnitudes),
+            
+            # Стандартное отклонение (вибрации)
+            'std_x': self._calculate_std(x_values),
+            'std_y': self._calculate_std(y_values),
+            'std_z': self._calculate_std(z_values),
+            'std_magnitude': self._calculate_std(magnitudes),
+            
+            # Количество пиков (резкие изменения)
+            'peaks_count': self._count_peaks(magnitudes, threshold=11.0),
+        }
+        
+        return stats
+    
+    def _calculate_std(self, values: List[float]) -> float:
+        """Вычисляет стандартное отклонение"""
+        if len(values) < 2:
+            return 0.0
+        mean = sum(values) / len(values)
+        variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+        return math.sqrt(variance)
+    
+    def _count_peaks(self, values: List[float], threshold: float) -> int:
+        """Подсчитывает количество пиков выше порога"""
+        peaks = 0
+        for i in range(1, len(values) - 1):
+            if values[i] > threshold and values[i] > values[i-1] and values[i] > values[i+1]:
+                peaks += 1
+        return peaks
+    
+    def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
+        """Классифицирует событие на основе статистики"""
+        
+        # Обнаружение ямы: большой пик в Y и Z
+        if (stats['range_y'] > 3.5 or stats['range_z'] > 3.0) and stats['max_magnitude'] > 12.5:
+            return {
+                'event_type': 'pothole',
+                'severity': self._calculate_severity(stats['max_magnitude'], 12.0, 16.0),
+                'confidence': 0.85,
+                'magnitude': stats['max_magnitude'],
+                'delta_y': stats['range_y'],
+                'delta_z': stats['range_z'],
+            }
+        
+        # Обнаружение резкого торможения: большой диапазон в Y
+        if stats['range_y'] > 2.5 and stats['max_magnitude'] > 11.5 and speed > 5:
+            return {
+                'event_type': 'braking',
+                'severity': self._calculate_severity(stats['range_y'], 2.0, 4.0),
+                'confidence': 0.80,
+                'magnitude': stats['max_magnitude'],
+                'delta_y': stats['range_y'],
+            }
+        
+        # Обнаружение неровности: большое стандартное отклонение
+        if stats['std_magnitude'] > 0.9 and stats['peaks_count'] >= 3:
+            return {
+                'event_type': 'bump',
+                'severity': self._calculate_severity(stats['std_magnitude'], 0.8, 1.5),
+                'confidence': 0.75,
+                'magnitude': stats['mean_magnitude'],
+                'variance': stats['std_magnitude'],
+                'peaks': stats['peaks_count'],
+            }
+        
+        # Обнаружение вибраций (плохая дорога): высокая вариативность
+        if stats['std_magnitude'] > 0.7 and speed > 3:
+            return {
+                'event_type': 'vibration',
+                'severity': self._calculate_severity(stats['std_magnitude'], 0.7, 1.2),
+                'confidence': 0.70,
+                'magnitude': stats['mean_magnitude'],
+                'variance': stats['std_magnitude'],
+            }
+        
+        return None
+    
     def update_thresholds(self, device_id: str, new_thresholds: Dict):
         """Обновляет пороги для конкретного устройства (адаптация)"""
         # TODO: Реализовать персональные пороги для устройств
