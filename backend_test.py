@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for EventDetector (Phase 2) and BatchOfflineManager (Phase 3)
-Tests the new event-driven data collection functionality
+Backend Testing Suite for Clear Database V2 API and EventDetector functionality
+Tests the new DELETE /api/admin/clear-database-v2 endpoint with date range filtering
 """
 
 import requests
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 
 # Backend URL from frontend/.env
