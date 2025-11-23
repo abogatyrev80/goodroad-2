@@ -1257,6 +1257,52 @@ async def delete_event(event_id: str):
         
         return {"message": "Событие удалено", "deleted_count": result.deleted_count}
     except HTTPException:
+
+# 🆕 API для очистки базы данных (работает с любой подключенной БД)
+@api_router.delete("/admin/clear-database")
+async def clear_database(confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения")):
+    """
+    Очистить ВСЮ базу данных (локальную или Atlas)
+    ОПАСНО: Удаляет все данные без возможности восстановления!
+    """
+    if confirm != "CONFIRM":
+        raise HTTPException(
+            status_code=400, 
+            detail="Для подтверждения передайте параметр confirm=CONFIRM"
+        )
+    
+    try:
+        collections_to_clear = [
+            'raw_sensor_data',
+            'processed_events', 
+            'events',
+            'user_warnings',
+            'road_conditions',
+            'road_warnings',
+            'sensor_data',
+            'calibration_profiles'
+        ]
+        
+        results = {}
+        total_deleted = 0
+        
+        for collection_name in collections_to_clear:
+            try:
+                result = await db[collection_name].delete_many({})
+                results[collection_name] = result.deleted_count
+                total_deleted += result.deleted_count
+            except Exception as e:
+                results[collection_name] = f"Error: {str(e)}"
+        
+        return {
+            "message": "База данных очищена",
+            "database": db_name,
+            "total_deleted": total_deleted,
+            "details": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
