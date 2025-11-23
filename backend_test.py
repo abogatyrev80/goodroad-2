@@ -50,6 +50,267 @@ class BackendTester:
         except Exception as e:
             self.log_test("API Connectivity", False, f"Error: {str(e)}")
             return False
+    
+    def add_test_data_for_clear_db(self):
+        """Add test data with different dates for Clear Database V2 filtering tests"""
+        print("\n🔧 Adding test data with different dates for Clear Database V2 tests...")
+        
+        # Test data for different date ranges
+        test_dates = [
+            "2023-12-15",  # Old data (should be deleted in date range tests)
+            "2024-06-15",  # Mid-range data
+            "2025-01-15",  # Recent data (current month)
+            "2025-02-01",  # Future data
+        ]
+        
+        for date_str in test_dates:
+            # Create test sensor data
+            test_data = {
+                "deviceId": f"test-clear-db-{date_str}",
+                "sensorData": [
+                    {
+                        "type": "location",
+                        "timestamp": int(datetime.fromisoformat(date_str + "T12:00:00").timestamp() * 1000),
+                        "data": {
+                            "latitude": 55.7558,
+                            "longitude": 37.6176,
+                            "speed": 25.0,
+                            "accuracy": 5.0
+                        }
+                    },
+                    {
+                        "type": "accelerometer", 
+                        "timestamp": int(datetime.fromisoformat(date_str + "T12:00:01").timestamp() * 1000),
+                        "data": {
+                            "x": 0.2,
+                            "y": 0.4,
+                            "z": 9.8
+                        }
+                    }
+                ]
+            }
+            
+            try:
+                response = self.session.post(f"{BACKEND_URL}/sensor-data", json=test_data, timeout=10)
+                if response and response.status_code == 200:
+                    print(f"   ✅ Added test data for {date_str}")
+                else:
+                    print(f"   ❌ Failed to add test data for {date_str}: {response.status_code if response else 'No response'}")
+            except Exception as e:
+                print(f"   ❌ Error adding test data for {date_str}: {str(e)}")
+    
+    def test_clear_database_v2_no_confirmation(self):
+        """Test Clear Database V2: Request without confirmation parameter"""
+        print("\n🧪 Testing Clear Database V2 - No Confirmation")
+        
+        try:
+            response = self.session.delete(f"{BACKEND_URL}/admin/clear-database-v2", timeout=10)
+            
+            if response is None:
+                self.log_test("Clear DB V2 - No Confirmation", False, "Request failed")
+                return False
+                
+            if response.status_code == 400:
+                try:
+                    data = response.json()
+                    if "confirm=CONFIRM" in data.get("detail", ""):
+                        self.log_test("Clear DB V2 - No Confirmation", True, "Correctly rejected without confirmation")
+                        return True
+                    else:
+                        self.log_test("Clear DB V2 - No Confirmation", False, f"Wrong error message: {data}")
+                        return False
+                except:
+                    self.log_test("Clear DB V2 - No Confirmation", False, "Invalid JSON response")
+                    return False
+            else:
+                self.log_test("Clear DB V2 - No Confirmation", False, f"Expected 400, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Clear DB V2 - No Confirmation", False, f"Error: {str(e)}")
+            return False
+    
+    def test_clear_database_v2_invalid_date(self):
+        """Test Clear Database V2: Request with invalid date format"""
+        print("\n🧪 Testing Clear Database V2 - Invalid Date Format")
+        
+        try:
+            response = self.session.delete(f"{BACKEND_URL}/admin/clear-database-v2", 
+                                         params={"confirm": "CONFIRM", "date_from": "invalid-date"},
+                                         timeout=10)
+            
+            if response is None:
+                self.log_test("Clear DB V2 - Invalid Date", False, "Request failed")
+                return False
+                
+            if response.status_code == 400:
+                try:
+                    data = response.json()
+                    detail = data.get("detail", "").lower()
+                    if "формат" in detail or "format" in detail or "invalid" in detail:
+                        self.log_test("Clear DB V2 - Invalid Date", True, "Correctly rejected invalid date format")
+                        return True
+                    else:
+                        self.log_test("Clear DB V2 - Invalid Date", False, f"Wrong error message: {data}")
+                        return False
+                except:
+                    self.log_test("Clear DB V2 - Invalid Date", False, "Invalid JSON response")
+                    return False
+            else:
+                self.log_test("Clear DB V2 - Invalid Date", False, f"Expected 400, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("Clear DB V2 - Invalid Date", False, f"Error: {str(e)}")
+            return False
+    
+    def test_clear_database_v2_date_range(self):
+        """Test Clear Database V2: Clear database with date range"""
+        print("\n🧪 Testing Clear Database V2 - Date Range (2025-01-01 to 2025-01-31)")
+        
+        try:
+            response = self.session.delete(f"{BACKEND_URL}/admin/clear-database-v2", 
+                                         params={
+                                             "confirm": "CONFIRM",
+                                             "date_from": "2025-01-01",
+                                             "date_to": "2025-01-31"
+                                         },
+                                         timeout=30)
+            
+            if response is None:
+                self.log_test("Clear DB V2 - Date Range", False, "Request failed")
+                return False
+                
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    required_fields = ["message", "database", "period", "total_deleted", "details"]
+                    
+                    missing_fields = [field for field in required_fields if field not in data]
+                    if missing_fields:
+                        self.log_test("Clear DB V2 - Date Range", False, f"Missing fields: {missing_fields}")
+                        return False
+                    
+                    # Check period structure
+                    period = data.get("period", {})
+                    if period.get("from") != "2025-01-01" or period.get("to") != "2025-01-31":
+                        self.log_test("Clear DB V2 - Date Range", False, f"Wrong period: {period}")
+                        return False
+                    
+                    # Check details structure (should have collection breakdown)
+                    details = data.get("details", {})
+                    expected_collections = ['raw_sensor_data', 'processed_events', 'events', 
+                                          'user_warnings', 'road_conditions', 'road_warnings', 
+                                          'sensor_data', 'calibration_profiles']
+                    
+                    found_collections = [col for col in expected_collections if col in details]
+                    if len(found_collections) < 6:  # At least 6 collections should be present
+                        self.log_test("Clear DB V2 - Date Range", False, f"Missing collections in details: {details}")
+                        return False
+                    
+                    self.log_test("Clear DB V2 - Date Range", True, 
+                                f"Deleted {data['total_deleted']} records from {len(found_collections)} collections")
+                    return True
+                    
+                except Exception as e:
+                    self.log_test("Clear DB V2 - Date Range", False, f"JSON parsing error: {e}")
+                    return False
+            else:
+                self.log_test("Clear DB V2 - Date Range", False, f"Expected 200, got {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Clear DB V2 - Date Range", False, f"Error: {str(e)}")
+            return False
+    
+    def test_clear_database_v2_from_date(self):
+        """Test Clear Database V2: Clear database from specific date"""
+        print("\n🧪 Testing Clear Database V2 - From Date (2024-01-01)")
+        
+        try:
+            response = self.session.delete(f"{BACKEND_URL}/admin/clear-database-v2", 
+                                         params={
+                                             "confirm": "CONFIRM",
+                                             "date_from": "2024-01-01"
+                                         },
+                                         timeout=30)
+            
+            if response is None:
+                self.log_test("Clear DB V2 - From Date", False, "Request failed")
+                return False
+                
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Check period structure
+                    period = data.get("period", {})
+                    if period.get("from") != "2024-01-01" or period.get("to") is not None:
+                        self.log_test("Clear DB V2 - From Date", False, f"Wrong period: {period}")
+                        return False
+                    
+                    # Check message contains appropriate text
+                    message = data.get("message", "")
+                    if "с 2024-01-01" not in message and "from 2024-01-01" not in message:
+                        self.log_test("Clear DB V2 - From Date", False, f"Wrong message: {message}")
+                        return False
+                    
+                    self.log_test("Clear DB V2 - From Date", True, 
+                                f"Deleted {data['total_deleted']} records from {data['period']['from']}")
+                    return True
+                    
+                except Exception as e:
+                    self.log_test("Clear DB V2 - From Date", False, f"JSON parsing error: {e}")
+                    return False
+            else:
+                self.log_test("Clear DB V2 - From Date", False, f"Expected 200, got {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Clear DB V2 - From Date", False, f"Error: {str(e)}")
+            return False
+    
+    def test_clear_database_v2_to_date(self):
+        """Test Clear Database V2: Clear database to specific date"""
+        print("\n🧪 Testing Clear Database V2 - To Date (2023-12-31)")
+        
+        try:
+            response = self.session.delete(f"{BACKEND_URL}/admin/clear-database-v2", 
+                                         params={
+                                             "confirm": "CONFIRM",
+                                             "date_to": "2023-12-31"
+                                         },
+                                         timeout=30)
+            
+            if response is None:
+                self.log_test("Clear DB V2 - To Date", False, "Request failed")
+                return False
+                
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Check period structure
+                    period = data.get("period", {})
+                    if period.get("to") != "2023-12-31" or period.get("from") is not None:
+                        self.log_test("Clear DB V2 - To Date", False, f"Wrong period: {period}")
+                        return False
+                    
+                    # Check message contains appropriate text
+                    message = data.get("message", "")
+                    if "до 2023-12-31" not in message and "to 2023-12-31" not in message:
+                        self.log_test("Clear DB V2 - To Date", False, f"Wrong message: {message}")
+                        return False
+                    
+                    self.log_test("Clear DB V2 - To Date", True, 
+                                f"Deleted {data['total_deleted']} records to {data['period']['to']}")
+                    return True
+                    
+                except Exception as e:
+                    self.log_test("Clear DB V2 - To Date", False, f"JSON parsing error: {e}")
+                    return False
+            else:
+                self.log_test("Clear DB V2 - To Date", False, f"Expected 200, got {response.status_code}: {response.text}")
+                return False
+        except Exception as e:
+            self.log_test("Clear DB V2 - To Date", False, f"Error: {str(e)}")
+            return False
             
     def test_event_type_sensor_data(self):
         """Test POST /api/sensor-data with NEW event type data format"""
