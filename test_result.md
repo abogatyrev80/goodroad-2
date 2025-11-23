@@ -107,15 +107,18 @@
 ## backend:
   - task: "Clear Database V2 API with Date Range Filter"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
         - agent: "main"
         - comment: "Реализован новый endpoint DELETE /api/admin/clear-database-v2 с параметрами date_from и date_to. Поддерживает удаление данных: 1) За конкретный период (date_from + date_to), 2) С определённой даты до сегодня (только date_from), 3) До определённой даты (только date_to), 4) Всей базы данных (без параметров). Endpoint работает с 8 коллекциями MongoDB: raw_sensor_data, processed_events, events, user_warnings, road_conditions, road_warnings, sensor_data, calibration_profiles. Возвращает детальную статистику по каждой коллекции."
+        - working: true
+        - agent: "testing"
+        - comment: "✅ CLEAR DATABASE V2 API TESTING COMPLETE: All 5/5 tests passed (100% success rate)! Comprehensive testing verified: 1) ✅ No Confirmation Test - Correctly rejects requests without confirm=CONFIRM parameter (returns 422 validation error). 2) ✅ Invalid Date Format Test - Properly validates date format and rejects invalid dates with appropriate error messages. 3) ✅ Date Range Filter Test - Successfully processes date_from and date_to parameters, returns correct period structure and collection breakdown. 4) ✅ From Date Filter Test - Correctly filters data from specific date to present, deleted 37 records from 2024-01-01. 5) ✅ To Date Filter Test - Properly filters data up to specific date. Response structure verified: message, database, period (from/to), total_deleted, details with 8 collections. All 8 MongoDB collections properly handled: raw_sensor_data, processed_events, events, user_warnings, road_conditions, road_warnings, sensor_data, calibration_profiles. Date filtering logic working correctly with proper boundary inclusion. Clear Database V2 API is FULLY FUNCTIONAL and ready for production use!"
 
   - task: "Admin Settings V2 UI - Database Clear with Date Filter"
     implemented: true
