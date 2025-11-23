@@ -397,6 +397,92 @@
             }, 3000);
         }
 
+        // Очистка базы данных с диапазоном дат
+        async function clearDatabase() {
+            const confirm = document.getElementById('confirm-delete').value;
+            const dateFrom = document.getElementById('date-from').value;
+            const dateTo = document.getElementById('date-to').value;
+            
+            if (confirm !== 'CONFIRM') {
+                showDbMessage('❌ Введите "CONFIRM" для подтверждения', 'error');
+                return;
+            }
+            
+            // Формируем параметры запроса
+            let params = new URLSearchParams({ confirm: 'CONFIRM' });
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            
+            // Дополнительное подтверждение
+            let confirmMsg = 'Вы уверены что хотите удалить данные';
+            if (dateFrom && dateTo) {
+                confirmMsg += ` с ${dateFrom} по ${dateTo}`;
+            } else if (dateFrom) {
+                confirmMsg += ` с ${dateFrom} до сегодня`;
+            } else if (dateTo) {
+                confirmMsg += ` до ${dateTo}`;
+            } else {
+                confirmMsg += ' из всей базы данных';
+            }
+            confirmMsg += '?\n\nЭто действие необратимо!';
+            
+            if (!window.confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                showDbMessage('⏳ Выполняется очистка...', 'success');
+                
+                const response = await fetch(`/api/admin/clear-database-v2?${params.toString()}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let detailsMsg = `\n\nУдалено записей:\n`;
+                    for (const [collection, count] of Object.entries(data.details)) {
+                        if (typeof count === 'number' && count > 0) {
+                            detailsMsg += `• ${collection}: ${count}\n`;
+                        }
+                    }
+                    
+                    showDbMessage(
+                        `✅ ${data.message}\nВсего удалено: ${data.total_deleted} записей${detailsMsg}`,
+                        'success'
+                    );
+                    
+                    // Очищаем поля после успешной операции
+                    clearDatabaseInputs();
+                } else {
+                    showDbMessage(`❌ Ошибка: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showDbMessage(`❌ Ошибка при очистке базы данных: ${error.message}`, 'error');
+            }
+        }
+        
+        // Очистить поля ввода для очистки БД
+        function clearDatabaseInputs() {
+            document.getElementById('date-from').value = '';
+            document.getElementById('date-to').value = '';
+            document.getElementById('confirm-delete').value = '';
+        }
+        
+        // Показать сообщение для секции БД
+        function showDbMessage(text, type) {
+            const messageEl = document.getElementById('db-message');
+            messageEl.textContent = text;
+            messageEl.className = 'message ' + type;
+            messageEl.style.whiteSpace = 'pre-line'; // Для переносов строк
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 8000); // 8 секунд для успешных сообщений (больше времени, чтобы прочитать детали)
+            }
+        }
+
         // Загрузка при старте страницы
         loadThresholds();
     </script>
