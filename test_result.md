@@ -102,9 +102,34 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-## user_problem_statement: Integrating EventDetector (Phase 2) and BatchOfflineManager (Phase 3) services into index.tsx to enable event-driven, batched, and offline-capable data synchronization for the "Good Road" application. The EventDetector provides smart detection of road events (potholes, braking, vibrations) based on accelerometer data. The BatchOfflineManager handles batching of events (up to 10 events or 60 seconds), offline storage in AsyncStorage, and retry mechanism for failed uploads. This modernization replaces the simple 10-second periodic data upload with an intelligent, event-driven system that accumulates data only when significant road conditions are detected.
+## user_problem_statement: Добавлена функциональность очистки базы данных с возможностью указания временного диапазона. Реализован новый backend endpoint /api/admin/clear-database-v2 с параметрами date_from и date_to для фильтрации данных по датам. Обновлен admin UI (admin_settings_v2.html) с добавлением date pickers и кнопки для очистки данных за выбранный период.
 
 ## backend:
+  - task: "Clear Database V2 API with Date Range Filter"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Реализован новый endpoint DELETE /api/admin/clear-database-v2 с параметрами date_from и date_to. Поддерживает удаление данных: 1) За конкретный период (date_from + date_to), 2) С определённой даты до сегодня (только date_from), 3) До определённой даты (только date_to), 4) Всей базы данных (без параметров). Endpoint работает с 8 коллекциями MongoDB: raw_sensor_data, processed_events, events, user_warnings, road_conditions, road_warnings, sensor_data, calibration_profiles. Возвращает детальную статистику по каждой коллекции."
+
+  - task: "Admin Settings V2 UI - Database Clear with Date Filter"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/templates/admin_settings_v2.html"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "Добавлена новая секция 'Управление Базой Данных' в админ-панель. Включает: 1) Два date picker для выбора date_from и date_to, 2) Поле подтверждения с требованием ввести 'CONFIRM', 3) Кнопку 'Очистить базу данных' с предупреждением, 4) JavaScript функцию clearDatabase() с двойным подтверждением (поле ввода + alert), 5) Детальное отображение результатов с количеством удалённых записей по коллекциям. UI имеет красный цвет для опасных операций."
+
+## backend (previous tasks):
   - task: "Sensor Data Upload API"
     implemented: true
     working: true
