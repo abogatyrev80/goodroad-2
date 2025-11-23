@@ -110,20 +110,23 @@ class BackendTester:
                 self.log_test("Clear DB V2 - No Confirmation", False, "Request failed")
                 return False
                 
-            if response.status_code == 400:
+            if response.status_code == 422:  # FastAPI validation error
                 try:
                     data = response.json()
-                    if "confirm=CONFIRM" in data.get("detail", ""):
-                        self.log_test("Clear DB V2 - No Confirmation", True, "Correctly rejected without confirmation")
-                        return True
-                    else:
-                        self.log_test("Clear DB V2 - No Confirmation", False, f"Wrong error message: {data}")
-                        return False
+                    # Check if it's a validation error for missing confirm parameter
+                    if isinstance(data.get("detail"), list) and len(data["detail"]) > 0:
+                        error = data["detail"][0]
+                        if error.get("loc") == ["query", "confirm"] and error.get("type") == "missing":
+                            self.log_test("Clear DB V2 - No Confirmation", True, "Correctly rejected without confirmation (422 validation error)")
+                            return True
+                    
+                    self.log_test("Clear DB V2 - No Confirmation", False, f"Unexpected validation error: {data}")
+                    return False
                 except:
                     self.log_test("Clear DB V2 - No Confirmation", False, "Invalid JSON response")
                     return False
             else:
-                self.log_test("Clear DB V2 - No Confirmation", False, f"Expected 400, got {response.status_code}")
+                self.log_test("Clear DB V2 - No Confirmation", False, f"Expected 422, got {response.status_code}")
                 return False
         except Exception as e:
             self.log_test("Clear DB V2 - No Confirmation", False, f"Error: {str(e)}")
