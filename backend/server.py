@@ -1257,6 +1257,9 @@ async def delete_event(event_id: str):
         
         return {"message": "Событие удалено", "deleted_count": result.deleted_count}
     except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 🆕 API для очистки базы данных (работает с любой подключенной БД)
 @api_router.delete("/admin/clear-database")
