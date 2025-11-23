@@ -2525,6 +2525,12 @@ async def admin_settings_v2_api(request: Request):
     return templates.TemplateResponse("admin_settings_v2.html", {"request": request})
 
 
+# QR Code page endpoint (outside of /api router)
+@app.get("/expo-qr", response_class=HTMLResponse)
+async def expo_qr_page(request: Request):
+    """Serve QR codes page for Expo Go"""
+    return templates.TemplateResponse("expo_qr_page.html", {"request": request})
+
 # Include the router in the main app
 app.include_router(api_router)
 
