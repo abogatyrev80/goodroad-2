@@ -2525,6 +2525,18 @@ async def admin_settings_v2_api(request: Request):
     return templates.TemplateResponse("admin_settings_v2.html", {"request": request})
 
 
+# Admin Index - Main navigation page
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_index(request: Request):
+    """Serve the main admin navigation page"""
+    return templates.TemplateResponse("admin_index.html", {"request": request})
+
+# Also add via API router for deployment access
+@api_router.get("/admin", response_class=HTMLResponse)
+async def admin_index_api(request: Request):
+    """Serve the main admin navigation page via API route"""
+    return templates.TemplateResponse("admin_index.html", {"request": request})
+
 # QR Code page endpoint (outside of /api router)
 @app.get("/expo-qr", response_class=HTMLResponse)
 async def expo_qr_page(request: Request):
