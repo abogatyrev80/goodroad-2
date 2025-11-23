@@ -404,18 +404,20 @@
 ## metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 0
+  test_sequence: 1
   run_ui: false
 
 ## test_plan:
-  current_focus: []
+  current_focus:
+    - "Clear Database V2 API with Date Range Filter"
+    - "Admin Settings V2 UI - Database Clear with Date Filter"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 ## agent_communication:
     - agent: "main"
-    - message: "Implemented complete Good Road automotive navigation app with background location tracking, accelerometer monitoring, road condition analysis, and data upload capabilities. Backend has sensor data processing, road condition analysis using acceleration variance and spike detection. Frontend has real-time sensor monitoring with background task management. Ready for backend testing."
+    - message: "✅ РЕАЛИЗАЦИЯ ЗАВЕРШЕНА (2025-11-23): Добавлена функциональность очистки базы данных с фильтром по диапазону дат. BACKEND: Создан новый endpoint DELETE /api/admin/clear-database-v2 с параметрами date_from (начальная дата) и date_to (конечная дата). Endpoint поддерживает 4 режима работы: 1) Полная очистка (без параметров), 2) Диапазон дат (date_from + date_to), 3) С даты до сегодня (date_from), 4) До даты (date_to). Работает с 8 коллекциями MongoDB. Возвращает детальную статистику удалённых записей. FRONTEND: Обновлена админ-панель admin_settings_v2.html - добавлена секция 'Управление Базой Данных' с date pickers, полем подтверждения ('CONFIRM'), кнопкой очистки с двойным подтверждением (поле + alert), детальным отображением результатов. Готово к тестированию!"
     - agent: "main"
     - message: "🚀 STARTING PHASE 2 & 3 INTEGRATION (2025-01-19): Beginning integration of EventDetector (Phase 2) and BatchOfflineManager (Phase 3) into index.tsx. Current status: EventDetector is partially wired in index.tsx with basic initialization and accelerometer listener, but events are not flowing to BatchOfflineManager. BatchOfflineManager is created but not initialized or used in index.tsx. Plan: 1) Wire EventDetector events to BatchOfflineManager for batching, 2) Replace direct data upload with BatchOfflineManager flow, 3) Add UI for batch statistics, 4) Test backend connectivity. This will transform the simple 10-second periodic upload into intelligent event-driven batched synchronization."
     - agent: "main"
