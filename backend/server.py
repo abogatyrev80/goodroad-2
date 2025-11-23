@@ -1260,10 +1260,21 @@ async def delete_event(event_id: str):
 
 # 🆕 API для очистки базы данных (работает с любой подключенной БД)
 @api_router.delete("/admin/clear-database")
-async def clear_database(confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения")):
+async def clear_database(
+    confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
+    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)")
+):
     """
-    Очистить ВСЮ базу данных (локальную или Atlas)
-    ОПАСНО: Удаляет все данные без возможности восстановления!
+    Очистить базу данных (локальную или Atlas) с возможностью фильтрации по периоду
+    
+    Параметры:
+    - confirm: должно быть 'CONFIRM' для подтверждения
+    - days: удалить данные старше N дней (опционально)
+    
+    Примеры:
+    - /admin/clear-database?confirm=CONFIRM - удалить ВСЕ данные
+    - /admin/clear-database?confirm=CONFIRM&days=7 - удалить данные старше 7 дней
+    - /admin/clear-database?confirm=CONFIRM&days=30 - удалить данные старше 30 дней
     """
     if confirm != "CONFIRM":
         raise HTTPException(
@@ -1283,20 +1294,43 @@ async def clear_database(confirm: str = Query(..., description="Введите '
             'calibration_profiles'
         ]
         
+        # Определяем фильтр по дате
+        delete_filter = {}
+        if days is not None and days > 0:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            # Для коллекций с полем timestamp (datetime)
+            date_filter_timestamp = {"timestamp": {"$lt": cutoff_date}}
+            # Для коллекций с полем created_at (datetime)
+            date_filter_created = {"created_at": {"$lt": cutoff_date}}
+        else:
+            date_filter_timestamp = {}
+            date_filter_created = {}
+        
         results = {}
         total_deleted = 0
         
         for collection_name in collections_to_clear:
             try:
-                result = await db[collection_name].delete_many({})
+                # Выбираем правильный фильтр в зависимости от структуры коллекции
+                if collection_name in ['raw_sensor_data', 'sensor_data']:
+                    filter_to_use = date_filter_timestamp if days else {}
+                elif collection_name in ['road_conditions', 'road_warnings', 'user_warnings', 'processed_events', 'events']:
+                    filter_to_use = date_filter_created if days else {}
+                else:
+                    filter_to_use = {}
+                
+                result = await db[collection_name].delete_many(filter_to_use)
                 results[collection_name] = result.deleted_count
                 total_deleted += result.deleted_count
             except Exception as e:
                 results[collection_name] = f"Error: {str(e)}"
         
+        period_msg = f"старше {days} дней" if days else "все данные"
+        
         return {
-            "message": "База данных очищена",
+            "message": f"База данных очищена ({period_msg})",
             "database": db_name,
+            "period": f"{days} days" if days else "all time",
             "total_deleted": total_deleted,
             "details": results
         }
