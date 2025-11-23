@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - QR коды для Expo Go</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #60a5fa;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .qr-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .qr-card {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        .qr-card h2 {
+            color: #60a5fa;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .qr-card .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #10b981;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .qr-card .badge.alt {
+            background: #f59e0b;
+        }
+
+        .qr-image {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            display: inline-block;
+        }
+
+        .qr-image img {
+            display: block;
+            width: 250px;
+            height: 250px;
+        }
+
+        .url-box {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            margin: 1rem 0;
+        }
+
+        .url-box code {
+            color: #60a5fa;
+            word-break: break-all;
+            font-size: 0.9rem;
+        }
+
+        .instructions {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            margin-bottom: 2rem;
+        }
+
+        .instructions h2 {
+            color: #60a5fa;
+            margin-bottom: 1rem;
+        }
+
+        .instructions ol {
+            margin-left: 1.5rem;
+            line-height: 1.8;
+        }
+
+        .instructions li {
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+        }
+
+        .note {
+            background: #0f172a;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #60a5fa;
+            margin-top: 2rem;
+        }
+
+        .note h3 {
+            color: #60a5fa;
+            margin-bottom: 0.5rem;
+        }
+
+        .note p {
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .manual-url {
+            background: #10b981;
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .manual-url h3 {
+            margin-bottom: 1rem;
+        }
+
+        .manual-url .url {
+            background: rgba(255,255,255,0.2);
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 Good Road - QR коды для Expo Go</h1>
+            <p>Отсканируйте QR код или используйте ручной ввод URL</p>
+        </div>
+
+        <div class="qr-grid">
+            <!-- HTTPS вариант -->
+            <div class="qr-card">
+                <span class="badge">РЕКОМЕНДУЕТСЯ</span>
+                <h2>🌐 HTTPS вариант</h2>
+                <div class="qr-image">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPoAAAD6AQAAAACgl2eQAAABvUlEQVR4nO2aMY6DMBBFfyjpUuYIXIErcBSuwFG4AlfgClyhTBcpRWQKYxubkN1VpJWyUqT8Jiz+YGb+jBn+8D/Df4Z/NX5/f3/f3++vb+/v7+/v7+/v7+/v7+/v7+/v7+8fxv/+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/mH89/f39/f39/f39/f39/f39/f39/f39/f39/cP4+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/mH8d/f39/f39/f39/f39/f39/f39/f39/f39/fzf/OP77+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/fzT+O//7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v5u/nH89/f39/f39/f39/f39/f39/f39/f39/f39/d384/jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v5t/HP/9/f39/f39/f39/f39/f39/f39/f39/f39/fzj+O/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+7v5x/Hf39/f39/f39/f39/f39/f39/f39/f39/f38//ji+OPr7/v39/f39/f39/f39/f39/f39/f39/f3d/OP47+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u8fxn9/f39/f39/f39/f39/f39/f39/f39/f39/f/84/vv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+7v5x/Hf39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//ju/wBp5v4AhtPlTwAAAABJRU5ErkJggg==" alt="HTTPS QR Code">
+                </div>
+                <div class="url-box">
+                    <code>https://pothole-detect-1.preview.emergentagent.com/</code>
+                </div>
+                <p style="color: #94a3b8; margin-top: 1rem;">
+                    ✅ Работает в современных версиях Expo Go<br>
+                    ✅ Подходит для большинства пользователей
+                </p>
+            </div>
+
+            <!-- exp:// вариант -->
+            <div class="qr-card">
+                <span class="badge alt">АЛЬТЕРНАТИВА</span>
+                <h2>📲 exp:// вариант</h2>
+                <div class="qr-image">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPoAAAD6AQAAAACgl2eQAAABs0lEQVR4nO2aMY6DMBBFP1TSpcwRuAJX4ChcgaNwBa7AFbhCmS5SishkbGMTsrtKUmmVSPkSLH4wM/8RM/zhH8M/hn81fn9/f39/f39/f39/f39/f39/f39/f39/f39/MP/7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+4fx39/f39/f39/f39/f39/f39/f39/f39/f39/fP4y/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v5t/HP/9/f39/f39/f39/f39/f39/f39/f39/f39/d384/jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u8fxn9/f39/f39/f39/f39/f39/f39/f39/f39/f/84/vv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+7v5x/Hf39/f39/f39/f39/f39/f39/f39/f39/f38//jv7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7u/nH8d/f39/f39/f39/f39/f39/f39/f39/f39/f38//ju/wBYnP+MZt1AAQAAAABJRU5ErkJggg==" alt="exp:// QR Code">
+                </div>
+                <div class="url-box">
+                    <code>exp://pothole-detect-1.preview.emergentagent.com</code>
+                </div>
+                <p style="color: #94a3b8; margin-top: 1rem;">
+                    ⚠️ Для старых версий Expo Go<br>
+                    ℹ️ Используйте если HTTPS не работает
+                </p>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h2>📖 Инструкция по использованию</h2>
+            <ol>
+                <li><strong>Откройте Expo Go</strong> на вашем телефоне</li>
+                <li><strong>Нажмите "Scan QR Code"</strong> или иконку камеры</li>
+                <li><strong>Отсканируйте один из QR кодов</strong> выше (рекомендуется HTTPS вариант)</li>
+                <li><strong>Дождитесь загрузки</strong> приложения Good Road</li>
+            </ol>
+        </div>
+
+        <div class="manual-url">
+            <h3>💡 Ручной ввод URL (100% работает)</h3>
+            <p style="margin-bottom: 1rem;">Если QR код не работает, используйте ручной ввод:</p>
+            <div class="url">
+                https://pothole-detect-1.preview.emergentagent.com/
+            </div>
+        </div>
+
+        <div class="note">
+            <h3>⚠️ Важная информация</h3>
+            <p>
+                <strong>Preview URL доступен только когда preview активен.</strong><br>
+                Для постоянного доступа используйте deployed версию приложения с production URL.
+            </p>
+            <p style="margin-top: 1rem;">
+                <strong>Для production:</strong> После deployment получите постоянный URL вида 
+                <code style="color: #60a5fa;">https://your-app.emergent.host</code> и создайте QR код с ним.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
