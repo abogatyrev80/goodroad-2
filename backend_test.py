@@ -13,10 +13,12 @@ import sys
 # Backend URL from frontend/.env
 BACKEND_URL = "https://pothole-detect-1.preview.emergentagent.com/api"
 
-class EventDetectorTester:
+class BackendTester:
     def __init__(self):
         self.session = requests.Session()
         self.test_results = []
+        self.total_tests = 0
+        self.passed_tests = 0
         
     def log_test(self, test_name, success, details=""):
         """Log test results"""
