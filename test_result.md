@@ -412,7 +412,6 @@
 
 ## test_plan:
   current_focus:
-    - "Clear Database V2 API with Date Range Filter"
     - "Admin Settings V2 UI - Database Clear with Date Filter"
   stuck_tasks: []
   test_all: false
