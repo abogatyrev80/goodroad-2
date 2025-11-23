@@ -775,15 +775,88 @@ class BackendTester:
         except Exception as e:
             self.log_test("Event-Generated Warnings", False, f"Error: {str(e)}")
             
+    def run_clear_database_v2_tests(self):
+        """Run Clear Database V2 specific tests"""
+        print("🚀 Starting Clear Database V2 API Testing")
+        print(f"🎯 Backend URL: {BACKEND_URL}")
+        print("=" * 80)
+        
+        # Test basic connectivity first
+        if not self.test_api_connectivity():
+            print("❌ Backend connectivity failed. Stopping tests.")
+            return False
+        
+        # Add test data for filtering tests
+        self.add_test_data_for_clear_db()
+        
+        # Clear Database V2 test sequence
+        clear_db_tests = [
+            ("Clear DB V2 - No Confirmation", self.test_clear_database_v2_no_confirmation),
+            ("Clear DB V2 - Invalid Date", self.test_clear_database_v2_invalid_date),
+            ("Clear DB V2 - Date Range", self.test_clear_database_v2_date_range),
+            ("Clear DB V2 - From Date", self.test_clear_database_v2_from_date),
+            ("Clear DB V2 - To Date", self.test_clear_database_v2_to_date),
+        ]
+        
+        clear_db_passed = 0
+        
+        for test_name, test_func in clear_db_tests:
+            print(f"\n--- {test_name} ---")
+            try:
+                if test_func():
+                    clear_db_passed += 1
+            except Exception as e:
+                self.log_test(test_name, False, f"Test execution error: {str(e)}")
+        
+        # Summary for Clear Database V2 tests
+        print("\n" + "=" * 80)
+        print("📊 Clear Database V2 API Test Summary")
+        print("=" * 80)
+        
+        clear_db_success_rate = (clear_db_passed / len(clear_db_tests)) * 100
+        print(f"Clear DB V2 Tests Passed: {clear_db_passed}/{len(clear_db_tests)} ({clear_db_success_rate:.1f}%)")
+        
+        if clear_db_success_rate >= 80:
+            print("✅ CLEAR DATABASE V2 API: WORKING CORRECTLY")
+        else:
+            print("❌ CLEAR DATABASE V2 API: CRITICAL ISSUES FOUND")
+        
+        return clear_db_success_rate >= 80
+    
     def run_all_tests(self):
-        """Run all EventDetector and BatchOfflineManager tests"""
-        print("🚀 Starting EventDetector (Phase 2) and BatchOfflineManager (Phase 3) Backend Testing")
+        """Run all backend tests including Clear Database V2 and EventDetector tests"""
+        print("🚀 Starting Comprehensive Backend Testing Suite")
         print(f"Backend URL: {BACKEND_URL}")
         print("=" * 80)
         
-        # Test sequence
-        tests = [
-            ("API Connectivity", self.test_api_connectivity),
+        # Test basic connectivity first
+        if not self.test_api_connectivity():
+            print("❌ Backend connectivity failed. Stopping all tests.")
+            return False
+        
+        # Run Clear Database V2 tests (priority focus)
+        print("\n" + "🎯" * 20 + " CLEAR DATABASE V2 TESTS " + "🎯" * 20)
+        self.add_test_data_for_clear_db()
+        
+        clear_db_tests = [
+            ("Clear DB V2 - No Confirmation", self.test_clear_database_v2_no_confirmation),
+            ("Clear DB V2 - Invalid Date", self.test_clear_database_v2_invalid_date),
+            ("Clear DB V2 - Date Range", self.test_clear_database_v2_date_range),
+            ("Clear DB V2 - From Date", self.test_clear_database_v2_from_date),
+            ("Clear DB V2 - To Date", self.test_clear_database_v2_to_date),
+        ]
+        
+        for test_name, test_func in clear_db_tests:
+            print(f"\n--- {test_name} ---")
+            try:
+                test_func()
+            except Exception as e:
+                self.log_test(test_name, False, f"Test execution error: {str(e)}")
+        
+        # Run EventDetector tests (existing functionality)
+        print("\n" + "🎯" * 20 + " EVENTDETECTOR TESTS " + "🎯" * 20)
+        
+        event_tests = [
             ("Event Type Data Processing", self.test_event_type_sensor_data),
             ("Severity Mapping", self.test_severity_mapping),
             ("Warning Generation", self.test_warning_generation),
@@ -791,24 +864,29 @@ class BackendTester:
             ("Database Verification", self.test_database_verification)
         ]
         
-        passed_tests = 0
-        total_tests = len(tests)
-        
-        for test_name, test_func in tests:
+        for test_name, test_func in event_tests:
             print(f"\n--- {test_name} ---")
             try:
-                if test_func():
-                    passed_tests += 1
+                test_func()
             except Exception as e:
                 self.log_test(test_name, False, f"Test execution error: {str(e)}")
                 
-        # Summary
+        # Overall Summary
         print("\n" + "=" * 80)
-        print("🎯 EventDetector & BatchOfflineManager Backend Test Summary")
+        print("🎯 COMPREHENSIVE BACKEND TEST SUMMARY")
         print("=" * 80)
         
-        success_rate = (passed_tests / total_tests) * 100
-        print(f"Tests Passed: {passed_tests}/{total_tests} ({success_rate:.1f}%)")
+        success_rate = (self.passed_tests / self.total_tests) * 100 if self.total_tests > 0 else 0
+        print(f"Overall Tests Passed: {self.passed_tests}/{self.total_tests} ({success_rate:.1f}%)")
+        
+        # Separate Clear DB V2 results
+        clear_db_results = [r for r in self.test_results if "Clear DB V2" in r["test"]]
+        clear_db_passed = sum(1 for r in clear_db_results if r["success"])
+        clear_db_total = len(clear_db_results)
+        
+        if clear_db_total > 0:
+            clear_db_rate = (clear_db_passed / clear_db_total) * 100
+            print(f"Clear Database V2 Tests: {clear_db_passed}/{clear_db_total} ({clear_db_rate:.1f}%)")
         
         if success_rate >= 80:
             print("✅ OVERALL STATUS: BACKEND FUNCTIONALITY WORKING")
