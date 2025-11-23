@@ -22,6 +22,10 @@ class BackendTester:
         
     def log_test(self, test_name, success, details=""):
         """Log test results"""
+        self.total_tests += 1
+        if success:
+            self.passed_tests += 1
+        
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status}: {test_name}")
         if details:
