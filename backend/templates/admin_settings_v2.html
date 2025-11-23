@@ -279,6 +279,41 @@
 
             <div id="message" class="message"></div>
         </div>
+
+        <!-- Новая секция: Очистка базы данных -->
+        <div class="section">
+            <h2>🗑️ Управление Базой Данных</h2>
+            
+            <div class="description">
+                <p><strong>Очистка данных по диапазону дат:</strong></p>
+                <p>• Выберите диапазон дат для удаления данных</p>
+                <p>• Оставьте поля пустыми для полной очистки базы данных</p>
+                <p>• <strong>Внимание:</strong> Действие необратимо!</p>
+            </div>
+
+            <div class="threshold-card">
+                <h3>📅 Период Очистки</h3>
+                <div class="param-group">
+                    <label>Дата начала (включительно):</label>
+                    <input type="date" id="date-from" placeholder="YYYY-MM-DD">
+                </div>
+                <div class="param-group">
+                    <label>Дата окончания (включительно):</label>
+                    <input type="date" id="date-to" placeholder="YYYY-MM-DD">
+                </div>
+                <div class="param-group">
+                    <label style="color: #ef4444; font-weight: bold;">Подтверждение:</label>
+                    <input type="text" id="confirm-delete" placeholder='Введите "CONFIRM" для подтверждения' style="border-color: #ef4444;">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-danger" onclick="clearDatabase()">⚠️ Очистить базу данных</button>
+                <button class="btn btn-secondary" onclick="clearDatabaseInputs()">🔄 Сбросить поля</button>
+            </div>
+
+            <div id="db-message" class="message"></div>
+        </div>
     </div>
 
     <script>
