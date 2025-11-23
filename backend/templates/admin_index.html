@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Панель управления</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .header .version {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.3rem 1rem;
+            border-radius: 20px;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-right: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .card-description {
+            color: #718096;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .card-features {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .card-features li {
+            color: #4a5568;
+            padding: 0.3rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .card-features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #48bb78;
+            font-weight: bold;
+        }
+
+        .card-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        .badge-new {
+            background: #48bb78;
+            color: white;
+        }
+
+        .badge-legacy {
+            background: #edf2f7;
+            color: #718096;
+        }
+
+        .badge-tools {
+            background: #4299e1;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 3rem;
+            opacity: 0.8;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255,255,255,0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-top: 1rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #48bb78;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Good Road</h1>
+            <p>Система мониторинга качества дорог</p>
+            <div class="version">v2.0.0</div>
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                Система работает
+            </div>
+        </div>
+
+        <div class="cards-grid">
+            <!-- Dashboard V2 -->
+            <a href="/api/admin/dashboard/v2" class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Dashboard V2</div>
+                </div>
+                <div class="card-description">
+                    Основная панель управления с визуализацией данных и аналитикой событий на дороге
+                </div>
+                <ul class="card-features">
+                    <li>Визуализация событий на карте</li>
+                    <li>Аналитика и статистика</li>
+                    <li>Фильтрация по типам событий</li>
+                    <li>Тепловая карта дорожных условий</li>
+                </ul>
+                <span class="card-badge badge-new">НОВАЯ АРХИТЕКТУРА</span>
+            </a>
+
+            <!-- ML Settings -->
+            <a href="/api/admin/settings/v2" class="card">
+                <div class="card-header">
+                    <div class="card-icon">⚙️</div>
+                    <div class="card-title">Настройки ML</div>
+                </div>
+                <div class="card-description">
+                    Управление параметрами машинного обучения и очистка базы данных
+                </div>
+                <ul class="card-features">
+                    <li>Настройка чувствительности детекции</li>
+                    <li>Пороговые значения для событий</li>
+                    <li>Очистка БД по диапазону дат</li>
+                    <li>Управление данными</li>
+                </ul>
+                <span class="card-badge badge-new">С ФИЛЬТРОМ ДАТ</span>
+            </a>
+
+            <!-- Dashboard V1 (Legacy) -->
+            <a href="/api/admin/dashboard" class="card">
+                <div class="card-header">
+                    <div class="card-icon">📈</div>
+                    <div class="card-title">Dashboard V1</div>
+                </div>
+                <div class="card-description">
+                    Оригинальная панель управления для работы со старой архитектурой данных
+                </div>
+                <ul class="card-features">
+                    <li>Совместимость со старыми данными</li>
+                    <li>Базовая визуализация</li>
+                    <li>Экспорт данных</li>
+                    <li>Ручное редактирование точек</li>
+                </ul>
+                <span class="card-badge badge-legacy">LEGACY</span>
+            </a>
+
+            <!-- QR Codes -->
+            <a href="/expo-qr" class="card">
+                <div class="card-header">
+                    <div class="card-icon">📱</div>
+                    <div class="card-title">QR коды Expo</div>
+                </div>
+                <div class="card-description">
+                    QR коды для подключения мобильного приложения через Expo Go
+                </div>
+                <ul class="card-features">
+                    <li>HTTPS вариант QR кода</li>
+                    <li>exp:// протокол</li>
+                    <li>Инструкции по подключению</li>
+                    <li>Ручной ввод URL</li>
+                </ul>
+                <span class="card-badge badge-tools">ИНСТРУМЕНТЫ</span>
+            </a>
+
+            <!-- API Documentation -->
+            <a href="/api/" class="card">
+                <div class="card-header">
+                    <div class="card-icon">📚</div>
+                    <div class="card-title">API Info</div>
+                </div>
+                <div class="card-description">
+                    Информация о API и статус подключения к базе данных
+                </div>
+                <ul class="card-features">
+                    <li>Версия API</li>
+                    <li>Статус MongoDB</li>
+                    <li>Системная информация</li>
+                    <li>Health check</li>
+                </ul>
+                <span class="card-badge badge-tools">API</span>
+            </a>
+
+            <!-- API Docs -->
+            <a href="/docs" class="card">
+                <div class="card-header">
+                    <div class="card-icon">📖</div>
+                    <div class="card-title">API Docs</div>
+                </div>
+                <div class="card-description">
+                    Интерактивная документация API с возможностью тестирования endpoints
+                </div>
+                <ul class="card-features">
+                    <li>Swagger UI интерфейс</li>
+                    <li>Тестирование endpoints</li>
+                    <li>Схемы данных</li>
+                    <li>Примеры запросов</li>
+                </ul>
+                <span class="card-badge badge-tools">SWAGGER</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>Good Road © 2025 | Smart Road Monitoring System</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                Архитектура: React Native + FastAPI + MongoDB
+            </p>
+        </div>
+    </div>
+</body>
+</html>
