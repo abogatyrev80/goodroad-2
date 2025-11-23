@@ -904,6 +904,6 @@ class BackendTester:
         return success_rate >= 80
 
 if __name__ == "__main__":
-    tester = EventDetectorTester()
+    tester = BackendTester()
     success = tester.run_all_tests()
     sys.exit(0 if success else 1)
