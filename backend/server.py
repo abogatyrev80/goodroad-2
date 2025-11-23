@@ -1341,6 +1341,114 @@ async def clear_database(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# 🆕 API для очистки базы данных V2 с фильтром по диапазону дат
+@api_router.delete("/admin/clear-database-v2")
+async def clear_database_v2(
+    confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
+    date_from: Optional[str] = Query(None, description="Начальная дата для удаления (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Конечная дата для удаления (YYYY-MM-DD)")
+):
+    """
+    Очистить базу данных с возможностью фильтрации по диапазону дат
+    
+    Параметры:
+    - confirm: должно быть 'CONFIRM' для подтверждения
+    - date_from: начальная дата (включительно) в формате YYYY-MM-DD
+    - date_to: конечная дата (включительно) в формате YYYY-MM-DD
+    
+    Примеры:
+    - /admin/clear-database-v2?confirm=CONFIRM - удалить ВСЕ данные
+    - /admin/clear-database-v2?confirm=CONFIRM&date_from=2025-01-01&date_to=2025-01-31 - удалить данные за январь 2025
+    - /admin/clear-database-v2?confirm=CONFIRM&date_to=2024-12-31 - удалить все данные до конца 2024 года
+    - /admin/clear-database-v2?confirm=CONFIRM&date_from=2024-01-01 - удалить все данные с начала 2024 года
+    """
+    if confirm != "CONFIRM":
+        raise HTTPException(
+            status_code=400, 
+            detail="Для подтверждения передайте параметр confirm=CONFIRM"
+        )
+    
+    try:
+        collections_to_clear = [
+            'raw_sensor_data',
+            'processed_events', 
+            'events',
+            'user_warnings',
+            'road_conditions',
+            'road_warnings',
+            'sensor_data',
+            'calibration_profiles'
+        ]
+        
+        # Определяем фильтры по диапазону дат
+        date_filter_timestamp = {}
+        date_filter_created = {}
+        
+        if date_from or date_to:
+            # Для коллекций с полем timestamp (datetime)
+            timestamp_conditions = {}
+            if date_from:
+                from_date = datetime.fromisoformat(date_from)
+                timestamp_conditions["$gte"] = from_date
+            if date_to:
+                to_date = datetime.fromisoformat(date_to + "T23:59:59")
+                timestamp_conditions["$lte"] = to_date
+            date_filter_timestamp = {"timestamp": timestamp_conditions}
+            
+            # Для коллекций с полем created_at (datetime)
+            created_conditions = {}
+            if date_from:
+                from_date = datetime.fromisoformat(date_from)
+                created_conditions["$gte"] = from_date
+            if date_to:
+                to_date = datetime.fromisoformat(date_to + "T23:59:59")
+                created_conditions["$lte"] = to_date
+            date_filter_created = {"created_at": created_conditions}
+        
+        results = {}
+        total_deleted = 0
+        
+        for collection_name in collections_to_clear:
+            try:
+                # Выбираем правильный фильтр в зависимости от структуры коллекции
+                if collection_name in ['raw_sensor_data', 'sensor_data']:
+                    filter_to_use = date_filter_timestamp if (date_from or date_to) else {}
+                elif collection_name in ['road_conditions', 'road_warnings', 'user_warnings', 'processed_events', 'events']:
+                    filter_to_use = date_filter_created if (date_from or date_to) else {}
+                else:
+                    filter_to_use = {}
+                
+                result = await db[collection_name].delete_many(filter_to_use)
+                results[collection_name] = result.deleted_count
+                total_deleted += result.deleted_count
+            except Exception as e:
+                results[collection_name] = f"Error: {str(e)}"
+        
+        # Формируем сообщение о периоде
+        if date_from and date_to:
+            period_msg = f"с {date_from} по {date_to}"
+        elif date_from:
+            period_msg = f"с {date_from} до сегодня"
+        elif date_to:
+            period_msg = f"до {date_to}"
+        else:
+            period_msg = "все данные"
+        
+        return {
+            "message": f"База данных очищена ({period_msg})",
+            "database": db_name,
+            "period": {
+                "from": date_from,
+                "to": date_to
+            },
+            "total_deleted": total_deleted,
+            "details": results
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Неверный формат даты: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 🆕 API для редактирования raw data
 @api_router.delete("/admin/v2/raw-data/{data_id}")
 async def delete_raw_data(data_id: str):
