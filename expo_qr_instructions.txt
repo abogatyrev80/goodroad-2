@@ -1,0 +1,30 @@
+=== ИНСТРУКЦИИ ПО ИСПОЛЬЗОВАНИЮ QR КОДОВ ===
+
+Созданы 2 варианта QR кодов для Expo Go:
+
+1. HTTPS вариант (РЕКОМЕНДУЕТСЯ):
+   Файл: /app/expo_qr_for_expo_go.png
+   URL: https://pothole-detect-1.preview.emergentagent.com/
+   Использование: Работает в современных версиях Expo Go
+
+2. exp:// вариант (АЛЬТЕРНАТИВА):
+   Файл: /app/expo_qr_exp.png
+   URL: exp://pothole-detect-1.preview.emergentagent.com
+   Использование: Для старых версий Expo Go
+
+=== КАК ИСПОЛЬЗОВАТЬ ===
+
+В Expo Go приложении:
+1. Откройте Expo Go на телефоне
+2. Нажмите 'Scan QR Code'
+3. Отсканируйте один из созданных QR кодов
+
+ИЛИ
+
+1. Откройте Expo Go на телефоне
+2. Нажмите 'Enter URL manually'
+3. Введите: https://pothole-detect-1.preview.emergentagent.com/
+
+=== ПРИМЕЧАНИЕ ===
+Если QR код не работает, используйте ручной ввод URL.
+Это самый надежный способ.
