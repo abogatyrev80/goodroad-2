@@ -362,47 +362,6 @@ async def root():
 
 # Legacy /sensor-data endpoint removed - use /raw-data instead
 
-@api_router.post("/cleanup-expired-obstacles")
-async def cleanup_expired_obstacles():
-    """Очистить устаревшие препятствия (cron-задача)"""
-    try:
-        now = datetime.utcnow()
-        
-        # Найти устаревшие препятствия
-        expired = await db.road_conditions.find({
-            "expires_at": {"$lt": now},
-            "status": "active"
-        }).to_list(length=1000)
-        
-        # Пометить как устаревшие
-        if expired:
-            expired_ids = [e["_id"] for e in expired]
-            result = await db.road_conditions.update_many(
-                {"_id": {"$in": expired_ids}},
-                {
-                    "$set": {
-                        "status": "expired",
-                        "updated_at": now
-                    }
-                }
-            )
-            
-            print(f"🕒 Помечено {result.modified_count} препятствий как устаревшие")
-            
-            return {
-                "message": "Cleanup completed",
-                "expired_count": result.modified_count,
-                "timestamp": now
-            }
-        
-        return {
-            "message": "No expired obstacles found",
-            "expired_count": 0,
-            "timestamp": now
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @api_router.get("/ml-statistics")
 async def get_ml_statistics():
     """Get ML-ready statistics with variance, speed, and delta values"""
@@ -1235,12 +1194,6 @@ async def delete_raw_data(data_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@api_router.get("/admin/sensor-data")
-async def get_all_sensor_data(
-    limit: int = Query(1000, description="Maximum number of records to return"),
-    skip: int = Query(0, description="Number of records to skip"),
-    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
 ):
     """
     Get all sensor data for administrative analysis
@@ -1329,10 +1282,6 @@ async def get_all_sensor_data(
         logging.error(f"Error getting admin sensor data: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving admin data: {str(e)}")
 
-@api_router.patch("/admin/sensor-data/{point_id}")
-async def update_sensor_data_classification(
-    point_id: str,
-    updates: AdminSensorDataUpdate
 ):
     """
     Update sensor data point classification by administrator
@@ -1381,108 +1330,6 @@ async def update_sensor_data_classification(
         logging.error(f"Error updating sensor data point {point_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error updating data point: {str(e)}")
 
-@api_router.get("/admin/analytics")
-async def get_admin_analytics():
-    """
-    Get analytics data for administrative dashboard
-    """
-    try:
-        # Basic statistics
-        total_points = await db.sensor_data.count_documents({})
-        verified_points = await db.sensor_data.count_documents({"is_verified": True})
-        hazard_points = await db.sensor_data.count_documents({"hazard_type": {"$ne": None}})
-        
-        # Calculate average road quality
-        pipeline = [
-            {"$match": {"road_quality_score": {"$exists": True}}},
-            {"$group": {
-                "_id": None,
-                "avg_quality": {"$avg": "$road_quality_score"},
-                "min_quality": {"$min": "$road_quality_score"},
-                "max_quality": {"$max": "$road_quality_score"}
-            }}
-        ]
-        
-        quality_stats = []
-        async for result in db.sensor_data.aggregate(pipeline):
-            quality_stats.append(result)
-        
-        avg_road_quality = quality_stats[0]["avg_quality"] if quality_stats else 0
-        
-        # Recent activity (last 7 days)
-        week_ago = datetime.now() - timedelta(days=7)
-        recent_points = await db.sensor_data.count_documents({
-            "timestamp": {"$gte": week_ago}
-        })
-        
-        # Hazard types distribution
-        hazard_pipeline = [
-            {"$match": {"hazard_type": {"$ne": None}}},
-            {"$group": {
-                "_id": "$hazard_type",
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"count": -1}}
-        ]
-        
-        hazard_distribution = []
-        async for result in db.sensor_data.aggregate(hazard_pipeline):
-            hazard_distribution.append({
-                "hazard_type": result["_id"],
-                "count": result["count"]
-            })
-        
-        # Quality distribution by ranges
-        quality_ranges = [
-            {"name": "Excellent", "min": 80, "max": 100},
-            {"name": "Good", "min": 60, "max": 79},
-            {"name": "Fair", "min": 40, "max": 59},
-            {"name": "Poor", "min": 20, "max": 39},
-            {"name": "Very Poor", "min": 0, "max": 19}
-        ]
-        
-        quality_distribution = []
-        for range_info in quality_ranges:
-            count = await db.sensor_data.count_documents({
-                "road_quality_score": {
-                    "$gte": range_info["min"],
-                    "$lte": range_info["max"]
-                }
-            })
-            quality_distribution.append({
-                "range": range_info["name"],
-                "min": range_info["min"],
-                "max": range_info["max"],
-                "count": count
-            })
-        
-        return {
-            "total_points": total_points,
-            "verified_points": verified_points,
-            "hazard_points": hazard_points,
-            "unverified_points": total_points - verified_points,
-            "avg_road_quality": round(avg_road_quality, 1) if avg_road_quality else 0,
-            "recent_points_7d": recent_points,
-            "hazard_distribution": hazard_distribution,
-            "quality_distribution": quality_distribution,
-            "quality_stats": quality_stats[0] if quality_stats else {
-                "avg_quality": 0,
-                "min_quality": 0,
-                "max_quality": 100
-            }
-        }
-        
-    except Exception as e:
-        logging.error(f"Error getting admin analytics: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving analytics: {str(e)}")
-
-@api_router.get("/admin/heatmap-data")
-async def get_heatmap_data(
-    southwest_lat: float = Query(..., description="Southwest corner latitude"),
-    southwest_lng: float = Query(..., description="Southwest corner longitude"), 
-    northeast_lat: float = Query(..., description="Northeast corner latitude"),
-    northeast_lng: float = Query(..., description="Northeast corner longitude"),
-    zoom_level: int = Query(10, description="Map zoom level for data density")
 ):
     """
     Get sensor data formatted for heatmap display on maps
@@ -1573,98 +1420,6 @@ async def get_heatmap_data(
     except Exception as e:
         logging.error(f"Error getting heatmap data: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving heatmap data: {str(e)}")
-
-@api_router.delete("/data/cleanup")
-async def cleanup_old_data():
-    """Clean up old sensor data (older than 30 days)"""
-    try:
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
-        
-        # Delete old sensor data
-        sensor_result = await db.sensor_data.delete_many({
-            "timestamp": {"$lt": cutoff_date}
-        })
-        
-        # Delete old warnings
-        warning_result = await db.road_warnings.delete_many({
-            "created_at": {"$lt": cutoff_date}
-        })
-        
-        return {
-            "message": "Data cleanup completed",
-            "deletedSensorBatches": sensor_result.deleted_count,
-            "deletedWarnings": warning_result.deleted_count
-        }
-        
-    except Exception as e:
-        logging.error(f"Error during data cleanup: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error during data cleanup: {str(e)}")
-
-@api_router.delete("/admin/sensor-data/{point_id}")
-async def delete_sensor_data_point(point_id: str):
-    """
-    Delete a specific sensor data point by ID
-    """
-    try:
-        from bson import ObjectId
-        
-        # Convert string ID to ObjectId
-        try:
-            object_id = ObjectId(point_id)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid point ID format")
-        
-        # Delete the document
-        result = await db.sensor_data.delete_one({"_id": object_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Sensor data point not found")
-        
-        return {
-            "message": "Sensor data point deleted successfully",
-            "point_id": point_id,
-            "deleted": True
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error deleting sensor data point {point_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error deleting data point: {str(e)}")
-
-@api_router.delete("/admin/cleanup-test-data")
-async def cleanup_test_data():
-    """
-    Delete all test sensor data records (devices with 'test' in deviceId)
-    """
-    try:
-        # Find all records with 'test' in deviceId (case insensitive)
-        query = {
-            "deviceId": {"$regex": "test", "$options": "i"}
-        }
-        
-        # Count before deletion
-        count_before = await db.sensor_data.count_documents(query)
-        
-        # Delete test records
-        result = await db.sensor_data.delete_many(query)
-        
-        # Get remaining count
-        remaining_count = await db.sensor_data.count_documents({})
-        
-        return {
-            "message": "Test data cleanup completed",
-            "deleted_records": result.deleted_count,
-            "found_test_records": count_before,
-            "remaining_records": remaining_count,
-            "test_pattern": "deviceId containing 'test' (case insensitive)"
-        }
-        
-    except Exception as e:
-        logging.error(f"Error during test data cleanup: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error during test data cleanup: {str(e)}")
-
-# === CALIBRATION ENDPOINTS ===
 
 @api_router.post("/calibration/submit")
 async def submit_calibration_data(calibration: CalibrationData):
@@ -1901,115 +1656,6 @@ class BulkDeleteFilters(BaseModel):
     hazard_type: Optional[str] = None
     is_verified: Optional[bool] = None
 
-@api_router.post("/admin/sensor-data/count-by-filters")
-async def count_data_by_filters(filters: BulkDeleteFilters):
-    """
-    Count number of records matching the given filters (preview before delete)
-    """
-    try:
-        query = {}
-        
-        # Date filters
-        if filters.date_from or filters.date_to:
-            date_filter = {}
-            if filters.date_from:
-                date_filter["$gte"] = datetime.fromisoformat(filters.date_from)
-            if filters.date_to:
-                date_filter["$lte"] = datetime.fromisoformat(filters.date_to + "T23:59:59")
-            query["timestamp"] = date_filter
-        
-        # GPS coordinate filters
-        if filters.lat_min is not None or filters.lat_max is not None:
-            lat_filter = {}
-            if filters.lat_min is not None:
-                lat_filter["$gte"] = filters.lat_min
-            if filters.lat_max is not None:
-                lat_filter["$lte"] = filters.lat_max
-            # Note: We need to check rawData array for coordinates
-            # This is a simplified version - in production might need aggregation
-        
-        # Hazard type filter
-        if filters.hazard_type:
-            query["hazard_type"] = filters.hazard_type
-        
-        # Verification status filter
-        if filters.is_verified is not None:
-            query["is_verified"] = filters.is_verified
-        
-        # Count matching records
-        count = await db.sensor_data.count_documents(query)
-        
-        # Get sample records (first 5)
-        sample = await db.sensor_data.find(query).limit(5).to_list(5)
-        sample_data = []
-        for doc in sample:
-            sample_data.append({
-                "_id": str(doc["_id"]),
-                "timestamp": doc.get("timestamp", datetime.now()).isoformat(),
-                "deviceId": doc.get("deviceId", "unknown")
-            })
-        
-        return {
-            "count": count,
-            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None},
-            "sample_records": sample_data
-        }
-        
-    except Exception as e:
-        logging.error(f"Error counting data by filters: {e}")
-        raise HTTPException(status_code=500, detail=f"Error counting data: {str(e)}")
-
-@api_router.delete("/admin/sensor-data/bulk")
-async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
-    """
-    Bulk delete sensor data records matching the given filters
-    """
-    try:
-        query = {}
-        
-        # Date filters
-        if filters.date_from or filters.date_to:
-            date_filter = {}
-            if filters.date_from:
-                date_filter["$gte"] = datetime.fromisoformat(filters.date_from)
-            if filters.date_to:
-                date_filter["$lte"] = datetime.fromisoformat(filters.date_to + "T23:59:59")
-            query["timestamp"] = date_filter
-        
-        # Hazard type filter
-        if filters.hazard_type:
-            query["hazard_type"] = filters.hazard_type
-        
-        # Verification status filter
-        if filters.is_verified is not None:
-            query["is_verified"] = filters.is_verified
-        
-        # Count before deletion
-        count_before = await db.sensor_data.count_documents(query)
-        
-        # Delete matching records
-        result = await db.sensor_data.delete_many(query)
-        
-        # Get remaining count
-        remaining_count = await db.sensor_data.count_documents({})
-        
-        return {
-            "message": "Bulk deletion completed",
-            "deleted_count": result.deleted_count,
-            "matched_count": count_before,
-            "remaining_records": remaining_count,
-            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None}
-        }
-        
-    except Exception as e:
-        logging.error(f"Error during bulk deletion: {e}")
-        raise HTTPException(status_code=500, detail=f"Error during bulk deletion: {str(e)}")
-
-@api_router.get("/admin/sensor-data/export/csv")
-async def export_sensor_data_csv(
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    limit: int = Query(10000, description="Maximum records to export")
 ):
     """
     Export sensor data as CSV file
@@ -2106,144 +1752,6 @@ async def export_sensor_data_csv(
         logging.error(f"Error exporting CSV: {e}")
         raise HTTPException(status_code=500, detail=f"Error exporting data: {str(e)}")
 
-@api_router.post("/admin/sensor-data/import/csv")
-async def import_sensor_data_csv(file: UploadFile = File(...)):
-    """
-    Import sensor data from CSV file
-    """
-    try:
-        # Read CSV file
-        contents = await file.read()
-        decoded = contents.decode('utf-8')
-        csv_reader = csv.DictReader(io.StringIO(decoded))
-        
-        imported_count = 0
-        error_count = 0
-        errors = []
-        
-        for row in csv_reader:
-            try:
-                # Create sensor data document
-                doc = {
-                    "deviceId": row.get("Device ID", "imported"),
-                    "timestamp": datetime.fromisoformat(row["Timestamp"]) if row.get("Timestamp") else datetime.now(),
-                    "rawData": [
-                        {
-                            "type": "location",
-                            "timestamp": int(datetime.now().timestamp() * 1000),
-                            "data": {
-                                "latitude": float(row.get("Latitude", 0)),
-                                "longitude": float(row.get("Longitude", 0)),
-                                "speed": float(row.get("Speed", 0)),
-                                "accuracy": float(row.get("Accuracy", 0))
-                            }
-                        },
-                        {
-                            "type": "accelerometer",
-                            "timestamp": int(datetime.now().timestamp() * 1000),
-                            "data": {
-                                "x": float(row.get("Accel_X", 0)),
-                                "y": float(row.get("Accel_Y", 0)),
-                                "z": float(row.get("Accel_Z", 0))
-                            }
-                        }
-                    ],
-                    "road_quality_score": float(row.get("Road Quality", 50)),
-                    "hazard_type": row.get("Hazard Type") if row.get("Hazard Type") else None,
-                    "severity": row.get("Severity", "medium"),
-                    "is_verified": row.get("Verified", "").lower() == "true",
-                    "admin_notes": row.get("Admin Notes", "")
-                }
-                
-                await db.sensor_data.insert_one(doc)
-                imported_count += 1
-                
-            except Exception as row_error:
-                error_count += 1
-                errors.append(f"Row {imported_count + error_count}: {str(row_error)}")
-                if len(errors) < 10:  # Limit error messages
-                    continue
-        
-        return {
-            "message": "Import completed",
-            "imported_count": imported_count,
-            "error_count": error_count,
-            "errors": errors[:10]  # Return first 10 errors
-        }
-        
-    except Exception as e:
-        logging.error(f"Error importing CSV: {e}")
-        raise HTTPException(status_code=500, detail=f"Error importing data: {str(e)}")
-
-@api_router.delete("/admin/cleanup-zero-coords")
-async def cleanup_zero_coordinates():
-    """
-    Delete all sensor data records with zero GPS coordinates (0.0, 0.0)
-    This removes invalid/corrupted GPS data from the database
-    """
-    try:
-        # Find all records with zero coordinates
-        # Since we now extract coordinates from rawData, we need to check rawData structure
-        
-        # First, let's get all records and check which ones have no valid GPS data
-        cursor = db.sensor_data.find({})
-        
-        records_to_delete = []
-        async for document in cursor:
-            has_valid_gps = False
-            raw_data = document.get("rawData", [])
-            
-            for item in raw_data:
-                # Обработка старого формата (location)
-                if item.get("type") == "location" and "data" in item:
-                    location_data = item["data"]
-                    lat = location_data.get("latitude", 0)
-                    lng = location_data.get("longitude", 0)
-                    
-                    # If we found non-zero coordinates, this record is valid
-                    if lat != 0.0 and lng != 0.0:
-                        has_valid_gps = True
-                        break
-                # Обработка нового формата (event) - НОВОЕ
-                elif item.get("type") == "event" and "data" in item:
-                    event_data_item = item["data"]
-                    # Location находится внутри data.location
-                    location_in_event = event_data_item.get("location", {})
-                    if location_in_event:
-                        lat = location_in_event.get("latitude", 0)
-                        lng = location_in_event.get("longitude", 0)
-                        
-                        # If we found non-zero coordinates, this record is valid
-                        if lat != 0.0 and lng != 0.0:
-                            has_valid_gps = True
-                            break
-            
-            # If no valid GPS data found, mark for deletion
-            if not has_valid_gps:
-                records_to_delete.append(document["_id"])
-        
-        # Delete records without valid GPS coordinates
-        if records_to_delete:
-            delete_result = await db.sensor_data.delete_many({
-                "_id": {"$in": records_to_delete}
-            })
-            deleted_count = delete_result.deleted_count
-        else:
-            deleted_count = 0
-        
-        return {
-            "message": "Zero coordinate cleanup completed",
-            "deleted_records": deleted_count,
-            "analyzed_records": len(records_to_delete) + await db.sensor_data.count_documents({}) if records_to_delete else await db.sensor_data.count_documents({}),
-            "remaining_records": await db.sensor_data.count_documents({})
-        }
-        
-    except Exception as e:
-        logging.error(f"Error during zero coordinate cleanup: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
-
-
-# Admin Dashboard Route - accessible via /api/admin/dashboard
 @api_router.api_route("/admin/dashboard", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def admin_dashboard_api(request: Request):
     """Serve the admin dashboard web interface via API route"""
@@ -2269,11 +1777,6 @@ async def health_check():
         }
 
 # Legacy route for local access
-@app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    """Serve the admin dashboard web interface (local access)"""
-    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
-
 @app.get("/admin/dashboard/v2", response_class=HTMLResponse)
 async def admin_dashboard_v2(request: Request):
     """Serve the NEW admin dashboard v2 for new architecture"""
