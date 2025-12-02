@@ -2537,6 +2537,17 @@ async def admin_index_api(request: Request):
     """Serve the main admin navigation page via API route"""
     return templates.TemplateResponse("admin_index.html", {"request": request})
 
+# API Endpoints documentation page
+@app.get("/admin/api-docs", response_class=HTMLResponse)
+async def api_endpoints_page(request: Request):
+    """Serve the API endpoints documentation page"""
+    return templates.TemplateResponse("api_endpoints.html", {"request": request})
+
+@api_router.get("/admin/api-docs", response_class=HTMLResponse)
+async def api_endpoints_page_api(request: Request):
+    """Serve the API endpoints documentation page via API route"""
+    return templates.TemplateResponse("api_endpoints.html", {"request": request})
+
 # QR Code page endpoint (outside of /api router)
 @app.get("/expo-qr", response_class=HTMLResponse)
 async def expo_qr_page(request: Request):
