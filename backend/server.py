@@ -2478,7 +2478,7 @@ async def cleanup_zero_coordinates():
 
 
 # Admin Dashboard Route - accessible via /api/admin/dashboard
-@api_router.get("/admin/dashboard", response_class=HTMLResponse)
+@api_router.api_route("/admin/dashboard", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def admin_dashboard_api(request: Request):
     """Serve the admin dashboard web interface via API route"""
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
