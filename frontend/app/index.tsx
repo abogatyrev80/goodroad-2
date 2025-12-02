@@ -187,34 +187,55 @@ export default function GoodRoadApp() {
         }
       });
       
-      // Запуск динамического сбора данных (частота зависит от скорости)
-      const startDynamicCollection = () => {
+      // 🆕 Новый алгоритм: Сбор синхронизированных пакетов каждую секунду
+      const collectSyncedPacket = () => {
         if (currentLocation && rawDataCollector.current) {
-          // 🆕 Передаем весь буфер накопленных данных акселерометра
+          // Берем snapshot акселерометра за последнюю секунду (~10 значений при 10Hz)
           const accelerometerSnapshot = [...accelerometerBuffer.current];
           
-          // Очищаем буфер после snapshot
+          // Очищаем буфер акселерометра для следующей секунды
           accelerometerBuffer.current = [];
           
-          console.log(`📊 Собрано ${accelerometerSnapshot.length} значений акселерометра`);
+          // Создаем синхронизированный пакет данных
+          const syncedPacket = {
+            timestamp: Date.now(),
+            gps: currentLocation,
+            accelerometerData: accelerometerSnapshot
+          };
           
-          rawDataCollector.current.addDataPoint(currentLocation, accelerometerSnapshot);
-          setDataPointsCollected(prev => prev + 1);
+          // Добавляем в буфер синхронизированных пакетов
+          syncedDataBuffer.current.push(syncedPacket);
           
-          // Вычисляем новый интервал на основе текущей скорости
-          const nextInterval = rawDataCollector.current.getCollectionInterval(currentSpeed);
+          console.log(`📦 Пакет собран: ${accelerometerSnapshot.length} значений акселерометра`);
+          console.log(`📊 Буфер пакетов: ${syncedDataBuffer.current.length} / 5`);
           
-          // Перезапускаем таймер с новым интервалом
-          dataCollectionInterval.current = setTimeout(startDynamicCollection, nextInterval);
+          // Отправляем батч когда накопится 5 пакетов (= 5 секунд данных)
+          if (syncedDataBuffer.current.length >= 5) {
+            console.log(`📤 Отправка батча из ${syncedDataBuffer.current.length} пакетов`);
+            
+            // Отправляем все пакеты
+            syncedDataBuffer.current.forEach(packet => {
+              rawDataCollector.current?.addDataPoint(packet.gps, packet.accelerometerData);
+            });
+            
+            // Обновляем счетчик
+            setDataPointsCollected(prev => prev + syncedDataBuffer.current.length);
+            
+            // Очищаем буфер после отправки
+            syncedDataBuffer.current = [];
+          }
+          
+          // Повторяем каждую секунду
+          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
         } else {
           // Если GPS еще не готов, повторяем попытку через 1 секунду
           console.log('⏳ Ожидание GPS сигнала...');
-          dataCollectionInterval.current = setTimeout(startDynamicCollection, 1000);
+          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
         }
       };
       
       // Запускаем первый цикл с задержкой, чтобы дать GPS время инициализироваться
-      dataCollectionInterval.current = setTimeout(startDynamicCollection, 2000);
+      dataCollectionInterval.current = setTimeout(collectSyncedPacket, 2000);
       
       setIsTracking(true);
       console.log('✅ Отслеживание запущено');
