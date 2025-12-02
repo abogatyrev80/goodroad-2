@@ -62,7 +62,7 @@ class RawDataCollector {
   private isOnline: boolean = false;
   
   // Настройки
-  private readonly BATCH_SIZE = 5; // Отправлять каждые 5 точек
+  private readonly BATCH_SIZE = 1; // Отправлять каждую точку немедленно (для production)
   private readonly MAX_BUFFER_SIZE = 50; // Максимум в буфере
   private readonly OFFLINE_STORAGE_KEY = 'raw_data_offline_queue';
   
