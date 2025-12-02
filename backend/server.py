@@ -2554,6 +2554,12 @@ async def expo_qr_page(request: Request):
     """Serve QR codes page for Expo Go"""
     return templates.TemplateResponse("expo_qr_page.html", {"request": request})
 
+# Also add via API router for deployment access
+@api_router.get("/expo-qr", response_class=HTMLResponse)
+async def expo_qr_page_api(request: Request):
+    """Serve QR codes page via API route (for deployment)"""
+    return templates.TemplateResponse("expo_qr_page.html", {"request": request})
+
 # Include the router in the main app
 app.include_router(api_router)
 
