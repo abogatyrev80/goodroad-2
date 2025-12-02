@@ -193,7 +193,7 @@ export default function GoodRoadApp() {
       
       // 🆕 Новый алгоритм: Сбор синхронизированных пакетов каждую секунду
       const collectSyncedPacket = () => {
-        if (currentLocation && rawDataCollector.current) {
+        if (currentLocationRef.current && rawDataCollector.current) {
           // Берем snapshot акселерометра за последнюю секунду (~10 значений при 10Hz)
           const accelerometerSnapshot = [...accelerometerBuffer.current];
           
