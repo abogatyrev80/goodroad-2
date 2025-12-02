@@ -203,7 +203,7 @@ export default function GoodRoadApp() {
           // Создаем синхронизированный пакет данных
           const syncedPacket = {
             timestamp: Date.now(),
-            gps: currentLocation,
+            gps: currentLocationRef.current,
             accelerometerData: accelerometerSnapshot
           };
           
