@@ -164,6 +164,7 @@ export default function GoodRoadApp() {
         },
         (location) => {
           setCurrentLocation(location);
+          currentLocationRef.current = location; // 🆕 Обновляем ref
           setCurrentSpeed(location.coords.speed ? location.coords.speed * 3.6 : 0);
           setGpsAccuracy(location.coords.accuracy || 0);
         }
