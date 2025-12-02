@@ -57,6 +57,9 @@ export default function GoodRoadApp() {
     accelerometerData: Array<{ x: number; y: number; z: number; timestamp: number }>;
   }>>([]);
   
+  // 🆕 Ref для currentLocation (чтобы избежать проблем с замыканиями в setTimeout)
+  const currentLocationRef = useRef<any>(null);
+  
   // Backend URL
   // Preview: использует .env (EXPO_PUBLIC_BACKEND_URL)
   // Production: использует app.json (extra.backendUrl)
