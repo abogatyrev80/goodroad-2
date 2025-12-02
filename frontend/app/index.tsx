@@ -50,6 +50,13 @@ export default function GoodRoadApp() {
   // 🆕 Буфер для накопления высокочастотных данных акселерометра
   const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
   
+  // 🆕 Буфер для синхронизированных пакетов данных (GPS + акселерометр за секунду)
+  const syncedDataBuffer = useRef<Array<{
+    timestamp: number;
+    gps: any;
+    accelerometerData: Array<{ x: number; y: number; z: number; timestamp: number }>;
+  }>>([]);
+  
   // Backend URL
   // Preview: использует .env (EXPO_PUBLIC_BACKEND_URL)
   // Production: использует app.json (extra.backendUrl)
