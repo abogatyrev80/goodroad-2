@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - API Endpoints</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, #1f6feb 0%, #238636 100%);
+            border-radius: 12px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .base-url {
+            background: #161b22;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #1f6feb;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .base-url strong {
+            color: #58a6ff;
+        }
+
+        .section {
+            background: #161b22;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #30363d;
+        }
+
+        .section-title {
+            color: #58a6ff;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .endpoint {
+            background: #0d1117;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid #238636;
+            transition: all 0.2s;
+        }
+
+        .endpoint:hover {
+            background: #161b22;
+            transform: translateX(5px);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .method {
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .method-get { background: #1f6feb; color: white; }
+        .method-post { background: #238636; color: white; }
+        .method-put { background: #d29922; color: white; }
+        .method-patch { background: #a371f7; color: white; }
+        .method-delete { background: #da3633; color: white; }
+
+        .endpoint-path {
+            color: #58a6ff;
+            font-size: 1rem;
+            word-break: break-all;
+        }
+
+        .endpoint-description {
+            color: #8b949e;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            padding-left: 1rem;
+            border-left: 2px solid #30363d;
+        }
+
+        .badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-new { background: #238636; color: white; }
+        .badge-legacy { background: #6e7681; color: white; }
+        .badge-html { background: #a371f7; color: white; }
+
+        .copy-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #30363d;
+            border-color: #58a6ff;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #161b22;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #8b949e;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            background: #21262d;
+            color: #58a6ff;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            border: 1px solid #30363d;
+            transition: all 0.2s;
+            margin-bottom: 2rem;
+        }
+
+        .back-link:hover {
+            background: #30363d;
+            transform: translateY(-2px);
+        }
+
+        code {
+            background: #0d1117;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            color: #79c0ff;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .endpoint-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/api/admin" class="back-link">← Назад к главной панели</a>
+
+        <div class="header">
+            <h1>🔌 API Endpoints</h1>
+            <p>Полная документация административных endpoints</p>
+        </div>
+
+        <div class="base-url">
+            <strong>Base URL (Preview):</strong> <code>https://pothole-detect-1.preview.emergentagent.com</code><br>
+            <strong>Base URL (Production):</strong> <code>https://your-app.emergent.host</code> (после deployment)
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">35+</div>
+                <div class="stat-label">Всего endpoints</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">20+</div>
+                <div class="stat-label">Admin API</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">6</div>
+                <div class="stat-label">HTML панели</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">2</div>
+                <div class="stat-label">Архитектуры</div>
+            </div>
+        </div>
+
+        <!-- HTML Панели -->
+        <div class="section">
+            <h2 class="section-title">🖥️ HTML Панели управления</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin</span>
+                    <span class="badge badge-html">HTML</span>
+                </div>
+                <div class="endpoint-description">
+                    Главная страница навигации со всеми админ панелями
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/dashboard/v2</span>
+                    <span class="badge badge-new">V2</span>
+                    <span class="badge badge-html">HTML</span>
+                </div>
+                <div class="endpoint-description">
+                    Основная панель управления с визуализацией событий на карте и аналитикой (новая архитектура)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/settings/v2</span>
+                    <span class="badge badge-new">V2</span>
+                    <span class="badge badge-html">HTML</span>
+                </div>
+                <div class="endpoint-description">
+                    Настройки ML чувствительности и очистка базы данных с фильтром по датам
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/dashboard</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                    <span class="badge badge-html">HTML</span>
+                </div>
+                <div class="endpoint-description">
+                    Оригинальная панель управления для старой архитектуры данных
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/expo-qr</span>
+                    <span class="badge badge-html">HTML</span>
+                </div>
+                <div class="endpoint-description">
+                    Страница с QR кодами для подключения к Expo Go
+                </div>
+            </div>
+        </div>
+
+        <!-- Аналитика V2 -->
+        <div class="section">
+            <h2 class="section-title">📊 Аналитика и Данные V2 (Новая архитектура)</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/v2/analytics</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить общую статистику и аналитику событий (raw_sensor_data, events)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/v2/raw-data</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить сырые данные с акселерометра и GPS (поддерживает пагинацию: limit, skip)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/v2/events</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить классифицированные события (pothole, braking, vibration, user reports)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/v2/heatmap</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить данные для тепловой карты событий
+                </div>
+            </div>
+        </div>
+
+        <!-- ML Settings V2 -->
+        <div class="section">
+            <h2 class="section-title">⚙️ Настройки ML (V2)</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/v2/ml-thresholds</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить текущие пороговые значения для ML классификации
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/admin/v2/ml-thresholds</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Обновить пороговые значения ML (pothole_threshold, braking_threshold, vibration_threshold, speed_bump_threshold)
+                </div>
+            </div>
+        </div>
+
+        <!-- Управление событиями V2 -->
+        <div class="section">
+            <h2 class="section-title">✏️ Управление событиями (V2)</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-put">PUT</span>
+                    <span class="endpoint-path">/api/admin/v2/events/{event_id}</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Редактировать существующее событие (тип, severity, координаты)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/v2/events/{event_id}</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Удалить конкретное событие по ID
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/v2/raw-data/{data_id}</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Удалить конкретную запись сырых данных по ID
+                </div>
+            </div>
+        </div>
+
+        <!-- Очистка БД -->
+        <div class="section">
+            <h2 class="section-title">🗑️ Очистка базы данных</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/clear-database-v2</span>
+                    <span class="badge badge-new">С фильтром дат</span>
+                </div>
+                <div class="endpoint-description">
+                    Очистка БД с возможностью указания диапазона дат<br>
+                    <code>?confirm=CONFIRM&date_from=2025-01-01&date_to=2025-01-31</code><br>
+                    Удаляет данные из 8 коллекций: raw_sensor_data, events, processed_events, user_warnings, road_conditions, road_warnings, sensor_data, calibration_profiles
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/clear-database</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Полная очистка базы данных (старая версия без фильтра)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/cleanup-test-data</span>
+                </div>
+                <div class="endpoint-description">
+                    Удалить тестовые данные (с device_id содержащим "test")
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/cleanup-zero-coords</span>
+                </div>
+                <div class="endpoint-description">
+                    Удалить записи с нулевыми координатами (lat=0, lon=0)
+                </div>
+            </div>
+        </div>
+
+        <!-- Legacy API (V1) -->
+        <div class="section">
+            <h2 class="section-title">📈 Legacy API (Старая архитектура)</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/sensor-data</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Получить данные из старой коллекции sensor_data
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/analytics</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Статистика для старой архитектуры
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/heatmap-data</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Данные тепловой карты для старой архитектуры
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-patch">PATCH</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/{point_id}</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Редактировать точку данных в старой коллекции
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/{point_id}</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Удалить точку данных из старой коллекции
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/count-by-filters</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Подсчет записей с фильтрами
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/bulk</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Массовое удаление записей
+                </div>
+            </div>
+        </div>
+
+        <!-- Экспорт/Импорт -->
+        <div class="section">
+            <h2 class="section-title">📤 Экспорт и Импорт</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/export/csv</span>
+                </div>
+                <div class="endpoint-description">
+                    Экспорт данных в CSV формат
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/admin/sensor-data/import/csv</span>
+                </div>
+                <div class="endpoint-description">
+                    Импорт данных из CSV файла
+                </div>
+            </div>
+        </div>
+
+        <!-- Системные endpoints -->
+        <div class="section">
+            <h2 class="section-title">🔧 Системные endpoints</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/</span>
+                </div>
+                <div class="endpoint-description">
+                    Базовая информация о API (версия, статус, MongoDB подключение)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                </div>
+                <div class="endpoint-description">
+                    Health check endpoint для мониторинга
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/ready</span>
+                </div>
+                <div class="endpoint-description">
+                    Readiness check (статус MongoDB)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/docs</span>
+                </div>
+                <div class="endpoint-description">
+                    Swagger UI - интерактивная документация API
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/openapi.json</span>
+                </div>
+                <div class="endpoint-description">
+                    OpenAPI схема в JSON формате
+                </div>
+            </div>
+        </div>
+
+        <!-- Мобильное приложение -->
+        <div class="section">
+            <h2 class="section-title">📱 Endpoints для мобильного приложения</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/raw-data</span>
+                    <span class="badge badge-new">V2</span>
+                </div>
+                <div class="endpoint-description">
+                    Основной endpoint для отправки данных с мобильного приложения (GPS + buffered accelerometer data)
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/sensor-data</span>
+                    <span class="badge badge-legacy">Legacy</span>
+                </div>
+                <div class="endpoint-description">
+                    Старый endpoint для отправки данных (deprecated, но поддерживается)
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 3rem; color: #8b949e;">
+            <p>Good Road API v2.0.0 | Все endpoints требуют базовый URL</p>
+            <p style="margin-top: 0.5rem;">Для интерактивного тестирования используйте <a href="/docs" style="color: #58a6ff;">Swagger UI</a></p>
+        </div>
+    </div>
+</body>
+</html>
