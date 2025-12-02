@@ -52,6 +52,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "backendUrl": "https://road-monitor-4.emergent.host"
     }
   }
 }
