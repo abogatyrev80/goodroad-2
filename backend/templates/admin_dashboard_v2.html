@@ -448,8 +448,8 @@
                             📊 Raw Data Point
                         </div>
                         <div class="event-details">
-                            <div>Accel: X:${data.accel_x?.toFixed(2) || 0}, Y:${data.accel_y?.toFixed(2) || 0}, Z:${data.accel_z?.toFixed(2) || 0}</div>
-                            <div>Gyro: X:${data.gyro_x?.toFixed(2) || 0}, Y:${data.gyro_y?.toFixed(2) || 0}, Z:${data.gyro_z?.toFixed(2) || 0}</div>
+                            <div>Accel: X:${data.accelerometer_x?.toFixed(2) || 0}, Y:${data.accelerometer_y?.toFixed(2) || 0}, Z:${data.accelerometer_z?.toFixed(2) || 0}</div>
+                            <div>Device: ${data.deviceId || 'Unknown'}</div>
                             <div>Скорость: ${data.speed?.toFixed(1) || 0} км/ч</div>
                             <div>${timestamp}</div>
                         </div>
