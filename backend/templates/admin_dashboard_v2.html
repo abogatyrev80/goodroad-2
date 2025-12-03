@@ -421,11 +421,26 @@
         }
 
         // Загрузить и отобразить сырые данные
-        async function loadRawData() {
+        async function loadRawData(limit = 1000) {
             try {
-                const response = await fetch('/api/admin/v2/raw-data?limit=100');
+                document.getElementById('filter-title').innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Сырые данные</span>
+                        <select onchange="loadRawData(parseInt(this.value))" style="padding: 0.25rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            <option value="100" ${limit === 100 ? 'selected' : ''}>100 точек</option>
+                            <option value="500" ${limit === 500 ? 'selected' : ''}>500 точек</option>
+                            <option value="1000" ${limit === 1000 ? 'selected' : ''}>1000 точек</option>
+                            <option value="5000" ${limit === 5000 ? 'selected' : ''}>5000 точек</option>
+                            <option value="10000" ${limit === 10000 ? 'selected' : ''}>Все точки</option>
+                        </select>
+                    </div>
+                `;
+                
+                const response = await fetch(`/api/admin/v2/raw-data?limit=${limit}`);
                 const result = await response.json();
                 const rawData = result.data || [];
+                
+                console.log(`📊 Загружено ${rawData.length} из ${result.total} точек данных`);
                 
                 displayRawDataList(rawData);
                 displayRawDataMarkers(rawData);
