@@ -124,7 +124,18 @@ export default function GoodRoadApp() {
   // Запрос разрешений
   const requestPermissions = async () => {
     try {
+      // 🆕 Запрашиваем фоновые разрешения для работы при заблокированном экране
       const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status === 'granted') {
+        // Дополнительно запрашиваем фоновые разрешения
+        const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+        if (backgroundStatus.status !== 'granted') {
+          console.warn('⚠️ Фоновые разрешения не предоставлены. Приложение будет работать только на переднем плане.');
+        } else {
+          console.log('✅ Фоновые разрешения получены');
+        }
+      }
       
       if (status !== 'granted') {
         alert('Для работы приложения необходим доступ к геолокации');
