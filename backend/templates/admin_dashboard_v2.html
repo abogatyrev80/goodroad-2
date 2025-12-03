@@ -405,6 +405,101 @@
             displayMarkers();
         }
 
+        // Переключить режим отображения
+        function switchViewMode(mode) {
+            const filterTitle = document.getElementById('filter-title');
+            const eventList = document.getElementById('event-list');
+            
+            if (mode === 'rawData') {
+                filterTitle.textContent = 'Фильтры сырых данных';
+                loadRawData();
+            } else {
+                filterTitle.textContent = 'Фильтры событий';
+                displayEvents();
+                displayMarkers();
+            }
+        }
+
+        // Загрузить и отобразить сырые данные
+        async function loadRawData() {
+            try {
+                const response = await fetch('/api/admin/v2/raw-data?limit=100');
+                const data = await response.json();
+                const rawData = data.raw_data || [];
+                
+                displayRawDataList(rawData);
+                displayRawDataMarkers(rawData);
+            } catch (error) {
+                console.error('Error loading raw data:', error);
+                alert('Ошибка загрузки сырых данных: ' + error.message);
+            }
+        }
+
+        // Отобразить список сырых данных
+        function displayRawDataList(rawData) {
+            const eventList = document.getElementById('event-list');
+            
+            eventList.innerHTML = rawData.slice(0, 20).map(data => {
+                const timestamp = new Date(data.timestamp).toLocaleString('ru-RU');
+                
+                return `
+                    <div class="event-item">
+                        <div class="event-type">
+                            📊 Raw Data Point
+                        </div>
+                        <div class="event-details">
+                            <div>Accel: X:${data.accel_x?.toFixed(2) || 0}, Y:${data.accel_y?.toFixed(2) || 0}, Z:${data.accel_z?.toFixed(2) || 0}</div>
+                            <div>Gyro: X:${data.gyro_x?.toFixed(2) || 0}, Y:${data.gyro_y?.toFixed(2) || 0}, Z:${data.gyro_z?.toFixed(2) || 0}</div>
+                            <div>Скорость: ${data.speed?.toFixed(1) || 0} км/ч</div>
+                            <div>${timestamp}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Отобразить маркеры сырых данных
+        function displayRawDataMarkers(rawData) {
+            // Очистить существующие маркеры
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            // Добавить новые маркеры для сырых данных
+            rawData.forEach(data => {
+                if (data.latitude && data.longitude) {
+                    const marker = L.circleMarker([data.latitude, data.longitude], {
+                        radius: 6,
+                        fillColor: '#94a3b8',
+                        color: '#fff',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.6
+                    }).addTo(map);
+
+                    const timestamp = new Date(data.timestamp).toLocaleString('ru-RU');
+                    
+                    marker.bindPopup(`
+                        <div style="color: #1e293b;">
+                            <h3>📊 Raw Sensor Data</h3>
+                            <p><strong>Accel:</strong> X:${data.accel_x?.toFixed(2) || 0}, Y:${data.accel_y?.toFixed(2) || 0}, Z:${data.accel_z?.toFixed(2) || 0}</p>
+                            <p><strong>Gyro:</strong> X:${data.gyro_x?.toFixed(2) || 0}, Y:${data.gyro_y?.toFixed(2) || 0}, Z:${data.gyro_z?.toFixed(2) || 0}</p>
+                            <p><strong>Speed:</strong> ${data.speed?.toFixed(1) || 0} км/ч</p>
+                            <p><strong>Time:</strong> ${timestamp}</p>
+                            <p><strong>GPS:</strong> ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</p>
+                        </div>
+                    `);
+
+                    markers.push(marker);
+                }
+            });
+
+            // Центрировать карту на маркерах
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
         // Инициализация
         initMap();
         loadData();
