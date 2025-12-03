@@ -228,9 +228,13 @@ export default function GoodRoadApp() {
           if (syncedDataBuffer.current.length >= 5) {
             console.log(`📤 Отправка батча из ${syncedDataBuffer.current.length} пакетов`);
             
-            // Отправляем все пакеты
+            // Отправляем все пакеты с правильными временными метками
             syncedDataBuffer.current.forEach(packet => {
-              rawDataCollector.current?.addDataPoint(packet.gps, packet.accelerometerData);
+              rawDataCollector.current?.addDataPoint(
+                packet.gps, 
+                packet.accelerometerData,
+                packet.timestamp // 🆕 Передаем timestamp пакета
+              );
             });
             
             // Обновляем счетчик
