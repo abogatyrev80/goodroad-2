@@ -305,14 +305,20 @@
                 document.getElementById('event-count').textContent = analytics.summary.processed_events || 0;
                 document.getElementById('warning-count').textContent = analytics.summary.active_warnings || 0;
 
-                // Загрузка событий
-                const eventsRes = await fetch('/api/admin/v2/events?limit=500');
-                const eventsData = await eventsRes.json();
-                allEvents = eventsData.events || [];
+                // 🆕 Загружаем данные в зависимости от текущего режима
+                if (currentViewMode === 'rawData') {
+                    // Режим сырых данных - обновляем raw data
+                    await loadRawData();
+                } else {
+                    // Режим событий - загружаем события
+                    const eventsRes = await fetch('/api/admin/v2/events?limit=500');
+                    const eventsData = await eventsRes.json();
+                    allEvents = eventsData.events || [];
 
-                // Отображение событий
-                displayEvents();
-                displayMarkers();
+                    // Отображение событий
+                    displayEvents();
+                    displayMarkers();
+                }
 
             } catch (error) {
                 console.error('Error loading data:', error);
