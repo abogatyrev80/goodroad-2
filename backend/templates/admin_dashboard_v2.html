@@ -424,8 +424,8 @@
         async function loadRawData() {
             try {
                 const response = await fetch('/api/admin/v2/raw-data?limit=100');
-                const data = await response.json();
-                const rawData = data.raw_data || [];
+                const result = await response.json();
+                const rawData = result.data || [];
                 
                 displayRawDataList(rawData);
                 displayRawDataMarkers(rawData);
