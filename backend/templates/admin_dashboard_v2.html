@@ -202,7 +202,19 @@
         
         <div class="sidebar">
             <div class="section">
-                <div class="section-title">Фильтры</div>
+                <div class="section-title">Режим отображения</div>
+                <div style="margin-bottom: 1rem; padding: 0.75rem; background: #0f172a; border-radius: 6px;">
+                    <label style="display: block; margin-bottom: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="viewMode" value="events" checked onchange="switchViewMode(this.value)">
+                        <span style="margin-left: 0.5rem;">События (Events)</span>
+                    </label>
+                    <label style="display: block; cursor: pointer;">
+                        <input type="radio" name="viewMode" value="rawData" onchange="switchViewMode(this.value)">
+                        <span style="margin-left: 0.5rem;">Сырые данные (Raw Data)</span>
+                    </label>
+                </div>
+                
+                <div class="section-title" id="filter-title">Фильтры событий</div>
                 <div class="filter-group">
                     <label>
                         <input type="checkbox" id="filter-pothole" checked onchange="filterEvents()">
