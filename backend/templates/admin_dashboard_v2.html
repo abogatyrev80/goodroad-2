@@ -481,9 +481,10 @@
                     marker.bindPopup(`
                         <div style="color: #1e293b;">
                             <h3>📊 Raw Sensor Data</h3>
-                            <p><strong>Accel:</strong> X:${data.accel_x?.toFixed(2) || 0}, Y:${data.accel_y?.toFixed(2) || 0}, Z:${data.accel_z?.toFixed(2) || 0}</p>
-                            <p><strong>Gyro:</strong> X:${data.gyro_x?.toFixed(2) || 0}, Y:${data.gyro_y?.toFixed(2) || 0}, Z:${data.gyro_z?.toFixed(2) || 0}</p>
+                            <p><strong>Device:</strong> ${data.deviceId || 'Unknown'}</p>
+                            <p><strong>Accel:</strong> X:${data.accelerometer_x?.toFixed(2) || 0}, Y:${data.accelerometer_y?.toFixed(2) || 0}, Z:${data.accelerometer_z?.toFixed(2) || 0}</p>
                             <p><strong>Speed:</strong> ${data.speed?.toFixed(1) || 0} км/ч</p>
+                            <p><strong>Accuracy:</strong> ${data.accuracy?.toFixed(1) || 0}m</p>
                             <p><strong>Time:</strong> ${timestamp}</p>
                             <p><strong>GPS:</strong> ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</p>
                         </div>
