@@ -473,32 +473,73 @@
             }).join('');
         }
 
-        // Отобразить маркеры сырых данных
+        // Отобразить маркеры сырых данных с траекторией
+        let trajectoryLine = null;
+        
         function displayRawDataMarkers(rawData) {
-            // Очистить существующие маркеры
+            // Очистить существующие маркеры и траекторию
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
+            if (trajectoryLine) {
+                map.removeLayer(trajectoryLine);
+                trajectoryLine = null;
+            }
 
-            // Добавить новые маркеры для сырых данных
-            rawData.forEach(data => {
+            // Сортировать данные по времени для правильной траектории
+            const sortedData = [...rawData].sort((a, b) => 
+                new Date(a.timestamp) - new Date(b.timestamp)
+            );
+
+            // Создать массив координат для траектории
+            const coordinates = sortedData
+                .filter(data => data.latitude && data.longitude)
+                .map(data => [data.latitude, data.longitude]);
+
+            // Нарисовать траекторию (линию)
+            if (coordinates.length > 1) {
+                trajectoryLine = L.polyline(coordinates, {
+                    color: '#60a5fa',
+                    weight: 3,
+                    opacity: 0.7,
+                    smoothFactor: 1
+                }).addTo(map);
+            }
+
+            // Добавить маркеры для точек данных
+            sortedData.forEach((data, index) => {
                 if (data.latitude && data.longitude) {
+                    // Первая точка - зеленая, последняя - красная, остальные - синие
+                    let fillColor = '#94a3b8';
+                    let radius = 5;
+                    if (index === 0) {
+                        fillColor = '#22c55e'; // Зеленый - старт
+                        radius = 8;
+                    } else if (index === sortedData.length - 1) {
+                        fillColor = '#ef4444'; // Красный - финиш
+                        radius = 8;
+                    }
+                    
                     const marker = L.circleMarker([data.latitude, data.longitude], {
-                        radius: 6,
-                        fillColor: '#94a3b8',
+                        radius: radius,
+                        fillColor: fillColor,
                         color: '#fff',
                         weight: 1,
                         opacity: 1,
-                        fillOpacity: 0.6
+                        fillOpacity: 0.7
                     }).addTo(map);
 
                     const timestamp = new Date(data.timestamp).toLocaleString('ru-RU');
+                    const pointLabel = index === 0 ? '🟢 СТАРТ' : 
+                                      index === sortedData.length - 1 ? '🔴 ФИНИШ' : 
+                                      `📍 Точка ${index + 1}`;
                     
                     marker.bindPopup(`
                         <div style="color: #1e293b;">
-                            <h3>📊 Raw Sensor Data</h3>
+                            <h3>${pointLabel}</h3>
                             <p><strong>Device:</strong> ${data.deviceId || 'Unknown'}</p>
                             <p><strong>Accel:</strong> X:${data.accelerometer_x?.toFixed(2) || 0}, Y:${data.accelerometer_y?.toFixed(2) || 0}, Z:${data.accelerometer_z?.toFixed(2) || 0}</p>
-                            <p><strong>Speed:</strong> ${data.speed?.toFixed(1) || 0} км/ч</p>
+                            <p><strong>Accel Count:</strong> ${data.accelerometer_count || 0} значений</p>
+                            <p><strong>Speed:</strong> ${data.speed?.toFixed(1) || 0} м/с (${(data.speed * 3.6)?.toFixed(1) || 0} км/ч)</p>
                             <p><strong>Accuracy:</strong> ${data.accuracy?.toFixed(1) || 0}m</p>
                             <p><strong>Time:</strong> ${timestamp}</p>
                             <p><strong>GPS:</strong> ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}</p>
