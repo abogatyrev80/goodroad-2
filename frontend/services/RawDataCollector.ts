@@ -97,13 +97,14 @@ class RawDataCollector {
    */
   public async addDataPoint(
     location: Location.LocationObject,
-    accelerometerBuffer: Array<{ x: number; y: number; z: number; timestamp: number }>
+    accelerometerBuffer: Array<{ x: number; y: number; z: number; timestamp: number }>,
+    customTimestamp?: number // 🆕 Опциональный параметр для точного timestamp
   ): Promise<void> {
     console.log(`📊 Добавление точки с ${accelerometerBuffer.length} значениями акселерометра`);
     
     const dataPoint: RawSensorDataPoint = {
       deviceId: this.deviceId,
-      timestamp: Date.now(),
+      timestamp: customTimestamp || Date.now(), // 🆕 Используем переданный timestamp если есть
       gps: {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
