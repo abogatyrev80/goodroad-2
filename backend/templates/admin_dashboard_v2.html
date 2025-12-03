@@ -408,6 +408,9 @@
 
         // Переключить режим отображения
         function switchViewMode(mode) {
+            currentViewMode = mode; // 🆕 Сохраняем выбранный режим
+            console.log('📍 Переключен режим:', mode);
+            
             const filterTitle = document.getElementById('filter-title');
             const eventList = document.getElementById('event-list');
             
