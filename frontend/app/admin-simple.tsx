@@ -235,7 +235,7 @@ export default function AdminPanelSimple() {
   const renderDataPoint = (point: SensorDataPoint) => (
     <Pressable
       key={point.id}
-      style={[styles.dataPointCard, { borderLeftColor: getPointColor(point) }]}
+      style={[styles.dataPointCard, { borderLeftColor: '#4CAF50' }]}
       onPress={() => {
         setSelectedPoint(point);
         setShowDetails(true);
@@ -246,12 +246,8 @@ export default function AdminPanelSimple() {
           {new Date(point.timestamp).toLocaleDateString('ru-RU')} {' '}
           {new Date(point.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
         </Text>
-        <View style={[styles.statusBadge, { 
-          backgroundColor: point.isVerified ? '#4CAF50' : '#FFC107' 
-        }]}>
-          <Text style={styles.statusText}>
-            {point.isVerified ? 'Верифицировано' : 'Требует проверки'}
-          </Text>
+        <View style={[styles.statusBadge, { backgroundColor: '#2196F3' }]}>
+          <Text style={styles.statusText}>Сырые данные</Text>
         </View>
       </View>
       
@@ -261,15 +257,9 @@ export default function AdminPanelSimple() {
       
       <View style={styles.dataPointStats}>
         <Text style={styles.statItem}>🚗 {point.speed.toFixed(1)} км/ч</Text>
-        <Text style={styles.statItem}>🛣️ {point.roadQuality}%</Text>
         <Text style={styles.statItem}>📡 ±{point.accuracy.toFixed(1)}м</Text>
+        <Text style={styles.statItem}>📊 ({point.accelerometer.x.toFixed(2)}, {point.accelerometer.y.toFixed(2)}, {point.accelerometer.z.toFixed(2)})</Text>
       </View>
-      
-      {point.hazardType && (
-        <Text style={[styles.hazardType, { color: getPointColor(point) }]}>
-          ⚠️ {point.hazardType} ({point.severity})
-        </Text>
-      )}
     </Pressable>
   );
 
