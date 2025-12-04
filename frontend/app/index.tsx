@@ -44,14 +44,55 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     const { locations } = data as any;
     console.log(`📍 Background location update: ${locations?.length || 0} locations`);
     
-    // Сохраняем локации в AsyncStorage для последующей обработки
-    // т.к. в фоновой задаче нет доступа к состоянию компонента
     if (locations && locations.length > 0) {
       const location = locations[0];
       try {
         const AsyncStorage = require('@react-native-async-storage/async-storage').default;
         
-        // Сохраняем последнюю локацию
+        // Получаем backend URL и deviceId из AsyncStorage
+        const backendUrl = await AsyncStorage.getItem('backendUrl');
+        const deviceId = await AsyncStorage.getItem('deviceId');
+        
+        if (!backendUrl || !deviceId) {
+          console.warn('⚠️ Backend URL or Device ID not found in AsyncStorage');
+          return;
+        }
+        
+        // 🆕 ПРЯМАЯ ОТПРАВКА GPS координат на сервер (БЕЗ акселерометра)
+        const gpsData = {
+          deviceId: deviceId,
+          data: [{
+            timestamp: location.timestamp,
+            gps: {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              speed: location.coords.speed || 0,
+              accuracy: location.coords.accuracy || 0,
+              altitude: location.coords.altitude,
+            },
+            accelerometer: [], // Пустой массив - акселерометр не работает в фоне
+          }]
+        };
+        
+        console.log(`📤 Background: отправка GPS данных на ${backendUrl}/api/raw-data`);
+        
+        // Отправляем данные на сервер
+        const response = await fetch(`${backendUrl}/api/raw-data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(gpsData),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Background: данные отправлены успешно (${result.rawDataSaved} записей)`);
+        } else {
+          console.error(`❌ Background: ошибка отправки данных: ${response.status}`);
+        }
+        
+        // Сохраняем последнюю локацию для UI (опционально)
         await AsyncStorage.setItem('lastBackgroundLocation', JSON.stringify({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -61,9 +102,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
           timestamp: location.timestamp,
         }));
         
-        console.log(`✅ Background location saved: (${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)})`);
       } catch (e) {
-        console.error('Error saving background location:', e);
+        console.error('❌ Error in background task:', e);
       }
     }
   }
