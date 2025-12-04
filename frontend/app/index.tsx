@@ -295,7 +295,9 @@ export default function GoodRoadApp() {
       // Подписка на акселерометр
       // Настройка акселерометра для высокочастотного сбора
       Accelerometer.setUpdateInterval(100); // 10 Hz (каждые 100мс)
-      accelerometerSubscription.current = Accelerometer.addListener((data) => {
+      
+      console.log('🎯 Запуск акселерометра...');
+      const subscription = Accelerometer.addListener((data) => {
         // Обновляем UI (последнее значение для отображения)
         setAccelerometerData(data);
         
@@ -312,6 +314,9 @@ export default function GoodRoadApp() {
           accelerometerBuffer.current.shift(); // Удаляем самое старое значение
         }
       });
+      
+      accelerometerSubscription.current = subscription;
+      console.log('✅ Акселерометр запущен, subscription активна');
       
       // 🆕 Новый алгоритм: Сбор синхронизированных пакетов каждую секунду
       const collectSyncedPacket = () => {
