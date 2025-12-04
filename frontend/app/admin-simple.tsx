@@ -205,40 +205,13 @@ export default function AdminPanelSimple() {
     await loadData();
   };
 
+  // Верификация недоступна для raw_sensor_data (это просто сырые данные без классификации)
+  // Верификация работает только с processed_events
   const updatePointVerification = async (pointId: string, verified: boolean) => {
-    try {
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
-      const response = await fetch(`${backendUrl}/api/admin/sensor-data/${pointId}`, {
-        method: 'PATCH',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ is_verified: verified }),
-      });
-
-      if (response.ok) {
-        // Обновляем локальные данные
-        setSensorData(prev => 
-          prev.map(point => 
-            point.id === pointId ? { ...point, isVerified: verified } : point
-          )
-        );
-        
-        // Обновляем статистику
-        setStats(prev => ({
-          ...prev,
-          verifiedPoints: verified ? prev.verifiedPoints + 1 : prev.verifiedPoints - 1
-        }));
-        
-        Alert.alert('Успешно', verified ? 'Точка верифицирована' : 'Верификация отменена');
-      } else {
-        Alert.alert('Ошибка', `Не удалось обновить статус: ${response.status}`);
-      }
-    } catch (error: any) {
-      console.error('❌ Verification update error:', error);
-      Alert.alert('Ошибка', 'Не удалось обновить статус верификации');
-    }
+    Alert.alert(
+      'Недоступно', 
+      'Верификация недоступна для сырых данных. Эти данные не классифицированы и не содержат информации о событиях.'
+    );
   };
 
   const getPointColor = (point: SensorDataPoint): string => {
