@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-## user_problem_statement: Добавлена функциональность очистки базы данных с возможностью указания временного диапазона. Реализован новый backend endpoint /api/admin/clear-database-v2 с параметрами date_from и date_to для фильтрации данных по датам. Обновлен admin UI (admin_settings_v2.html) с добавлением date pickers и кнопки для очистки данных за выбранный период.
+## user_problem_statement: Исправление мобильной админ-панели (admin-simple.tsx) для корректной работы с V2 API endpoints. Предыдущий инженер начал обновление, но не завершил - панель обращалась к V2 endpoints, но парсила данные в старом формате, что приводило к ошибкам отображения.
 
 ## backend:
   - task: "Clear Database V2 API with Date Range Filter"
