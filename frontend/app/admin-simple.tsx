@@ -75,16 +75,16 @@ export default function AdminPanelSimple() {
       console.log('🔗 Полный URL для запроса данных:', `${backendUrl}/api/admin/sensor-data`);
       console.log('🔗 Полный URL для запроса статистики:', `${backendUrl}/api/admin/analytics`);
       
-      // Загружаем данные и статистику параллельно
+      // 🆕 Загружаем данные и статистику параллельно (V2 endpoints)
       const [sensorResponse, statsResponse] = await Promise.all([
-        fetch(`${backendUrl}/api/admin/sensor-data`, {
+        fetch(`${backendUrl}/api/admin/v2/raw-data?limit=100`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
           },
         }),
-        fetch(`${backendUrl}/api/admin/analytics`, {
+        fetch(`${backendUrl}/api/admin/v2/analytics`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -97,7 +97,8 @@ export default function AdminPanelSimple() {
       console.log('📈 Stats response status:', statsResponse.status);
 
       if (sensorResponse.ok) {
-        const sensorData = await sensorResponse.json();
+        const result = await sensorResponse.json();
+        const sensorData = result.data || []; // V2 возвращает {data: [...], total: N}
         console.log('✅ Sensor data loaded:', sensorData.data?.length || 0, 'points');
         
         if (sensorData.data && Array.isArray(sensorData.data)) {
