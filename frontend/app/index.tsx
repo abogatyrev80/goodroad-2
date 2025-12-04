@@ -324,6 +324,12 @@ export default function GoodRoadApp() {
           // Берем snapshot акселерометра за последнюю секунду (~10 значений при 10Hz)
           const accelerometerSnapshot = [...accelerometerBuffer.current];
           
+          // ⚠️ КРИТИЧЕСКАЯ ПРОВЕРКА: если акселерометр пустой - выводим предупреждение
+          if (accelerometerSnapshot.length === 0) {
+            console.warn('⚠️ ВНИМАНИЕ: Акселерометр не работает! Буфер пустой!');
+            console.warn('   Проверьте: 1) Запущена ли subscription? 2) Работает ли Accelerometer.addListener?');
+          }
+          
           // Очищаем буфер акселерометра для следующей секунды
           accelerometerBuffer.current = [];
           
@@ -337,7 +343,7 @@ export default function GoodRoadApp() {
           // Добавляем в буфер синхронизированных пакетов
           syncedDataBuffer.current.push(syncedPacket);
           
-          console.log(`📦 Пакет собран: ${accelerometerSnapshot.length} значений акселерометра`);
+          console.log(`📦 Пакет собран: GPS(${currentLocationRef.current.coords.latitude.toFixed(4)}, ${currentLocationRef.current.coords.longitude.toFixed(4)}) + ${accelerometerSnapshot.length} значений акселерометра`);
           console.log(`📊 Буфер пакетов: ${syncedDataBuffer.current.length} / 5`);
           
           // Отправляем батч когда накопится 5 пакетов (= 5 секунд данных)
