@@ -336,6 +336,13 @@ export default function GoodRoadApp() {
         await rawDataCollector.current.forceSend();
       }
       
+      // 🆕 Остановка фоновой задачи
+      const hasTask = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+      if (hasTask) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+        console.log('✅ Фоновое отслеживание остановлено');
+      }
+      
       // Остановка подписок
       if (locationSubscription.current) {
         locationSubscription.current.remove();
