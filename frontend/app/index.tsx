@@ -24,6 +24,7 @@ import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 import * as Network from 'expo-network';
 import * as TaskManager from 'expo-task-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Новые сервисы
 import RawDataCollector, { Warning } from '../services/RawDataCollector';
