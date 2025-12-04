@@ -14,6 +14,7 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,10 +23,14 @@ import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 import * as Network from 'expo-network';
+import * as TaskManager from 'expo-task-manager';
 
 // Новые сервисы
 import RawDataCollector, { Warning } from '../services/RawDataCollector';
 import WarningAlert from '../components/WarningAlert';
+
+// 🆕 Фоновая задача для отслеживания локации
+const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
 export default function GoodRoadApp() {
   // Состояние приложения
