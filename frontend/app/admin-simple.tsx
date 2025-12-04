@@ -709,4 +709,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
   },
+  infoBox: {
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  infoText: {
+    color: '#ffffff',
+    fontSize: 13,
+    textAlign: 'center',
+  },
 });
