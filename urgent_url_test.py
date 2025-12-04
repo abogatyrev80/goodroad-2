@@ -2,7 +2,7 @@
 """
 🚨 URGENT URL CONNECTIVITY TEST
 Testing both production URLs to determine correct mobile app endpoint:
-- https://pothole-detect-1.preview.emergentagent.com (from env variables)
+- https://road-quality-app.preview.emergentagent.com (from env variables)
 - https://smoothroad.emergent.host (updated URL)
 """
 
@@ -13,7 +13,7 @@ from datetime import datetime
 import sys
 
 # Test URLs
-URL_PREVIEW = "https://pothole-detect-1.preview.emergentagent.com"
+URL_PREVIEW = "https://road-quality-app.preview.emergentagent.com"
 URL_EMERGENT = "https://smoothroad.emergent.host"
 
 def test_url_connectivity(base_url, url_name):
