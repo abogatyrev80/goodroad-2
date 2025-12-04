@@ -174,11 +174,23 @@ export default function GoodRoadApp() {
     setWarnings(prev => [...prev, ...newWarnings]);
   }, []);
   
-  // Инициализация RawDataCollector
+  // Инициализация RawDataCollector и сохранение настроек для background task
   useEffect(() => {
     console.log('🔧 Инициализация RawDataCollector...');
     console.log(`Device ID: ${deviceId}`);
     console.log(`Backend URL: ${backendUrl}`);
+    
+    // 🆕 Сохраняем настройки в AsyncStorage для background task
+    const saveSettings = async () => {
+      try {
+        await AsyncStorage.setItem('backendUrl', backendUrl);
+        await AsyncStorage.setItem('deviceId', deviceId);
+        console.log('✅ Настройки сохранены в AsyncStorage для background task');
+      } catch (error) {
+        console.error('❌ Ошибка сохранения настроек:', error);
+      }
+    };
+    saveSettings();
     
     if (!rawDataCollector.current) {
       try {
