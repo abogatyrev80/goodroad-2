@@ -208,7 +208,23 @@ export default function GoodRoadApp() {
     }
     
     try {
-      // Подписка на GPS
+      // 🆕 Запускаем ФОНОВОЕ отслеживание локации через Task Manager
+      console.log('🚀 Запуск фонового отслеживания локации...');
+      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000, // Обновление каждую секунду
+        distanceInterval: 1, // Обновление при движении на 1 метр
+        foregroundService: {
+          notificationTitle: 'Good Road',
+          notificationBody: 'Отслеживание качества дороги активно',
+          notificationColor: '#4CAF50',
+        },
+        pausesUpdatesAutomatically: false, // НЕ останавливать при остановке устройства
+        showsBackgroundLocationIndicator: true, // Показывать индикатор фонового отслеживания
+      });
+      console.log('✅ Фоновое отслеживание локации запущено');
+      
+      // ДОПОЛНИТЕЛЬНО: подписка на foreground обновления для UI
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
@@ -217,11 +233,12 @@ export default function GoodRoadApp() {
         },
         (location) => {
           setCurrentLocation(location);
-          currentLocationRef.current = location; // 🆕 Обновляем ref
+          currentLocationRef.current = location;
           setCurrentSpeed(location.coords.speed ? location.coords.speed * 3.6 : 0);
           setGpsAccuracy(location.coords.accuracy || 0);
         }
       );
+      console.log('✅ Foreground отслеживание для UI запущено');
       
       // Подписка на акселерометр
       // Настройка акселерометра для высокочастотного сбора
