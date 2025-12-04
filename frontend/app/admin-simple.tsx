@@ -98,27 +98,32 @@ export default function AdminPanelSimple() {
 
       if (sensorResponse.ok) {
         const result = await sensorResponse.json();
-        const sensorData = result.data || []; // V2 возвращает {data: [...], total: N}
-        console.log('✅ Sensor data loaded:', sensorData.data?.length || 0, 'points');
+        console.log('✅ Raw data response:', result);
+        console.log('✅ Sensor data loaded:', result.data?.length || 0, 'points');
         
-        if (sensorData.data && Array.isArray(sensorData.data)) {
-          const formattedData: SensorDataPoint[] = sensorData.data.map((point: any) => ({
-            id: point._id || point.id,
+        // V2 API возвращает {total, limit, skip, returned, data: [...]}
+        if (result.data && Array.isArray(result.data)) {
+          const formattedData: SensorDataPoint[] = result.data.map((point: any) => ({
+            id: point._id || String(Math.random()),
             latitude: point.latitude || 0,
             longitude: point.longitude || 0,
             timestamp: point.timestamp,
             speed: point.speed || 0,
             accuracy: point.accuracy || 0,
-            accelerometer: point.accelerometer || { x: 0, y: 0, z: 0 },
-            roadQuality: point.road_quality_score || 50,
-            hazardType: point.hazard_type,
-            severity: point.severity || 'medium',
-            isVerified: point.is_verified || false,
-            adminNotes: point.admin_notes || ''
+            accelerometer: {
+              x: point.accelerometer_x || 0,
+              y: point.accelerometer_y || 0,
+              z: point.accelerometer_z || 0
+            },
+            roadQuality: 50, // В raw_sensor_data нет road_quality_score
+            hazardType: undefined,
+            severity: 'medium',
+            isVerified: false,
+            adminNotes: ''
           }));
           
           setSensorData(formattedData);
-          console.log('✅ Formatted sensor data set');
+          console.log('✅ Formatted sensor data set:', formattedData.length, 'points');
         }
       } else {
         console.error('❌ Sensor data request failed:', sensorResponse.status);
@@ -128,11 +133,12 @@ export default function AdminPanelSimple() {
         const statsData = await statsResponse.json();
         console.log('✅ Stats loaded:', statsData);
         
+        // V2 API возвращает {summary: {raw_data_points, processed_events, active_warnings}, ...}
         setStats({
-          totalPoints: statsData.total_points || 0,
-          verifiedPoints: statsData.verified_points || 0,
-          hazardPoints: statsData.hazard_points || 0,
-          avgRoadQuality: statsData.avg_road_quality || 0
+          totalPoints: statsData.summary?.raw_data_points || 0,
+          verifiedPoints: 0, // raw_sensor_data не имеет верификации
+          hazardPoints: statsData.summary?.processed_events || 0,
+          avgRoadQuality: 0 // raw_sensor_data не имеет road quality score
         });
       } else {
         console.error('❌ Stats request failed:', statsResponse.status);
