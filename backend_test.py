@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import sys
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://pothole-detect-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://road-quality-app.preview.emergentagent.com/api"
 
 class BackendTester:
     def __init__(self):
