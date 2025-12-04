@@ -424,7 +424,7 @@
 
 ## test_plan:
   current_focus:
-    - "Admin Settings V2 UI - Database Clear with Date Filter"
+    - "Mobile Admin Panel V2 API Integration"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
