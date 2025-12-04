@@ -32,6 +32,42 @@ import WarningAlert from '../components/WarningAlert';
 // 🆕 Фоновая задача для отслеживания локации
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
+// 🆕 Определение фоновой задачи (должно быть ВНЕ компонента!)
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('❌ Background location task error:', error);
+    return;
+  }
+  
+  if (data) {
+    const { locations } = data as any;
+    console.log(`📍 Background location update: ${locations?.length || 0} locations`);
+    
+    // Сохраняем локации в AsyncStorage для последующей обработки
+    // т.к. в фоновой задаче нет доступа к состоянию компонента
+    if (locations && locations.length > 0) {
+      const location = locations[0];
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        
+        // Сохраняем последнюю локацию
+        await AsyncStorage.setItem('lastBackgroundLocation', JSON.stringify({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          speed: location.coords.speed || 0,
+          accuracy: location.coords.accuracy || 0,
+          altitude: location.coords.altitude,
+          timestamp: location.timestamp,
+        }));
+        
+        console.log(`✅ Background location saved: (${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)})`);
+      } catch (e) {
+        console.error('Error saving background location:', e);
+      }
+    }
+  }
+});
+
 export default function GoodRoadApp() {
   // Состояние приложения
   const [isTracking, setIsTracking] = useState(false);
