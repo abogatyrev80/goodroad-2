@@ -410,28 +410,33 @@ export default function AdminPanelSimple() {
               </View>
               
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Качество дороги:</Text>
-                <Text style={[styles.detailValue, { color: getPointColor(selectedPoint) }]}>
-                  {selectedPoint.roadQuality}% ({selectedPoint.roadQuality > 70 ? 'Хорошее' : selectedPoint.roadQuality > 40 ? 'Среднее' : 'Плохое'})
+                <Text style={styles.detailLabel}>Скорость:</Text>
+                <Text style={styles.detailValue}>
+                  {selectedPoint.speed.toFixed(1)} км/ч
                 </Text>
               </View>
               
-              <Pressable
-                style={[styles.verifyButton, selectedPoint.isVerified && styles.verifyButtonActive]}
-                onPress={() => {
-                  updatePointVerification(selectedPoint.id, !selectedPoint.isVerified);
-                  setSelectedPoint({ ...selectedPoint, isVerified: !selectedPoint.isVerified });
-                }}
-              >
-                <Ionicons 
-                  name={selectedPoint.isVerified ? "checkmark-circle" : "checkmark-circle-outline"} 
-                  size={20} 
-                  color={selectedPoint.isVerified ? "white" : "#4CAF50"} 
-                />
-                <Text style={[styles.verifyButtonText, selectedPoint.isVerified && { color: 'white' }]}>
-                  {selectedPoint.isVerified ? 'Верифицировано' : 'Верифицировать'}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Точность GPS:</Text>
+                <Text style={styles.detailValue}>
+                  ±{selectedPoint.accuracy.toFixed(1)} метров
                 </Text>
-              </Pressable>
+              </View>
+              
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Акселерометр (x, y, z):</Text>
+                <Text style={styles.detailValue}>
+                  X: {selectedPoint.accelerometer.x.toFixed(3)} м/с²{'\n'}
+                  Y: {selectedPoint.accelerometer.y.toFixed(3)} м/с²{'\n'}
+                  Z: {selectedPoint.accelerometer.z.toFixed(3)} м/с²
+                </Text>
+              </View>
+              
+              <View style={[styles.infoBox, { backgroundColor: '#2196F3' }]}>
+                <Text style={styles.infoText}>
+                  ℹ️ Это сырые данные без классификации событий
+                </Text>
+              </View>
             </ScrollView>
             
             <Pressable 
