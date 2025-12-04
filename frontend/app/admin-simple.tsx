@@ -317,19 +317,15 @@ export default function AdminPanelSimple() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{stats.totalPoints}</Text>
-            <Text style={styles.statLabel}>Всего точек</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.verifiedPoints}</Text>
-            <Text style={styles.statLabel}>Верифицировано</Text>
+            <Text style={styles.statLabel}>Сырых данных</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{stats.hazardPoints}</Text>
-            <Text style={styles.statLabel}>Препятствий</Text>
+            <Text style={styles.statLabel}>Событий</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.avgRoadQuality.toFixed(1)}%</Text>
-            <Text style={styles.statLabel}>Ср. качество</Text>
+            <Text style={styles.statNumber}>{sensorData.length}</Text>
+            <Text style={styles.statLabel}>Загружено</Text>
           </View>
         </View>
 
