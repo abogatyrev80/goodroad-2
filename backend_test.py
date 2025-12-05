@@ -15,8 +15,7 @@ Test Coverage:
 9. Performance testing
 """
 
-import asyncio
-import aiohttp
+import requests
 import json
 import time
 from datetime import datetime
@@ -27,17 +26,21 @@ BACKEND_URL = "https://road-monitor-4.emergent.host/api"
 
 class NearbyObstaclesAPITester:
     def __init__(self):
-        self.session = None
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': 'NearbyObstaclesTester/1.0'
+        })
         self.test_results = []
         
-    async def setup(self):
+    def setup(self):
         """Initialize HTTP session"""
-        self.session = aiohttp.ClientSession()
+        pass
         
-    async def cleanup(self):
+    def cleanup(self):
         """Close HTTP session"""
         if self.session:
-            await self.session.close()
+            self.session.close()
             
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
