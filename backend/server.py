@@ -86,10 +86,9 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             try:
                 await db.obstacle_clusters.create_index([("status", 1)])
                 await db.obstacle_clusters.create_index([("expiresAt", 1)])
-                await db.obstacle_clusters.create_index([
-                    ("location.latitude", "2d"),
-                    ("location.longitude", "2d")
-                ])
+                # Простые индексы для lat/lng (не гео-пространственные)
+                await db.obstacle_clusters.create_index([("location.latitude", 1)])
+                await db.obstacle_clusters.create_index([("location.longitude", 1)])
                 logger.info("✅ Created indexes for obstacle_clusters collection")
             except Exception as e:
                 logger.warning(f"⚠️ Could not create indexes (may already exist): {e}")
