@@ -356,23 +356,38 @@ def detect_road_issues(analysis: Dict[str, float]) -> List[RoadWarning]:
 @app.get("/health")
 async def health_check():
     """
-    Basic health check - returns 200 if service is running
-    Used for liveness probe
+    Liveness probe - returns 200 if service process is running
+    This endpoint should always return quickly without heavy operations
     """
     return {
         "status": "healthy",
         "service": "Good Road API",
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/ready")
 async def readiness_check():
     """
-    Readiness check - returns 200 only if all dependencies are ready
-    Used for readiness probe
+    Readiness probe - returns 200 only if all dependencies are ready
+    Checks MongoDB connection and other critical dependencies
     """
     if not mongodb_connected:
+        logger.warning("Readiness check failed: MongoDB not connected")
         raise HTTPException(status_code=503, detail="MongoDB not connected")
+    
+    try:
+        # Quick ping to verify connection is still alive
+        await db.command("ping")
+        return {
+            "status": "ready",
+            "service": "Good Road API",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Readiness check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Database check failed: {str(e)}")
     
     try:
         # Quick ping to verify MongoDB is still responsive
