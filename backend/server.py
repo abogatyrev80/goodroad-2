@@ -105,6 +105,17 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             
         except Exception as e:
             logger.error(f"❌ MongoDB connection attempt {attempt}/{max_retries} failed: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            
+            if attempt < max_retries:
+                logger.info(f"⏳ Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"❌ Failed to connect to MongoDB after {max_retries} attempts")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Database connection failed: {str(e)}"
+                )
             
             if attempt < max_retries:
                 logger.info(f"Retrying in {retry_delay} seconds...")
