@@ -47,16 +47,34 @@ export interface DriverReaction {
 }
 
 class ObstacleService {
-  private backendUrl: string;
+  private backendUrl: string | null = null;
   private cachedObstacles: Obstacle[] = [];
   private lastFetchTime: number = 0;
   private passedObstacles: Set<string> = new Set(); // ID пройденных препятствий
   private driverReactions: DriverReaction[] = [];
   private readonly CACHE_DURATION = 30000; // 30 секунд
   private readonly PASSED_DISTANCE = 50; // метров - считается пройденным
+  private initialized = false;
 
   constructor() {
     // Не загружаем AsyncStorage в конструкторе - делаем это лениво при первом использовании
+  }
+
+  /**
+   * Ленивая инициализация сервиса
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+
+    // Инициализируем URL
+    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://road-monitor-4.emergent.host';
+    this.backendUrl = url.endsWith('/') ? url : url + '/';
+    console.log('🚧 ObstacleService initialized with URL:', this.backendUrl);
+
+    // Загружаем реакции водителя
+    await this.loadDriverReactions();
+    
+    this.initialized = true;
   }
 
   /**
