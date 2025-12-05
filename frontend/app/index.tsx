@@ -523,8 +523,8 @@ export default function GoodRoadApp() {
         </View>
         
         <View style={styles.headerRight}>
-          <Pressable onPress={() => router.push('/settings')} style={styles.iconButton}>
-            <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+          <Pressable onPress={() => router.push('/audio-settings')} style={styles.iconButton}>
+            <Ionicons name="volume-high-outline" size={24} color="#FFFFFF" />
           </Pressable>
           <Pressable onPress={() => router.push('/admin-simple')} style={styles.iconButton}>
             <Ionicons name="analytics-outline" size={24} color="#FFFFFF" />
