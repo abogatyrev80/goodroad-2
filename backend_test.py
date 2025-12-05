@@ -60,25 +60,25 @@ class NearbyObstaclesAPITester:
             print(f"   Response: {response_data}")
         print()
 
-    async def test_api_connectivity(self):
+    def test_api_connectivity(self):
         """Test basic API connectivity"""
         try:
-            async with self.session.get(f"{BACKEND_URL}/") as response:
-                if response.status == 200:
-                    data = await response.json()
-                    self.log_test(
-                        "API Connectivity", 
-                        True, 
-                        f"API version {data.get('version', 'unknown')} operational"
-                    )
-                    return True
-                else:
-                    self.log_test(
-                        "API Connectivity", 
-                        False, 
-                        f"HTTP {response.status}"
-                    )
-                    return False
+            response = self.session.get(f"{BACKEND_URL}/")
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test(
+                    "API Connectivity", 
+                    True, 
+                    f"API version {data.get('version', 'unknown')} operational"
+                )
+                return True
+            else:
+                self.log_test(
+                    "API Connectivity", 
+                    False, 
+                    f"HTTP {response.status_code}"
+                )
+                return False
         except Exception as e:
             self.log_test("API Connectivity", False, f"Connection error: {str(e)}")
             return False
