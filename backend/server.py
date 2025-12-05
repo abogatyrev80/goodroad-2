@@ -1083,6 +1083,63 @@ async def get_processed_events(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving events: {str(e)}")
 
+@api_router.get("/admin/v2/clusters")
+async def get_obstacle_clusters(
+    limit: int = 1000,
+    status: str = "active"
+):
+    """
+    🆕 Получить кластеры препятствий
+    
+    Args:
+        limit: Максимальное количество кластеров
+        status: Статус кластера (active, expired, fixed)
+    
+    Returns:
+        Список кластеров с агрегированной информацией
+    """
+    try:
+        if not obstacle_clusterer:
+            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
+        
+        # Автоматически помечаем устаревшие кластеры
+        await obstacle_clusterer.expire_old_clusters()
+        
+        # Получаем активные кластеры
+        query = {"status": status}
+        if status == "active":
+            query["expiresAt"] = {"$gt": datetime.utcnow()}
+        
+        clusters = await db.obstacle_clusters.find(
+            query,
+            {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1, 
+             "confidence": 1, "reportCount": 1, "devices": 1, 
+             "firstReported": 1, "lastReported": 1, "status": 1, 
+             "expiresAt": 1, "roadInfo": 1}
+        ).sort("lastReported", -1).limit(limit).to_list(limit)
+        
+        # Преобразуем даты в строки для JSON
+        for cluster in clusters:
+            cluster['clusterId'] = cluster.pop('_id')
+            cluster['firstReported'] = cluster['firstReported'].isoformat() if cluster.get('firstReported') else None
+            cluster['lastReported'] = cluster['lastReported'].isoformat() if cluster.get('lastReported') else None
+            cluster['expiresAt'] = cluster['expiresAt'].isoformat() if cluster.get('expiresAt') else None
+            
+            # Убираем history из severity (слишком большой для передачи)
+            if 'severity' in cluster and 'history' in cluster['severity']:
+                del cluster['severity']['history']
+            if 'roadInfo' in cluster and 'speeds' in cluster['roadInfo']:
+                del cluster['roadInfo']['speeds']
+        
+        return {
+            "total": len(clusters),
+            "clusters": clusters
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving clusters: {str(e)}")
+
 @api_router.get("/admin/v2/heatmap")
 async def get_heatmap_data():
     """Получить данные для heatmap из processed_events"""
