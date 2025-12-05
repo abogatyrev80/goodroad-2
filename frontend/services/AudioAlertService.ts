@@ -161,6 +161,9 @@ class AudioAlertService {
    * Выдать аудио-оповещение
    */
   async alert(obstacle: Obstacle, currentSpeed: number): Promise<void> {
+    // Инициализируемся при первом использовании
+    await this.ensureInitialized();
+
     if (!this.settings.voiceEnabled && !this.settings.soundEnabled) {
       return;
     }
