@@ -409,8 +409,16 @@ class GoodRoadBackendTester:
             print("✅ ALL TESTS PASSED!")
         
         return passed, total, self.test_results
+
+if __name__ == "__main__":
+    tester = GoodRoadBackendTester()
+    passed, total, results = tester.run_all_tests()
     
-    def test_clear_database_v2_no_confirmation(self):
+    # Exit with error code if tests failed
+    if passed < total:
+        sys.exit(1)
+    else:
+        sys.exit(0)
         """Test Clear Database V2: Request without confirmation parameter"""
         print("\n🧪 Testing Clear Database V2 - No Confirmation")
         
