@@ -1166,6 +1166,90 @@ async def get_heatmap_data():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving heatmap data: {str(e)}")
 
+@api_router.get("/obstacles/nearby")
+async def get_nearby_obstacles(
+    latitude: float,
+    longitude: float,
+    radius: float = 5000,  # 5 км по умолчанию
+    min_confirmations: int = 1
+):
+    """
+    🆕 Получить препятствия рядом с текущей позицией (для мобильного приложения)
+    
+    Args:
+        latitude: Широта текущей позиции
+        longitude: Долгота текущей позиции
+        radius: Радиус поиска в метрах (по умолчанию 5000м = 5км)
+        min_confirmations: Минимальное количество подтверждений (по умолчанию 1)
+    
+    Returns:
+        Список активных кластеров препятствий отсортированных по приоритету
+    """
+    try:
+        if not obstacle_clusterer:
+            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
+        
+        # Получаем все активные кластеры
+        all_clusters = await db.obstacle_clusters.find({
+            "status": "active",
+            "expiresAt": {"$gt": datetime.utcnow()},
+            "reportCount": {"$gte": min_confirmations}
+        }).to_list(1000)
+        
+        # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
+        nearby_obstacles = []
+        for cluster in all_clusters:
+            distance = obstacle_clusterer.haversine_distance(
+                latitude, longitude,
+                cluster['location']['latitude'],
+                cluster['location']['longitude']
+            )
+            
+            if distance <= radius:
+                # Оптимизированный формат для мобильного приложения
+                obstacle = {
+                    "id": str(cluster['_id']),
+                    "type": cluster['obstacleType'],
+                    "latitude": cluster['location']['latitude'],
+                    "longitude": cluster['location']['longitude'],
+                    "distance": round(distance, 1),  # метры
+                    "severity": {
+                        "average": round(cluster['severity']['average'], 1),
+                        "max": cluster['severity']['max']
+                    },
+                    "confidence": round(cluster['confidence'], 2),
+                    "confirmations": cluster['reportCount'],
+                    "avgSpeed": round(cluster['roadInfo']['avgSpeed'] * 3.6, 1),  # м/с -> км/ч
+                    "lastReported": cluster['lastReported'].isoformat()
+                }
+                
+                # Вычисляем приоритет для сортировки
+                # Приоритет = confirmations * 100 + (1 / (distance + 1)) * 10
+                # Чем больше подтверждений и ближе - тем выше приоритет
+                priority = cluster['reportCount'] * 100 + (1 / (distance + 1)) * 10
+                obstacle['priority'] = round(priority, 2)
+                
+                nearby_obstacles.append(obstacle)
+        
+        # Сортируем по приоритету (убывание)
+        nearby_obstacles.sort(key=lambda x: x['priority'], reverse=True)
+        
+        return {
+            "userLocation": {
+                "latitude": latitude,
+                "longitude": longitude
+            },
+            "searchRadius": radius,
+            "minConfirmations": min_confirmations,
+            "total": len(nearby_obstacles),
+            "obstacles": nearby_obstacles
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving nearby obstacles: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving nearby obstacles: {str(e)}")
+
 @api_router.get("/road-conditions")
 async def get_road_conditions(
     latitude: float,
