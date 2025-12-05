@@ -443,7 +443,7 @@
 
         // 🆕 Состояние фильтров сырых данных
         let rawDataFilters = {
-            limit: 1000,
+            limit: 10000, // Увеличен лимит, теперь фиксированный
             dateFrom: null,
             dateTo: null,
             timeFrom: null,
@@ -453,7 +453,7 @@
         
         // 🆕 Обновить фильтры сырых данных
         function updateRawDataFilters() {
-            rawDataFilters.limit = parseInt(document.getElementById('raw-limit').value) || 1000;
+            // Убрана логика выбора лимита - теперь фиксированный 10000
             rawDataFilters.dateFrom = document.getElementById('raw-date-from').value || null;
             rawDataFilters.dateTo = document.getElementById('raw-date-to').value || null;
             rawDataFilters.timeFrom = document.getElementById('raw-time-from').value || null;
@@ -466,7 +466,6 @@
         
         // 🆕 Сбросить фильтры
         function resetRawDataFilters() {
-            document.getElementById('raw-limit').value = '1000';
             document.getElementById('raw-date-from').value = '';
             document.getElementById('raw-date-to').value = '';
             document.getElementById('raw-time-from').value = '';
@@ -474,7 +473,7 @@
             document.getElementById('raw-device').value = '';
             
             rawDataFilters = {
-                limit: 1000,
+                limit: 10000,
                 dateFrom: null,
                 dateTo: null,
                 timeFrom: null,
