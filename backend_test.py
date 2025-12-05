@@ -365,7 +365,7 @@ class GoodRoadBackendTester:
             self.log_test("Processed Events Data", False, f"Error: {str(e)}")
             return False
     
-    def add_test_data_for_clear_db(self):
+    def run_all_tests(self):
         """Add test data with different dates for Clear Database V2 filtering tests"""
         print("\n🔧 Adding test data with different dates for Clear Database V2 tests...")
         
