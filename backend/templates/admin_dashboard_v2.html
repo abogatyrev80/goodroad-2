@@ -591,23 +591,54 @@
         function displayRawDataList(rawData) {
             const eventList = document.getElementById('event-list');
             
-            eventList.innerHTML = rawData.slice(0, 20).map(data => {
+            // 🆕 Заголовок с информацией о фильтрах
+            let filterInfo = `<div style="background: #334155; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.75rem; color: #94a3b8;">`;
+            filterInfo += `📊 Показано: <strong style="color: #60a5fa;">${rawData.length}</strong> записей<br>`;
+            
+            if (rawDataFilters.dateFrom || rawDataFilters.dateTo) {
+                filterInfo += `📅 Период: ${rawDataFilters.dateFrom || 'начало'} - ${rawDataFilters.dateTo || 'сейчас'}<br>`;
+            }
+            if (rawDataFilters.timeFrom || rawDataFilters.timeTo) {
+                filterInfo += `🕐 Время: ${rawDataFilters.timeFrom || '00:00'} - ${rawDataFilters.timeTo || '23:59'}<br>`;
+            }
+            if (rawDataFilters.deviceId) {
+                filterInfo += `📱 Устройство: ${rawDataFilters.deviceId}`;
+            }
+            filterInfo += `</div>`;
+            
+            eventList.innerHTML = filterInfo + rawData.slice(0, 50).map(data => {
                 const timestamp = new Date(data.timestamp).toLocaleString('ru-RU');
+                const accelMagnitude = Math.sqrt(
+                    Math.pow(data.accelerometer_x || 0, 2) + 
+                    Math.pow(data.accelerometer_y || 0, 2) + 
+                    Math.pow(data.accelerometer_z || 0, 2)
+                );
                 
                 return `
-                    <div class="event-item">
-                        <div class="event-type">
-                            📊 Raw Data Point
+                    <div class="event-item" style="cursor: pointer;" onclick="map.setView([${data.latitude}, ${data.longitude}], 16);">
+                        <div class="event-type" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>📊 ${timestamp.split(',')[1].trim()}</span>
+                            <span style="font-size: 0.75rem; color: #94a3b8;">${(data.speed * 3.6).toFixed(0)} км/ч</span>
                         </div>
                         <div class="event-details">
-                            <div>Accel: X:${data.accelerometer_x?.toFixed(2) || 0}, Y:${data.accelerometer_y?.toFixed(2) || 0}, Z:${data.accelerometer_z?.toFixed(2) || 0}</div>
-                            <div>Device: ${data.deviceId || 'Unknown'}</div>
-                            <div>Скорость: ${data.speed?.toFixed(1) || 0} км/ч</div>
-                            <div>${timestamp}</div>
+                            <div style="font-size: 0.7rem;">📍 ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}</div>
+                            <div style="font-size: 0.7rem;">📊 Magnitude: ${accelMagnitude.toFixed(3)} м/с²</div>
+                            <div style="font-size: 0.7rem;">📱 ${data.deviceId ? data.deviceId.substring(0, 20) + '...' : 'Unknown'}</div>
+                            <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.25rem;">${timestamp.split(',')[0]}</div>
                         </div>
                     </div>
                 `;
             }).join('');
+            
+            // 🆕 Добавить информацию если записей больше 50
+            if (rawData.length > 50) {
+                eventList.innerHTML += `
+                    <div style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.75rem;">
+                        Показаны первые 50 из ${rawData.length} записей.<br>
+                        Используйте карту для просмотра всех точек.
+                    </div>
+                `;
+            }
         }
 
         // Отобразить маркеры сырых данных с траекторией
