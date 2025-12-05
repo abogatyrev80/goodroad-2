@@ -1516,7 +1516,6 @@ async def clear_database(
         ]
         
         # Определяем фильтр по дате
-        delete_filter = {}
         if days is not None and days > 0:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             # Для коллекций с полем timestamp (datetime)
