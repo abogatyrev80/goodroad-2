@@ -668,7 +668,8 @@ export default function GoodRoadApp() {
           </View>
         )}
 
-        {/* Карточка статистики: Сбор данных */}
+        {/* Карточка статистики: Сбор данных - скрыто для конечных пользователей */}
+        {false && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="stats-chart" size={24} color="#FF9800" />
