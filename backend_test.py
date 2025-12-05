@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
 """
-Good Road App Backend Testing Suite - Phase 1 Clusters Testing
-Testing clusters functionality and related backend APIs as requested in review
+Backend Testing Suite for Good Road App - Phase 2 Mobile API
+Focus: /api/obstacles/nearby endpoint testing
+
+Test Coverage:
+1. Basic requests with minimal parameters
+2. Custom radius parameter testing
+3. Minimum confirmations filtering
+4. Input validation (invalid types, missing parameters)
+5. Response structure validation
+6. Priority algorithm verification
+7. Geographic filtering accuracy
+8. Integration with clustering system
+9. Performance testing
 """
 
-import requests
+import asyncio
+import aiohttp
 import json
 import time
-from datetime import datetime, timedelta
-import sys
+from datetime import datetime
+from typing import Dict, List, Any
 
-# Backend URL from frontend/.env - using EXPO_PUBLIC_BACKEND_URL which should have the clusters
-BACKEND_URL = "https://roadquality-app.preview.emergentagent.com/api"
+# Backend URL from environment
+BACKEND_URL = "https://road-monitor-4.emergent.host/api"
 
 class GoodRoadBackendTester:
     def __init__(self):
