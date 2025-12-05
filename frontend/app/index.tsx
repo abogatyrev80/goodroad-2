@@ -609,7 +609,52 @@ export default function GoodRoadApp() {
           </View>
         </View>
         
-        {/* Статистика сбора данных */}
+        {/* 🆕 Карточка: Препятствия впереди */}
+        {isTracking && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="warning" size={24} color="#f59e0b" />
+              <Text style={styles.cardTitle}>Препятствия впереди</Text>
+            </View>
+            
+            <View style={styles.cardContent}>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Всего обнаружено:</Text>
+                <Text style={[styles.statValue, obstaclesCount > 0 && styles.statValueWarning]}>
+                  {obstaclesCount}
+                </Text>
+              </View>
+              
+              {closestObstacle && (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.obstacleInfo}>
+                    <Text style={styles.obstacleType}>
+                      {closestObstacle.type === 'pothole' && '🕳️ Яма'}
+                      {closestObstacle.type === 'speed_bump' && '⚠️ Лежачий полицейский'}
+                      {closestObstacle.type === 'bump' && '⚠️ Неровность'}
+                      {closestObstacle.type === 'accident' && '🚨 Авария'}
+                      {closestObstacle.type === 'braking' && '🚨 Торможение'}
+                      {closestObstacle.type === 'vibration' && '〰️ Вибрация'}
+                    </Text>
+                    <Text style={styles.obstacleDistance}>
+                      {Math.round(closestObstacle.distance)} м
+                    </Text>
+                    <Text style={styles.obstacleConfidence}>
+                      ✅ {closestObstacle.confirmations} {closestObstacle.confirmations === 1 ? 'подтверждение' : 'подтверждения'}
+                    </Text>
+                  </View>
+                </>
+              )}
+              
+              {obstaclesCount === 0 && (
+                <Text style={styles.noObstacles}>✨ Путь свободен</Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Карточка статистики: Сбор данных */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="stats-chart" size={24} color="#FF9800" />
