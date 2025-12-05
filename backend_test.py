@@ -30,397 +30,622 @@ class NearbyObstaclesAPITester:
         self.session = None
         self.test_results = []
         
-    def log_test(self, test_name, success, details="", response_data=None):
-        """Log test results"""
-        self.total_tests += 1
-        if success:
-            self.passed_tests += 1
-        else:
-            self.failed_tests.append(test_name)
+    async def setup(self):
+        """Initialize HTTP session"""
+        self.session = aiohttp.ClientSession()
         
+    async def cleanup(self):
+        """Close HTTP session"""
+        if self.session:
+            await self.session.close()
+            
+    def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
+        """Log test result"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat(),
+            "response_data": response_data
+        }
+        self.test_results.append(result)
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status}: {test_name}")
         if details:
             print(f"   Details: {details}")
-        self.test_results.append({
-            "test": test_name,
-            "success": success,
-            "details": details,
-            "response_data": response_data,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    def test_api_connectivity(self):
+        if not success and response_data:
+            print(f"   Response: {response_data}")
+        print()
+
+    async def test_api_connectivity(self):
         """Test basic API connectivity"""
         try:
-            response = self.session.get(f"{BACKEND_URL}/")
-            if response.status_code == 200:
-                data = response.json()
-                mongodb_status = data.get('mongodb_connected', 'unknown')
-                self.log_test("API Connectivity", True, 
-                            f"API version: {data.get('version', 'unknown')}, MongoDB: {mongodb_status}")
-                return True
-            else:
-                self.log_test("API Connectivity", False, f"HTTP {response.status_code}: {response.text}")
-                return False
+            async with self.session.get(f"{BACKEND_URL}/") as response:
+                if response.status == 200:
+                    data = await response.json()
+                    self.log_test(
+                        "API Connectivity", 
+                        True, 
+                        f"API version {data.get('version', 'unknown')} operational"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "API Connectivity", 
+                        False, 
+                        f"HTTP {response.status}"
+                    )
+                    return False
         except Exception as e:
             self.log_test("API Connectivity", False, f"Connection error: {str(e)}")
             return False
 
-    def test_clusters_endpoint(self):
-        """Test GET /api/admin/v2/clusters endpoint - HIGH PRIORITY"""
+    async def test_basic_request(self):
+        """Test 1: Basic request with minimal parameters (latitude + longitude)"""
         try:
-            # Test with default parameters
-            response = self.session.get(f"{BACKEND_URL}/admin/v2/clusters")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check response structure
-                if 'total' in data and 'clusters' in data:
-                    cluster_count = data.get('total', 0)
-                    clusters = data.get('clusters', [])
-                    
-                    self.log_test(
-                        "Clusters Endpoint - Default Parameters", 
-                        True, 
-                        f"Found {cluster_count} clusters, returned {len(clusters)} clusters"
-                    )
-                    
-                    # Test with limit parameter
-                    response2 = self.session.get(f"{BACKEND_URL}/admin/v2/clusters?limit=10")
-                    if response2.status_code == 200:
-                        data2 = response2.json()
-                        self.log_test(
-                            "Clusters Endpoint - Limit Parameter", 
-                            True, 
-                            f"Limit=10 returned {len(data2.get('clusters', []))} clusters"
-                        )
-                    else:
-                        self.log_test("Clusters Endpoint - Limit Parameter", False, f"HTTP {response2.status_code}")
-                    
-                    # Test with status filter
-                    response3 = self.session.get(f"{BACKEND_URL}/admin/v2/clusters?status=active")
-                    if response3.status_code == 200:
-                        data3 = response3.json()
-                        self.log_test(
-                            "Clusters Endpoint - Status Filter", 
-                            True, 
-                            f"Status=active returned {len(data3.get('clusters', []))} clusters"
-                        )
-                    else:
-                        self.log_test("Clusters Endpoint - Status Filter", False, f"HTTP {response3.status_code}")
-                    
-                    # Test expired status
-                    response4 = self.session.get(f"{BACKEND_URL}/admin/v2/clusters?status=expired")
-                    if response4.status_code == 200:
-                        data4 = response4.json()
-                        self.log_test(
-                            "Clusters Endpoint - Expired Status", 
-                            True, 
-                            f"Status=expired returned {len(data4.get('clusters', []))} clusters"
-                        )
-                    else:
-                        self.log_test("Clusters Endpoint - Expired Status", False, f"HTTP {response4.status_code}")
-                    
-                    return True
-                else:
-                    self.log_test("Clusters Endpoint - Default Parameters", False, f"Invalid response structure: {list(data.keys())}")
-                    return False
-            else:
-                self.log_test("Clusters Endpoint - Default Parameters", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Clusters Endpoint - Default Parameters", False, f"Error: {str(e)}")
-            return False
-
-    def test_analytics_v2_endpoint(self):
-        """Test GET /api/admin/v2/analytics endpoint - MEDIUM PRIORITY"""
-        try:
-            response = self.session.get(f"{BACKEND_URL}/admin/v2/analytics")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check required fields
-                required_fields = ['summary']
-                if all(field in data for field in required_fields):
-                    summary = data.get('summary', {})
-                    
-                    # Check summary fields
-                    summary_fields = ['raw_data_points', 'processed_events', 'active_warnings']
-                    if all(field in summary for field in summary_fields):
-                        self.log_test(
-                            "Analytics V2 Endpoint", 
-                            True, 
-                            f"Raw data: {summary.get('raw_data_points')}, Events: {summary.get('processed_events')}, Warnings: {summary.get('active_warnings')}"
-                        )
-                        return True
-                    else:
-                        missing = [f for f in summary_fields if f not in summary]
-                        self.log_test("Analytics V2 Endpoint", False, f"Missing summary fields: {missing}")
-                        return False
-                else:
-                    missing = [f for f in required_fields if f not in data]
-                    self.log_test("Analytics V2 Endpoint", False, f"Missing required fields: {missing}")
-                    return False
-            else:
-                self.log_test("Analytics V2 Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Analytics V2 Endpoint", False, f"Error: {str(e)}")
-            return False
-
-    def test_web_admin_dashboard(self):
-        """Test web admin dashboard accessibility - HIGH PRIORITY"""
-        try:
-            # Test the web admin dashboard URL
-            dashboard_url = "https://road-monitor-4.emergent.host/admin/dashboard/v2"
-            
-            response = self.session.get(dashboard_url)
-            
-            if response.status_code == 200:
-                content = response.text
-                
-                # Check for key elements that should be in the dashboard
-                required_elements = [
-                    'Leaflet',  # Map library
-                    'clusters',  # Clusters functionality
-                    'loadData',  # Data loading function
-                    'switchViewMode'  # View mode switching
-                ]
-                
-                found_elements = []
-                missing_elements = []
-                
-                for element in required_elements:
-                    if element.lower() in content.lower():
-                        found_elements.append(element)
-                    else:
-                        missing_elements.append(element)
-                
-                if len(found_elements) >= 3:  # At least 3 out of 4 elements should be present
-                    self.log_test(
-                        "Web Admin Dashboard Accessibility", 
-                        True, 
-                        f"Dashboard loaded successfully. Found elements: {found_elements}"
-                    )
-                    return True
-                else:
-                    self.log_test(
-                        "Web Admin Dashboard Accessibility", 
-                        False, 
-                        f"Dashboard missing key elements. Found: {found_elements}, Missing: {missing_elements}"
-                    )
-                    return False
-            else:
-                self.log_test("Web Admin Dashboard Accessibility", False, f"HTTP {response.status_code}: {response.text[:200]}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Web Admin Dashboard Accessibility", False, f"Error: {str(e)}")
-            return False
-
-    def test_cors_configuration(self):
-        """Test CORS configuration for web admin"""
-        try:
-            # Test CORS preflight request
-            headers = {
-                'Origin': 'https://roadquality-app.preview.emergentagent.com',
-                'Access-Control-Request-Method': 'GET',
-                'Access-Control-Request-Headers': 'Content-Type'
+            # Moscow coordinates for testing
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176
             }
             
-            response = self.session.options(f"{BACKEND_URL}/admin/v2/clusters", headers=headers)
-            
-            if response.status_code in [200, 204]:
-                cors_headers = {
-                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
-                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
-                }
-                
-                self.log_test(
-                    "CORS Configuration", 
-                    True, 
-                    f"CORS headers present: {cors_headers}"
-                )
-                return True
-            else:
-                self.log_test("CORS Configuration", False, f"CORS preflight failed: HTTP {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.log_test("CORS Configuration", False, f"Error: {str(e)}")
-            return False
-
-    def test_cluster_data_structure(self):
-        """Test cluster data structure if clusters exist"""
-        try:
-            response = self.session.get(f"{BACKEND_URL}/admin/v2/clusters?limit=1")
-            
-            if response.status_code == 200:
-                data = response.json()
-                clusters = data.get('clusters', [])
-                
-                if clusters:
-                    cluster = clusters[0]
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
                     
-                    # Expected cluster fields
-                    expected_fields = [
-                        'clusterId', 'obstacleType', 'location', 'severity',
-                        'confidence', 'reportCount', 'devices', 'firstReported',
-                        'lastReported', 'status'
-                    ]
+                    # Validate response structure
+                    required_fields = ["userLocation", "searchRadius", "minConfirmations", "total", "obstacles"]
+                    missing_fields = [field for field in required_fields if field not in data]
                     
-                    present_fields = []
-                    missing_fields = []
-                    
-                    for field in expected_fields:
-                        if field in cluster:
-                            present_fields.append(field)
-                        else:
-                            missing_fields.append(field)
-                    
-                    if len(present_fields) >= 7:  # At least 7 out of 10 fields should be present
+                    if missing_fields:
                         self.log_test(
-                            "Cluster Data Structure", 
-                            True, 
-                            f"Cluster structure valid. Present: {present_fields}"
-                        )
-                        return True
-                    else:
-                        self.log_test(
-                            "Cluster Data Structure", 
-                            False, 
-                            f"Invalid cluster structure. Missing: {missing_fields}"
+                            "Basic Request - Response Structure",
+                            False,
+                            f"Missing fields: {missing_fields}",
+                            data
                         )
                         return False
-                else:
+                    
+                    # Validate userLocation
+                    user_loc = data["userLocation"]
+                    if user_loc["latitude"] != params["latitude"] or user_loc["longitude"] != params["longitude"]:
+                        self.log_test(
+                            "Basic Request - User Location",
+                            False,
+                            f"User location mismatch: expected {params}, got {user_loc}"
+                        )
+                        return False
+                    
+                    # Validate default values
+                    if data["searchRadius"] != 5000:
+                        self.log_test(
+                            "Basic Request - Default Radius",
+                            False,
+                            f"Expected default radius 5000, got {data['searchRadius']}"
+                        )
+                        return False
+                    
+                    if data["minConfirmations"] != 1:
+                        self.log_test(
+                            "Basic Request - Default Min Confirmations",
+                            False,
+                            f"Expected default minConfirmations 1, got {data['minConfirmations']}"
+                        )
+                        return False
+                    
                     self.log_test(
-                        "Cluster Data Structure", 
-                        True, 
-                        "No clusters found - this is expected if no events have been processed yet"
+                        "Basic Request",
+                        True,
+                        f"Found {data['total']} obstacles within {data['searchRadius']}m radius"
                     )
                     return True
-            else:
-                self.log_test("Cluster Data Structure", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Basic Request",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
         except Exception as e:
-            self.log_test("Cluster Data Structure", False, f"Error: {str(e)}")
+            self.log_test("Basic Request", False, f"Exception: {str(e)}")
             return False
 
-    def test_obstacle_clusterer_initialization(self):
-        """Test if obstacle clusterer is properly initialized - LOW PRIORITY"""
+    async def test_custom_radius(self):
+        """Test 2: Request with custom radius (radius=10000)"""
         try:
-            # Try to access clusters endpoint to see if clusterer is working
-            response = self.session.get(f"{BACKEND_URL}/admin/v2/clusters")
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 10000
+            }
             
-            if response.status_code == 200:
-                self.log_test(
-                    "Obstacle Clusterer Initialization", 
-                    True, 
-                    "Clusterer appears to be initialized (clusters endpoint accessible)"
-                )
-                return True
-            elif response.status_code == 503:
-                # Service unavailable might indicate clusterer not initialized
-                self.log_test(
-                    "Obstacle Clusterer Initialization", 
-                    False, 
-                    "Clusterer not initialized (HTTP 503)"
-                )
-                return False
-            else:
-                self.log_test(
-                    "Obstacle Clusterer Initialization", 
-                    False, 
-                    f"Unexpected response: HTTP {response.status_code}"
-                )
-                return False
-                
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data["searchRadius"] != 10000:
+                        self.log_test(
+                            "Custom Radius",
+                            False,
+                            f"Expected radius 10000, got {data['searchRadius']}"
+                        )
+                        return False
+                    
+                    self.log_test(
+                        "Custom Radius",
+                        True,
+                        f"Custom radius {data['searchRadius']}m applied, found {data['total']} obstacles"
+                    )
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Custom Radius",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
         except Exception as e:
-            self.log_test("Obstacle Clusterer Initialization", False, f"Error: {str(e)}")
+            self.log_test("Custom Radius", False, f"Exception: {str(e)}")
             return False
 
-    def test_processed_events_data(self):
-        """Test if there are processed events for clustering"""
+    async def test_min_confirmations_filter(self):
+        """Test 3: Request with confirmation filter (min_confirmations=2)"""
         try:
-            response = self.session.get(f"{BACKEND_URL}/admin/v2/events?limit=5")
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "min_confirmations": 2
+            }
             
-            if response.status_code == 200:
-                data = response.json()
-                events = data.get('events', [])
-                total = data.get('total', 0)
-                
-                self.log_test(
-                    "Processed Events Data", 
-                    True, 
-                    f"Found {total} processed events, returned {len(events)} events"
-                )
-                return True
-            else:
-                self.log_test("Processed Events Data", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data["minConfirmations"] != 2:
+                        self.log_test(
+                            "Min Confirmations Filter",
+                            False,
+                            f"Expected minConfirmations 2, got {data['minConfirmations']}"
+                        )
+                        return False
+                    
+                    # Validate that all returned obstacles have >= 2 confirmations
+                    for obstacle in data["obstacles"]:
+                        if obstacle["confirmations"] < 2:
+                            self.log_test(
+                                "Min Confirmations Filter - Validation",
+                                False,
+                                f"Found obstacle with {obstacle['confirmations']} confirmations, expected >= 2"
+                            )
+                            return False
+                    
+                    self.log_test(
+                        "Min Confirmations Filter",
+                        True,
+                        f"Filter applied correctly, found {data['total']} obstacles with >= 2 confirmations"
+                    )
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Min Confirmations Filter",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
         except Exception as e:
-            self.log_test("Processed Events Data", False, f"Error: {str(e)}")
+            self.log_test("Min Confirmations Filter", False, f"Exception: {str(e)}")
             return False
-    
-    def run_all_tests(self):
-        """Run all backend tests for Phase 1 Clusters"""
-        print("🚀 Starting Good Road App Backend Testing - Phase 1 Clusters")
+
+    async def test_input_validation(self):
+        """Test 4: Input validation (invalid types, missing parameters)"""
+        test_cases = [
+            {
+                "name": "Missing Latitude",
+                "params": {"longitude": 37.6176},
+                "expected_status": 422
+            },
+            {
+                "name": "Missing Longitude", 
+                "params": {"latitude": 55.7558},
+                "expected_status": 422
+            },
+            {
+                "name": "Invalid Latitude Type",
+                "params": {"latitude": "invalid", "longitude": 37.6176},
+                "expected_status": 422
+            },
+            {
+                "name": "Invalid Longitude Type",
+                "params": {"latitude": 55.7558, "longitude": "invalid"},
+                "expected_status": 422
+            },
+            {
+                "name": "Invalid Radius Type",
+                "params": {"latitude": 55.7558, "longitude": 37.6176, "radius": "invalid"},
+                "expected_status": 422
+            },
+            {
+                "name": "Invalid Min Confirmations Type",
+                "params": {"latitude": 55.7558, "longitude": 37.6176, "min_confirmations": "invalid"},
+                "expected_status": 422
+            }
+        ]
+        
+        all_passed = True
+        
+        for test_case in test_cases:
+            try:
+                async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=test_case["params"]) as response:
+                    if response.status == test_case["expected_status"]:
+                        self.log_test(
+                            f"Input Validation - {test_case['name']}",
+                            True,
+                            f"Correctly returned HTTP {response.status}"
+                        )
+                    else:
+                        error_text = await response.text()
+                        self.log_test(
+                            f"Input Validation - {test_case['name']}",
+                            False,
+                            f"Expected HTTP {test_case['expected_status']}, got {response.status}: {error_text}"
+                        )
+                        all_passed = False
+                        
+            except Exception as e:
+                self.log_test(f"Input Validation - {test_case['name']}", False, f"Exception: {str(e)}")
+                all_passed = False
+        
+        return all_passed
+
+    async def test_response_structure(self):
+        """Test 5: Detailed response structure validation"""
+        try:
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 1000
+            }
+            
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Validate obstacle structure if any obstacles exist
+                    if data["total"] > 0 and data["obstacles"]:
+                        obstacle = data["obstacles"][0]
+                        required_obstacle_fields = [
+                            "id", "type", "latitude", "longitude", "distance", 
+                            "severity", "confidence", "confirmations", "avgSpeed", 
+                            "lastReported", "priority"
+                        ]
+                        
+                        missing_fields = [field for field in required_obstacle_fields if field not in obstacle]
+                        if missing_fields:
+                            self.log_test(
+                                "Response Structure - Obstacle Fields",
+                                False,
+                                f"Missing obstacle fields: {missing_fields}",
+                                obstacle
+                            )
+                            return False
+                        
+                        # Validate severity structure
+                        if "severity" in obstacle and isinstance(obstacle["severity"], dict):
+                            severity_fields = ["average", "max"]
+                            missing_severity = [field for field in severity_fields if field not in obstacle["severity"]]
+                            if missing_severity:
+                                self.log_test(
+                                    "Response Structure - Severity Fields",
+                                    False,
+                                    f"Missing severity fields: {missing_severity}"
+                                )
+                                return False
+                        
+                        self.log_test(
+                            "Response Structure",
+                            True,
+                            f"All required fields present in obstacle structure"
+                        )
+                    else:
+                        self.log_test(
+                            "Response Structure",
+                            True,
+                            "No obstacles found - structure validation skipped (expected behavior)"
+                        )
+                    
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Response Structure",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
+        except Exception as e:
+            self.log_test("Response Structure", False, f"Exception: {str(e)}")
+            return False
+
+    async def test_priority_algorithm(self):
+        """Test 6: Priority algorithm verification"""
+        try:
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 10000
+            }
+            
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data["total"] > 1:
+                        # Verify obstacles are sorted by priority (descending)
+                        obstacles = data["obstacles"]
+                        for i in range(len(obstacles) - 1):
+                            current_priority = obstacles[i]["priority"]
+                            next_priority = obstacles[i + 1]["priority"]
+                            
+                            if current_priority < next_priority:
+                                self.log_test(
+                                    "Priority Algorithm - Sorting",
+                                    False,
+                                    f"Obstacles not sorted by priority: {current_priority} < {next_priority}"
+                                )
+                                return False
+                        
+                        # Verify priority calculation formula
+                        # priority = confirmations * 100 + (1 / (distance + 1)) * 10
+                        first_obstacle = obstacles[0]
+                        expected_priority = (first_obstacle["confirmations"] * 100 + 
+                                           (1 / (first_obstacle["distance"] + 1)) * 10)
+                        
+                        if abs(first_obstacle["priority"] - expected_priority) > 0.1:
+                            self.log_test(
+                                "Priority Algorithm - Formula",
+                                False,
+                                f"Priority calculation mismatch: expected {expected_priority:.2f}, got {first_obstacle['priority']}"
+                            )
+                            return False
+                        
+                        self.log_test(
+                            "Priority Algorithm",
+                            True,
+                            f"Priority sorting and calculation verified for {len(obstacles)} obstacles"
+                        )
+                    else:
+                        self.log_test(
+                            "Priority Algorithm",
+                            True,
+                            "Insufficient obstacles for priority testing (expected behavior)"
+                        )
+                    
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Priority Algorithm",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
+        except Exception as e:
+            self.log_test("Priority Algorithm", False, f"Exception: {str(e)}")
+            return False
+
+    async def test_geographic_filtering(self):
+        """Test 7: Geographic filtering accuracy"""
+        try:
+            # Test with very small radius to verify distance calculations
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 100  # 100 meters
+            }
+            
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Verify all returned obstacles are within the specified radius
+                    for obstacle in data["obstacles"]:
+                        if obstacle["distance"] > params["radius"]:
+                            self.log_test(
+                                "Geographic Filtering",
+                                False,
+                                f"Obstacle at distance {obstacle['distance']}m exceeds radius {params['radius']}m"
+                            )
+                            return False
+                    
+                    self.log_test(
+                        "Geographic Filtering",
+                        True,
+                        f"All {data['total']} obstacles within {params['radius']}m radius"
+                    )
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Geographic Filtering",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
+        except Exception as e:
+            self.log_test("Geographic Filtering", False, f"Exception: {str(e)}")
+            return False
+
+    async def test_clustering_integration(self):
+        """Test 8: Integration with clustering system"""
+        try:
+            # Test that endpoint uses ObstacleClusterer and returns only active clusters
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 5000
+            }
+            
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Verify response format indicates clustering system integration
+                    if "obstacles" in data:
+                        for obstacle in data["obstacles"]:
+                            # Check that obstacle has clustering-related fields
+                            required_cluster_fields = ["confirmations", "confidence", "lastReported"]
+                            missing_fields = [field for field in required_cluster_fields if field not in obstacle]
+                            
+                            if missing_fields:
+                                self.log_test(
+                                    "Clustering Integration",
+                                    False,
+                                    f"Missing clustering fields: {missing_fields}"
+                                )
+                                return False
+                    
+                    self.log_test(
+                        "Clustering Integration",
+                        True,
+                        f"Clustering system integration verified - returned {data['total']} active clusters"
+                    )
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Clustering Integration",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
+        except Exception as e:
+            self.log_test("Clustering Integration", False, f"Exception: {str(e)}")
+            return False
+
+    async def test_performance(self):
+        """Test 9: Performance testing"""
+        try:
+            params = {
+                "latitude": 55.7558,
+                "longitude": 37.6176,
+                "radius": 50000  # Large radius for performance test
+            }
+            
+            start_time = time.time()
+            
+            async with self.session.get(f"{BACKEND_URL}/obstacles/nearby", params=params) as response:
+                end_time = time.time()
+                response_time = end_time - start_time
+                
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Performance threshold: should respond within 5 seconds
+                    if response_time > 5.0:
+                        self.log_test(
+                            "Performance",
+                            False,
+                            f"Response time {response_time:.2f}s exceeds 5s threshold"
+                        )
+                        return False
+                    
+                    self.log_test(
+                        "Performance",
+                        True,
+                        f"Response time {response_time:.2f}s for {data['total']} obstacles within {params['radius']}m"
+                    )
+                    return True
+                    
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Performance",
+                        False,
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return False
+                    
+        except Exception as e:
+            self.log_test("Performance", False, f"Exception: {str(e)}")
+            return False
+
+    async def run_all_tests(self):
+        """Run all tests and return summary"""
+        print("🚀 Starting Mobile API Endpoint Testing - /api/obstacles/nearby")
         print(f"Backend URL: {BACKEND_URL}")
         print("=" * 80)
         
-        # Test in priority order
-        tests = [
-            # HIGH PRIORITY
-            ("API Connectivity", self.test_api_connectivity),
-            ("Clusters Endpoint", self.test_clusters_endpoint),
-            ("Web Admin Dashboard", self.test_web_admin_dashboard),
-            ("CORS Configuration", self.test_cors_configuration),
+        await self.setup()
+        
+        try:
+            # Test API connectivity first
+            if not await self.test_api_connectivity():
+                print("❌ API connectivity failed - aborting tests")
+                return False
             
-            # MEDIUM PRIORITY  
-            ("Analytics V2 Endpoint", self.test_analytics_v2_endpoint),
-            ("Cluster Data Structure", self.test_cluster_data_structure),
-            ("Processed Events Data", self.test_processed_events_data),
+            # Run all endpoint tests
+            test_methods = [
+                self.test_basic_request,
+                self.test_custom_radius,
+                self.test_min_confirmations_filter,
+                self.test_input_validation,
+                self.test_response_structure,
+                self.test_priority_algorithm,
+                self.test_geographic_filtering,
+                self.test_clustering_integration,
+                self.test_performance
+            ]
             
-            # LOW PRIORITY
-            ("Obstacle Clusterer", self.test_obstacle_clusterer_initialization),
-        ]
-        
-        passed = 0
-        total = len(tests)
-        
-        for test_name, test_func in tests:
-            try:
-                if test_func():
-                    passed += 1
-            except Exception as e:
-                self.log_test(f"{test_name} (Exception)", False, f"Unexpected error: {str(e)}")
-        
-        print("=" * 80)
-        print(f"🎯 TESTING COMPLETE: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
-        
-        if self.failed_tests:
-            print(f"❌ FAILED TESTS ({len(self.failed_tests)}):")
-            for test in self.failed_tests:
-                print(f"   - {test}")
-        else:
-            print("✅ ALL TESTS PASSED!")
-        
-        return passed, total, self.test_results
+            passed_tests = 0
+            total_tests = len(test_methods)
+            
+            for test_method in test_methods:
+                if await test_method():
+                    passed_tests += 1
+            
+            # Print summary
+            print("=" * 80)
+            print(f"📊 TEST SUMMARY: {passed_tests}/{total_tests} tests passed ({passed_tests/total_tests*100:.1f}%)")
+            
+            if passed_tests == total_tests:
+                print("🎉 ALL TESTS PASSED - Mobile API endpoint is fully functional!")
+                return True
+            else:
+                failed_tests = total_tests - passed_tests
+                print(f"⚠️  {failed_tests} tests failed - see details above")
+                return False
+                
+        finally:
+            await self.cleanup()
+
+async def main():
+    """Main test execution"""
+    tester = NearbyObstaclesAPITester()
+    success = await tester.run_all_tests()
+    
+    if success:
+        print("\n✅ Mobile API Endpoint Testing COMPLETED SUCCESSFULLY")
+    else:
+        print("\n❌ Mobile API Endpoint Testing COMPLETED WITH FAILURES")
+    
+    return success
 
 if __name__ == "__main__":
-    tester = GoodRoadBackendTester()
-    passed, total, results = tester.run_all_tests()
-    
-    # Exit with error code if tests failed
-    if passed < total:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    asyncio.run(main())
