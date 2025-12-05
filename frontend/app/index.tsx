@@ -524,6 +524,9 @@ export default function GoodRoadApp() {
         </View>
         
         <View style={styles.headerRight}>
+          <Pressable onPress={() => router.push('/autostart-settings')} style={styles.iconButton}>
+            <Ionicons name="flash-outline" size={24} color="#FFFFFF" />
+          </Pressable>
           <Pressable onPress={() => router.push('/audio-settings')} style={styles.iconButton}>
             <Ionicons name="volume-high-outline" size={24} color="#FFFFFF" />
           </Pressable>
