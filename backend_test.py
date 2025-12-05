@@ -223,7 +223,7 @@ class GoodRoadBackendTester:
         try:
             # Test CORS preflight request
             headers = {
-                'Origin': 'https://road-monitor-4.emergent.host',
+                'Origin': 'https://roadquality-app.preview.emergentagent.com',
                 'Access-Control-Request-Method': 'GET',
                 'Access-Control-Request-Headers': 'Content-Type'
             }
