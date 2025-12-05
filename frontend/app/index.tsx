@@ -536,14 +536,13 @@ export default function GoodRoadApp() {
         </View>
       </View>
       
+      {/* 🆕 Визуальное предупреждение о препятствии (плавающее, поверх всего) */}
+      <ObstacleWarningOverlay
+        obstacle={closestObstacle}
+        visible={isTracking && closestObstacle !== null && closestObstacle.distance < 1000}
+      />
+      
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        
-        {/* 🆕 Визуальное предупреждение о препятствии (плавающее) */}
-        <ObstacleWarningOverlay
-          obstacle={closestObstacle}
-          visible={isTracking && closestObstacle !== null && closestObstacle.distance < 1000}
-        />
-
         {/* Предупреждения */}
         {warnings.length > 0 && (
           <View style={styles.warningsContainer}>
