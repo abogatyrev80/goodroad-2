@@ -458,6 +458,9 @@ class AudioAlertService {
    * Тестовое оповещение
    */
   async testAlert(): Promise<void> {
+    // Инициализируемся при первом использовании
+    await this.ensureInitialized();
+
     if (this.settings.voiceEnabled) {
       await Speech.speak('Тестовое голосовое оповещение работает', {
         language: 'ru-RU',
