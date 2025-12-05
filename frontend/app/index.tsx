@@ -703,6 +703,7 @@ export default function GoodRoadApp() {
             </View>
           </View>
         </View>
+        )}
         
       </ScrollView>
       
