@@ -31,6 +31,7 @@ import RawDataCollector, { Warning } from '../services/RawDataCollector';
 import WarningAlert from '../components/WarningAlert';
 // 🆕 Фаза 3: Аудио-оповещения о препятствиях
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
+import ObstacleWarningOverlay from '../components/ObstacleWarningOverlay';
 
 // 🆕 Фоновая задача для отслеживания локации
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
