@@ -10,8 +10,8 @@ import time
 from datetime import datetime, timedelta
 import sys
 
-# Backend URL from frontend/.env - using REACT_APP_BACKEND_URL
-BACKEND_URL = "https://road-monitor-4.emergent.host/api"
+# Backend URL from frontend/.env - using EXPO_PUBLIC_BACKEND_URL which should have the clusters
+BACKEND_URL = "https://roadquality-app.preview.emergentagent.com/api"
 
 class GoodRoadBackendTester:
     def __init__(self):
