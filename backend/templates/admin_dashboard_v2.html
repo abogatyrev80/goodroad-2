@@ -430,27 +430,154 @@
             }
         }
 
+        // 🆕 Состояние фильтров сырых данных
+        let rawDataFilters = {
+            limit: 1000,
+            dateFrom: null,
+            dateTo: null,
+            timeFrom: null,
+            timeTo: null,
+            deviceId: null
+        };
+        
+        // 🆕 Обновить фильтры сырых данных
+        function updateRawDataFilters() {
+            rawDataFilters.limit = parseInt(document.getElementById('raw-limit').value) || 1000;
+            rawDataFilters.dateFrom = document.getElementById('raw-date-from').value || null;
+            rawDataFilters.dateTo = document.getElementById('raw-date-to').value || null;
+            rawDataFilters.timeFrom = document.getElementById('raw-time-from').value || null;
+            rawDataFilters.timeTo = document.getElementById('raw-time-to').value || null;
+            rawDataFilters.deviceId = document.getElementById('raw-device').value || null;
+            
+            console.log('📊 Применены фильтры:', rawDataFilters);
+            loadRawData();
+        }
+        
+        // 🆕 Сбросить фильтры
+        function resetRawDataFilters() {
+            document.getElementById('raw-limit').value = '1000';
+            document.getElementById('raw-date-from').value = '';
+            document.getElementById('raw-date-to').value = '';
+            document.getElementById('raw-time-from').value = '';
+            document.getElementById('raw-time-to').value = '';
+            document.getElementById('raw-device').value = '';
+            
+            rawDataFilters = {
+                limit: 1000,
+                dateFrom: null,
+                dateTo: null,
+                timeFrom: null,
+                timeTo: null,
+                deviceId: null
+            };
+            
+            loadRawData();
+        }
+
         // Загрузить и отобразить сырые данные
-        async function loadRawData(limit = 1000) {
+        async function loadRawData() {
             try {
-                document.getElementById('filter-title').innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>Сырые данные</span>
-                        <select onchange="loadRawData(parseInt(this.value))" style="padding: 0.25rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
-                            <option value="100" ${limit === 100 ? 'selected' : ''}>100 точек</option>
-                            <option value="500" ${limit === 500 ? 'selected' : ''}>500 точек</option>
-                            <option value="1000" ${limit === 1000 ? 'selected' : ''}>1000 точек</option>
-                            <option value="5000" ${limit === 5000 ? 'selected' : ''}>5000 точек</option>
-                            <option value="10000" ${limit === 10000 ? 'selected' : ''}>Все точки</option>
-                        </select>
-                    </div>
-                `;
+                // 🆕 Создаём фильтры UI если их ещё нет
+                const filterTitle = document.getElementById('filter-title');
+                if (!filterTitle.querySelector('#raw-filters-container')) {
+                    filterTitle.innerHTML = `
+                        <div id="raw-filters-container" style="width: 100%;">
+                            <div style="font-size: 0.875rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 1rem;">
+                                Фильтры сырых данных
+                            </div>
+                            
+                            <!-- Лимит записей -->
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Количество записей:</label>
+                                <select id="raw-limit" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                                    <option value="100">100 точек</option>
+                                    <option value="500">500 точек</option>
+                                    <option value="1000" selected>1000 точек</option>
+                                    <option value="2000">2000 точек</option>
+                                    <option value="5000">5000 точек</option>
+                                    <option value="10000">10000 точек</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Фильтр по дате -->
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Дата от:</label>
+                                <input type="date" id="raw-date-from" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            </div>
+                            
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Дата до:</label>
+                                <input type="date" id="raw-date-to" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            </div>
+                            
+                            <!-- Фильтр по времени -->
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Время от:</label>
+                                <input type="time" id="raw-time-from" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            </div>
+                            
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Время до:</label>
+                                <input type="time" id="raw-time-to" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            </div>
+                            
+                            <!-- Фильтр по устройству -->
+                            <div style="margin-bottom: 1rem;">
+                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Устройство (Device ID):</label>
+                                <input type="text" id="raw-device" onchange="updateRawDataFilters()" placeholder="Введите Device ID..." style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
+                            </div>
+                            
+                            <!-- Кнопки действий -->
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button onclick="updateRawDataFilters()" style="flex: 1; padding: 0.5rem; background: #60a5fa; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                                    Применить
+                                </button>
+                                <button onclick="resetRawDataFilters()" style="flex: 1; padding: 0.5rem; background: #475569; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    Сбросить
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
                 
-                const response = await fetch(`/api/admin/v2/raw-data?limit=${limit}`);
+                // 🆕 Строим URL с параметрами фильтров
+                let url = `/api/admin/v2/raw-data?limit=${rawDataFilters.limit}`;
+                
+                const response = await fetch(url);
                 const result = await response.json();
-                const rawData = result.data || [];
+                let rawData = result.data || [];
                 
-                console.log(`📊 Загружено ${rawData.length} из ${result.total} точек данных`);
+                // 🆕 Применяем фильтры на клиенте (т.к. backend API не поддерживает все фильтры)
+                rawData = rawData.filter(item => {
+                    // Фильтр по дате
+                    if (rawDataFilters.dateFrom) {
+                        const itemDate = item.timestamp.split('T')[0];
+                        if (itemDate < rawDataFilters.dateFrom) return false;
+                    }
+                    if (rawDataFilters.dateTo) {
+                        const itemDate = item.timestamp.split('T')[0];
+                        if (itemDate > rawDataFilters.dateTo) return false;
+                    }
+                    
+                    // Фильтр по времени
+                    if (rawDataFilters.timeFrom) {
+                        const itemTime = item.timestamp.split('T')[1].substring(0, 5);
+                        if (itemTime < rawDataFilters.timeFrom) return false;
+                    }
+                    if (rawDataFilters.timeTo) {
+                        const itemTime = item.timestamp.split('T')[1].substring(0, 5);
+                        if (itemTime > rawDataFilters.timeTo) return false;
+                    }
+                    
+                    // Фильтр по устройству
+                    if (rawDataFilters.deviceId && !item.deviceId.includes(rawDataFilters.deviceId)) {
+                        return false;
+                    }
+                    
+                    return true;
+                });
+                
+                console.log(`📊 Загружено ${result.data.length} точек, после фильтров: ${rawData.length} из ${result.total}`);
                 
                 displayRawDataList(rawData);
                 displayRawDataMarkers(rawData);
