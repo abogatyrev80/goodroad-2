@@ -41,9 +41,22 @@ class AudioAlertService {
   private activeAlerts: Set<string> = new Set(); // ID препятствий с активными оповещениями
   private soundObjects: Map<string, Audio.Sound> = new Map();
   private lastSpeed: number = 0;
+  private initialized = false;
 
   constructor() {
     // Не загружаем AsyncStorage в конструкторе - делаем это лениво при первом использовании
+  }
+
+  /**
+   * Ленивая инициализация сервиса
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+
+    await this.loadSettings();
+    await this.loadSounds();
+    
+    this.initialized = true;
   }
 
   /**
