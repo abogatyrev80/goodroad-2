@@ -497,17 +497,12 @@
                                 Фильтры сырых данных
                             </div>
                             
-                            <!-- Лимит записей -->
-                            <div style="margin-bottom: 1rem;">
-                                <label style="display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Количество записей:</label>
-                                <select id="raw-limit" onchange="updateRawDataFilters()" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;">
-                                    <option value="100">100 точек</option>
-                                    <option value="500">500 точек</option>
-                                    <option value="1000" selected>1000 точек</option>
-                                    <option value="2000">2000 точек</option>
-                                    <option value="5000">5000 точек</option>
-                                    <option value="10000">10000 точек</option>
-                                </select>
+                            <!-- Счетчик отфильтрованных данных -->
+                            <div id="data-counter" style="margin-bottom: 1rem; padding: 1rem; background: #1e40af; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.75rem; color: #93c5fd; margin-bottom: 0.25rem;">Отфильтровано данных</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #fff;">
+                                    <span id="filtered-count">0</span> <span style="font-size: 1rem; color: #93c5fd;">из</span> <span id="total-count">0</span>
+                                </div>
                             </div>
                             
                             <!-- Фильтр по дате -->
