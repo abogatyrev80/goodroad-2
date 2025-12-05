@@ -698,6 +698,9 @@ from clustering import ObstacleClusterer
 event_classifier = EventClassifier()
 warning_generator = WarningGenerator()
 
+# 🆕 Инициализация кластеризатора (будет инициализирован после подключения к БД)
+obstacle_clusterer = None
+
 @api_router.post("/raw-data")
 async def process_raw_data(batch: RawDataBatch):
     """
