@@ -125,17 +125,18 @@ export default function GoodRoadApp() {
   const [dataPointsCollected, setDataPointsCollected] = useState(0);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   
-  // 🆕 Фаза 3: Состояния для препятствий
-  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
-  const [activeAlert, setActiveAlert] = useState<Obstacle | null>(null);
-  const [obstaclesCount, setObstaclesCount] = useState(0);
-  
   // Refs для управления ресурсами
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const accelerometerSubscription = useRef<any>(null);
   const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
   const rawDataCollector = useRef<RawDataCollector | null>(null);
-  const obstaclesFetchInterval = useRef<NodeJS.Timeout | null>(null);
+  
+  // 🆕 Фаза 3: Хук для аудио-оповещений о препятствиях
+  const { obstacles, closestObstacle, obstaclesCount } = useObstacleAlerts(
+    isTracking,
+    currentLocation,
+    currentSpeed
+  );
   
   // 🆕 Буфер для накопления высокочастотных данных акселерометра
   const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
