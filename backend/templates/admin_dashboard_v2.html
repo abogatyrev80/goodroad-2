@@ -311,7 +311,10 @@
                 document.getElementById('warning-count').textContent = analytics.summary.active_warnings || 0;
 
                 // 🆕 Загружаем данные в зависимости от текущего режима
-                if (currentViewMode === 'rawData') {
+                if (currentViewMode === 'clusters') {
+                    // Режим кластеров - загружаем кластеры
+                    await loadClusters();
+                } else if (currentViewMode === 'rawData') {
                     // Режим сырых данных - обновляем raw data
                     await loadRawData();
                 } else {
