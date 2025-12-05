@@ -596,8 +596,10 @@ export default function GoodRoadApp() {
             <Text style={styles.noDataText}>Ожидание GPS сигнала...</Text>
           )}
         </View>
+        )}
         
-        {/* Акселерометр */}
+        {/* Акселерометр - скрыто для конечных пользователей */}
+        {false && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="speedometer" size={24} color="#2196F3" />
