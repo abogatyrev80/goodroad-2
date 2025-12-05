@@ -29,9 +29,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Новые сервисы
 import RawDataCollector, { Warning } from '../services/RawDataCollector';
 import WarningAlert from '../components/WarningAlert';
-// 🆕 Фаза 3: Сервис препятствий
-import obstacleService, { Obstacle } from '../services/ObstacleService';
-import ObstacleAlert from '../components/ObstacleAlert';
+// 🆕 Фаза 3: Аудио-оповещения о препятствиях
+import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 
 // 🆕 Фоновая задача для отслеживания локации
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
