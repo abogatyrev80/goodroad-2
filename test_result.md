@@ -150,6 +150,18 @@
         - agent: "testing"
         - comment: "🎉 BACKEND TESTING COMPLETE - PHASE 1 CLUSTERS (2025-12-05): Comprehensive testing of Good Road App clusters functionality successfully completed! RESULTS: ✅ ALL 8/8 TESTS PASSED (100% SUCCESS RATE). DETAILED FINDINGS: 1) ✅ API Connectivity - Backend fully operational (API version 2.0.0, MongoDB connected). 2) ✅ Clusters Endpoint (/api/admin/v2/clusters) - All parameter variations working correctly: default parameters, limit parameter, status filters (active/expired). Returns proper JSON structure {total, clusters}. 3) ✅ Web Admin Dashboard - Successfully accessible at https://road-monitor-4.emergent.host/admin/dashboard/v2, contains all required elements (Leaflet maps, loadData, switchViewMode functions). 4) ✅ CORS Configuration - Properly configured for web admin access with correct headers. 5) ✅ Analytics V2 Endpoint (/api/admin/v2/analytics) - Returns correct structure with summary fields (raw_data_points: 457, processed_events: 2, active_warnings: 2). 6) ✅ Cluster Data Structure - No clusters found (expected behavior when no events processed yet), endpoint returns empty array correctly. 7) ✅ Processed Events Data - Found 2 processed events available for clustering. 8) ✅ Obstacle Clusterer Initialization - Clusterer properly initialized and accessible. BACKEND URLS TESTED: API endpoints via https://roadquality-app.preview.emergentagent.com/api, Dashboard via https://road-monitor-4.emergent.host/admin/dashboard/v2. CONCLUSION: Phase 1 Clusters backend functionality is FULLY OPERATIONAL and ready for production use!"
 
+  - task: "Mobile API Endpoint for Nearby Obstacles"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+        - agent: "main"
+        - comment: "✅ РЕАЛИЗОВАНО (2025-12-05): Создан endpoint GET /api/obstacles/nearby для мобильного приложения. ПАРАМЕТРЫ: latitude (float, обязательный), longitude (float, обязательный), radius (float, по умолчанию 5000м), min_confirmations (int, по умолчанию 1). ЛОГИКА: 1) Получает все активные кластеры с reportCount >= min_confirmations и expiresAt > now. 2) Использует haversine_distance из ObstacleClusterer для вычисления расстояния. 3) Фильтрует кластеры в радиусе radius метров. 4) Вычисляет приоритет: priority = confirmations * 100 + (1 / (distance + 1)) * 10. 5) Сортирует по приоритету (убывание). ФОРМАТ ОТВЕТА: userLocation, searchRadius, minConfirmations, total, obstacles[] (id, type, latitude, longitude, distance, severity{average, max}, confidence, confirmations, avgSpeed в км/ч, lastReported, priority). ВАЛИДАЦИЯ: FastAPI автоматически валидирует типы параметров. Протестировано вручную - корректно возвращает пустой список (кластеры не созданы), правильно обрабатывает параметры, валидирует входные данные."
+
 ## backend (previous tasks):
   - task: "Sensor Data Upload API"
     implemented: true
