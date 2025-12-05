@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Clear Database V2 API and EventDetector functionality
-Tests the new DELETE /api/admin/clear-database-v2 endpoint with date range filtering
+Good Road App Backend Testing Suite - Phase 1 Clusters Testing
+Testing clusters functionality and related backend APIs as requested in review
 """
 
 import requests
@@ -10,8 +10,8 @@ import time
 from datetime import datetime, timedelta
 import sys
 
-# Backend URL from frontend/.env
-BACKEND_URL = "https://roadquality-app.preview.emergentagent.com/api"
+# Backend URL from frontend/.env - using REACT_APP_BACKEND_URL
+BACKEND_URL = "https://road-monitor-4.emergent.host/api"
 
 class BackendTester:
     def __init__(self):
