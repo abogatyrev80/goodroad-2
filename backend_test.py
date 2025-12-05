@@ -13,18 +13,25 @@ import sys
 # Backend URL from frontend/.env - using REACT_APP_BACKEND_URL
 BACKEND_URL = "https://road-monitor-4.emergent.host/api"
 
-class BackendTester:
+class GoodRoadBackendTester:
     def __init__(self):
         self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': 'GoodRoadTester/1.0'
+        })
         self.test_results = []
         self.total_tests = 0
         self.passed_tests = 0
+        self.failed_tests = []
         
-    def log_test(self, test_name, success, details=""):
+    def log_test(self, test_name, success, details="", response_data=None):
         """Log test results"""
         self.total_tests += 1
         if success:
             self.passed_tests += 1
+        else:
+            self.failed_tests.append(test_name)
         
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status}: {test_name}")
@@ -33,7 +40,9 @@ class BackendTester:
         self.test_results.append({
             "test": test_name,
             "success": success,
-            "details": details
+            "details": details,
+            "response_data": response_data,
+            "timestamp": datetime.now().isoformat()
         })
         
     def test_api_connectivity(self):
