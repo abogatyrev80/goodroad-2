@@ -78,6 +78,9 @@ class AudioAlertService {
    * Сохранить настройки
    */
   async saveSettings(newSettings: Partial<AudioSettings>): Promise<void> {
+    // Инициализируемся при первом использовании
+    await this.ensureInitialized();
+
     this.settings = { ...this.settings, ...newSettings };
     try {
       await AsyncStorage.setItem('audio_settings', JSON.stringify(this.settings));
