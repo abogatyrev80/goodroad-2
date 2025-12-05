@@ -428,7 +428,10 @@
             const filterTitle = document.getElementById('filter-title');
             const eventList = document.getElementById('event-list');
             
-            if (mode === 'rawData') {
+            if (mode === 'clusters') {
+                filterTitle.textContent = 'Фильтры кластеров';
+                loadClusters();
+            } else if (mode === 'rawData') {
                 filterTitle.textContent = 'Фильтры сырых данных';
                 loadRawData();
             } else {
