@@ -25,17 +25,10 @@ from typing import Dict, List, Any
 # Backend URL from environment
 BACKEND_URL = "https://road-monitor-4.emergent.host/api"
 
-class GoodRoadBackendTester:
+class NearbyObstaclesAPITester:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'User-Agent': 'GoodRoadTester/1.0'
-        })
+        self.session = None
         self.test_results = []
-        self.total_tests = 0
-        self.passed_tests = 0
-        self.failed_tests = []
         
     def log_test(self, test_name, success, details="", response_data=None):
         """Log test results"""
