@@ -87,6 +87,9 @@ class ObstacleService {
     minConfirmations: number = 1
   ): Promise<Obstacle[]> {
     try {
+      // Инициализируемся при первом использовании
+      await this.ensureInitialized();
+
       // Проверяем кэш
       const now = Date.now();
       if (now - this.lastFetchTime < this.CACHE_DURATION && this.cachedObstacles.length > 0) {
