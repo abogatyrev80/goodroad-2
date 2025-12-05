@@ -172,7 +172,7 @@ class GoodRoadBackendTester:
         """Test web admin dashboard accessibility - HIGH PRIORITY"""
         try:
             # Test the web admin dashboard URL
-            dashboard_url = "https://road-monitor-4.emergent.host/admin/dashboard/v2"
+            dashboard_url = "https://roadquality-app.preview.emergentagent.com/admin/dashboard/v2"
             
             response = self.session.get(dashboard_url)
             
