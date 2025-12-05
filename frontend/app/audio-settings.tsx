@@ -1,0 +1,437 @@
+/**
+ * AudioSettings - Настройки аудио-оповещений
+ * 
+ * Позволяет настроить голосовые и звуковые предупреждения
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Switch,
+  ScrollView,
+  Pressable,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import Slider from '@react-native-community/slider';
+import audioAlertService, { AudioSettings } from '../services/AudioAlertService';
+
+export default function AudioSettingsScreen() {
+  const [settings, setSettings] = useState<AudioSettings>(audioAlertService.getSettings());
+  const [stats, setStats] = useState(audioAlertService.getEffectivenessStats());
+
+  useEffect(() => {
+    // Загружаем текущие настройки
+    const currentSettings = audioAlertService.getSettings();
+    setSettings(currentSettings);
+    setStats(audioAlertService.getEffectivenessStats());
+  }, []);
+
+  const handleSettingChange = async (key: keyof AudioSettings, value: any) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    await audioAlertService.saveSettings({ [key]: value });
+  };
+
+  const handleTestAlert = async () => {
+    await audioAlertService.testAlert();
+    Alert.alert('Тест', 'Тестовое оповещение воспроизведено');
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </Pressable>
+        <Text style={styles.headerTitle}>Аудио-оповещения</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.content}>
+        {/* Основные настройки */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔊 Основные настройки</Text>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Голосовые подсказки</Text>
+              <Text style={styles.settingDescription}>
+                Произносит тип и расстояние до препятствия
+              </Text>
+            </View>
+            <Switch
+              value={settings.voiceEnabled}
+              onValueChange={(value) => handleSettingChange('voiceEnabled', value)}
+              trackColor={{ false: '#475569', true: '#3b82f6' }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Звуковые сигналы</Text>
+              <Text style={styles.settingDescription}>
+                Воспроизводит звук перед голосом
+              </Text>
+            </View>
+            <Switch
+              value={settings.soundEnabled}
+              onValueChange={(value) => handleSettingChange('soundEnabled', value)}
+              trackColor={{ false: '#475569', true: '#3b82f6' }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* Громкость */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔉 Громкость</Text>
+          <View style={styles.sliderContainer}>
+            <Ionicons name="volume-low" size={20} color="#94a3b8" />
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={1}
+              value={settings.volume}
+              onValueChange={(value) => handleSettingChange('volume', value)}
+              minimumTrackTintColor="#3b82f6"
+              maximumTrackTintColor="#475569"
+              thumbTintColor="#3b82f6"
+            />
+            <Ionicons name="volume-high" size={20} color="#94a3b8" />
+          </View>
+          <Text style={styles.volumeLabel}>{Math.round(settings.volume * 100)}%</Text>
+        </View>
+
+        {/* Минимальные подтверждения */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>✅ Уровень доверия</Text>
+          <Text style={styles.sectionDescription}>
+            Минимальное количество подтверждений для оповещения
+          </Text>
+
+          <View style={styles.confirmationOptions}>
+            {[1, 2, 3].map((level) => (
+              <Pressable
+                key={level}
+                style={[
+                  styles.confirmationOption,
+                  settings.minConfirmations === level && styles.confirmationOptionActive,
+                ]}
+                onPress={() => handleSettingChange('minConfirmations', level)}
+              >
+                <Text
+                  style={[
+                    styles.confirmationOptionText,
+                    settings.minConfirmations === level &&
+                      styles.confirmationOptionTextActive,
+                  ]}
+                >
+                  {level}+
+                </Text>
+                <Text style={styles.confirmationOptionLabel}>
+                  {level === 1 && 'Все'}
+                  {level === 2 && 'Проверенные'}
+                  {level === 3 && 'Надежные'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Язык */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🌍 Язык оповещений</Text>
+          <View style={styles.languageOptions}>
+            <Pressable
+              style={[
+                styles.languageOption,
+                settings.language === 'ru' && styles.languageOptionActive,
+              ]}
+              onPress={() => handleSettingChange('language', 'ru')}
+            >
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  settings.language === 'ru' && styles.languageOptionTextActive,
+                ]}
+              >
+                🇷🇺 Русский
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.languageOption,
+                settings.language === 'en' && styles.languageOptionActive,
+              ]}
+              onPress={() => handleSettingChange('language', 'en')}
+            >
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  settings.language === 'en' && styles.languageOptionTextActive,
+                ]}
+              >
+                🇬🇧 English
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Статистика эффективности */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📊 Статистика</Text>
+          
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.totalAlerts}</Text>
+              <Text style={styles.statLabel}>Всего оповещений</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {Math.round(stats.reactionRate * 100)}%
+              </Text>
+              <Text style={styles.statLabel}>Реакция водителя</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {Math.round(stats.averageReactionDistance)}м
+              </Text>
+              <Text style={styles.statLabel}>Среднее расстояние</Text>
+            </View>
+          </View>
+
+          <Text style={styles.statsDescription}>
+            Система адаптируется под ваш стиль вождения на основе этих данных
+          </Text>
+        </View>
+
+        {/* Кнопка теста */}
+        <Pressable style={styles.testButton} onPress={handleTestAlert}>
+          <Ionicons name="play-circle" size={24} color="#fff" />
+          <Text style={styles.testButtonText}>Тестовое оповещение</Text>
+        </Pressable>
+
+        {/* Информация */}
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={20} color="#60a5fa" />
+          <Text style={styles.infoText}>
+            Система автоматически регулирует дистанцию и частоту оповещений на основе
+            вашей реакции. Чем чаще вы реагируете на предупреждения, тем точнее они
+            становятся.
+          </Text>
+        </View>
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#1e293b',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  placeholder: {
+    width: 40,
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#e2e8f0',
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginBottom: 16,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#e2e8f0',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+  },
+  volumeLabel: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  confirmationOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmationOption: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    borderWidth: 2,
+    borderColor: '#334155',
+  },
+  confirmationOptionActive: {
+    backgroundColor: '#1e40af',
+    borderColor: '#3b82f6',
+  },
+  confirmationOptionText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#94a3b8',
+    marginBottom: 4,
+  },
+  confirmationOptionTextActive: {
+    color: '#fff',
+  },
+  confirmationOptionLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  languageOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  languageOption: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    borderWidth: 2,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  languageOptionActive: {
+    backgroundColor: '#1e40af',
+    borderColor: '#3b82f6',
+  },
+  languageOptionText: {
+    fontSize: 16,
+    color: '#94a3b8',
+  },
+  languageOptionTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#3b82f6',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  statsDescription: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#3b82f6',
+    borderRadius: 12,
+  },
+  testButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#94a3b8',
+    lineHeight: 20,
+  },
+  bottomSpacer: {
+    height: 32,
+  },
+});
