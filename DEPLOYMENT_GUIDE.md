@@ -148,8 +148,8 @@ curl https://ваш-deployment-url.emergent.host/api/admin/analytics
 ## 📊 Текущие URL
 
 ### Preview (Работает сейчас):
-- Frontend: https://road-quality-app.preview.emergentagent.com/
-- Backend: https://road-quality-app.preview.emergentagent.com/api
+- Frontend: https://roadquality-app.preview.emergentagent.com/
+- Backend: https://roadquality-app.preview.emergentagent.com/api
 - MongoDB: Локальная (mongodb://localhost:27017)
 - База: test_database (7 записей)
 
