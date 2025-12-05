@@ -414,25 +414,29 @@ class EventClassifier:
         
         return None
     
-    def _calculate_severity_from_delta_z(self, delta_z: float, min_val: float, max_val: float) -> int:
+    def _calculate_severity_from_delta_z(self, delta_z: float, min_val: float = None, max_val: float = None) -> int:
         """
         🆕 Вычисляет severity (1-5) на основе отклонения Z от baseline
+        Использует фиксированные пороги из анализа реальных данных
         
-        1 = Critical (delta_z > max_val)
-        2 = High     (max_val > delta_z > 80% of range)
-        3 = Medium   (80% > delta_z > 60%)
-        4 = Low      (60% > delta_z > 40%)
-        5 = Info     (40% > delta_z > min_val)
+        1 = Critical (ΔZ > 0.291 м/с² = 3.0σ)
+        2 = High     (ΔZ > 0.243 м/с² = 2.5σ)
+        3 = Medium   (ΔZ > 0.194 м/с² = 2.0σ)
+        4 = Low      (ΔZ > 0.145 м/с² = 1.5σ)
+        5 = Info     (ΔZ <= 0.145 м/с²)
         """
-        if delta_z < min_val:
-            return 5  # Info
-        elif delta_z > max_val:
-            return 1  # Critical
+        levels = self.thresholds['severity_levels']
+        
+        if delta_z >= levels['critical']:
+            return 1  # Critical (3.0σ)
+        elif delta_z >= levels['high']:
+            return 2  # High (2.5σ)
+        elif delta_z >= levels['medium']:
+            return 3  # Medium (2.0σ)
+        elif delta_z >= levels['low']:
+            return 4  # Low (1.5σ)
         else:
-            # Линейная интерполяция между min и max
-            ratio = (delta_z - min_val) / (max_val - min_val)
-            severity = 5 - int(ratio * 4)
-            return max(1, min(5, severity))
+            return 5  # Info (< 1.5σ)
     
     def get_thresholds(self) -> Dict:
         """Возвращает текущие пороги чувствительности"""
