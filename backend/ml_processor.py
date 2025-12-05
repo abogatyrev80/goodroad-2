@@ -318,51 +318,111 @@ class EventClassifier:
         return peaks
     
     def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
-        """Классифицирует событие на основе статистики"""
+        """
+        🆕 Классифицирует событие на основе статистики с калиброванными порогами
+        Основано на реальных данных (04.12.2025)
+        """
         
-        # Обнаружение ямы: большой пик в Y и Z
-        if (stats['range_y'] > 3.5 or stats['range_z'] > 3.0) and stats['max_magnitude'] > 12.5:
+        baseline_z = self.thresholds['baseline']['z_mean']
+        
+        # Вычисляем отклонение Z от базового уровня
+        delta_z = stats['max_z'] - baseline_z
+        
+        # 🎯 СПЕЦИАЛЬНАЯ ЛОГИКА: Лежачий полицейский
+        # Характеристика: высокое Z-отклонение при НИЗКОЙ скорости
+        speed_bump_threshold = self.thresholds['speed_bump']
+        if (delta_z > speed_bump_threshold['deltaZ'] and 
+            speed_bump_threshold['min_speed'] < speed < speed_bump_threshold['max_speed'] and
+            stats['max_magnitude'] > speed_bump_threshold['magnitude']):
+            
             return {
-                'event_type': 'pothole',
-                'severity': self._calculate_severity(stats['max_magnitude'], 12.0, 16.0),
+                'event_type': 'speed_bump',
+                'severity': self._calculate_severity_from_delta_z(delta_z, 0.25, 0.35),
                 'confidence': 0.85,
                 'magnitude': stats['max_magnitude'],
-                'delta_y': stats['range_y'],
-                'delta_z': stats['range_z'],
+                'delta_z': delta_z,
+                'speed': speed,
+                'note': 'Detected by low speed + high Z deviation'
+            }
+        
+        # Обнаружение ямы: высокое Z-отклонение при ВЫСОКОЙ скорости
+        pothole_threshold = self.thresholds['pothole']
+        if (delta_z > pothole_threshold['deltaZ'] and 
+            speed > pothole_threshold['min_speed'] and
+            stats['max_magnitude'] > pothole_threshold['magnitude']):
+            
+            return {
+                'event_type': 'pothole',
+                'severity': self._calculate_severity_from_delta_z(delta_z, 0.25, 0.40),
+                'confidence': 0.80,
+                'magnitude': stats['max_magnitude'],
+                'delta_z': delta_z,
+                'speed': speed,
+                'note': 'Detected by high speed + high Z deviation'
             }
         
         # Обнаружение резкого торможения: большой диапазон в Y
-        if stats['range_y'] > 2.5 and stats['max_magnitude'] > 11.5 and speed > 5:
+        braking_threshold = self.thresholds['braking']
+        if (stats['range_y'] > braking_threshold['deltaY'] and 
+            stats['max_magnitude'] > braking_threshold['magnitude'] and 
+            speed > braking_threshold['min_speed']):
+            
             return {
                 'event_type': 'braking',
-                'severity': self._calculate_severity(stats['range_y'], 2.0, 4.0),
-                'confidence': 0.80,
+                'severity': self._calculate_severity(stats['range_y'], 0.15, 0.30),
+                'confidence': 0.75,
                 'magnitude': stats['max_magnitude'],
                 'delta_y': stats['range_y'],
             }
         
-        # Обнаружение неровности: большое стандартное отклонение
-        if stats['std_magnitude'] > 0.9 and stats['peaks_count'] >= 3:
+        # Обнаружение неровности/бугра: умеренное Z-отклонение
+        bump_threshold = self.thresholds['bump']
+        if (delta_z > bump_threshold['deltaZ'] and 
+            stats['max_magnitude'] > bump_threshold['magnitude']):
+            
             return {
                 'event_type': 'bump',
-                'severity': self._calculate_severity(stats['std_magnitude'], 0.8, 1.5),
-                'confidence': 0.75,
-                'magnitude': stats['mean_magnitude'],
-                'variance': stats['std_magnitude'],
-                'peaks': stats['peaks_count'],
+                'severity': self._calculate_severity_from_delta_z(delta_z, 0.20, 0.30),
+                'confidence': 0.70,
+                'magnitude': stats['max_magnitude'],
+                'delta_z': delta_z,
             }
         
         # Обнаружение вибраций (плохая дорога): высокая вариативность
-        if stats['std_magnitude'] > 0.7 and speed > 3:
+        vibration_threshold = self.thresholds['vibration']
+        if (stats['std_magnitude'] > vibration_threshold['std_magnitude'] and 
+            speed > 3 and
+            stats['max_magnitude'] > vibration_threshold['magnitude']):
+            
             return {
                 'event_type': 'vibration',
-                'severity': self._calculate_severity(stats['std_magnitude'], 0.7, 1.2),
-                'confidence': 0.70,
+                'severity': self._calculate_severity(stats['std_magnitude'], 0.08, 0.15),
+                'confidence': 0.65,
                 'magnitude': stats['mean_magnitude'],
                 'variance': stats['std_magnitude'],
             }
         
         return None
+    
+    def _calculate_severity_from_delta_z(self, delta_z: float, min_val: float, max_val: float) -> int:
+        """
+        🆕 Вычисляет severity (1-5) на основе отклонения Z от baseline
+        
+        1 = Critical (delta_z > max_val)
+        2 = High     (max_val > delta_z > 80% of range)
+        3 = Medium   (80% > delta_z > 60%)
+        4 = Low      (60% > delta_z > 40%)
+        5 = Info     (40% > delta_z > min_val)
+        """
+        if delta_z < min_val:
+            return 5  # Info
+        elif delta_z > max_val:
+            return 1  # Critical
+        else:
+            # Линейная интерполяция между min и max
+            ratio = (delta_z - min_val) / (max_val - min_val)
+            severity = 5 - int(ratio * 4)
+            return max(1, min(5, severity))
     
     def get_thresholds(self) -> Dict:
         """Возвращает текущие пороги чувствительности"""
