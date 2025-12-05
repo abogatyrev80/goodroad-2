@@ -833,7 +833,24 @@ async def process_raw_data(batch: RawDataBatch):
                     }
             
             if event:
-                # Событие обнаружено - сохраняем
+                # 🆕 КЛАСТЕРИЗАЦИЯ: Находим или создаём кластер для события
+                cluster_id = None
+                if obstacle_clusterer:
+                    try:
+                        cluster_id = await obstacle_clusterer.process_event(
+                            event={
+                                'eventType': event['eventType'],
+                                'severity': event['severity'],
+                                'latitude': gps.get("latitude"),
+                                'longitude': gps.get("longitude"),
+                                'speed': gps.get("speed", 0)
+                            },
+                            device_id=device_id
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Ошибка кластеризации: {e}")
+                
+                # Событие обнаружено - сохраняем с clusterId
                 processed_event = {
                     "id": str(uuid.uuid4()),
                     "deviceId": device_id,
@@ -853,6 +870,7 @@ async def process_raw_data(batch: RawDataBatch):
                     "accelerometer_deltaZ": event['accelerometer']['deltaZ'],
                     "accelerometer_variance": event['accelerometer']['variance'],
                     "roadType": event['roadType'],
+                    "clusterId": cluster_id,  # 🆕 Добавляем ID кластера
                     "created_at": datetime.utcnow()
                 }
                 processed_events.append(processed_event)
