@@ -30,8 +30,16 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection configuration with fallback for production
-mongo_url = os.environ.get('MONGO_URL') or os.environ.get('MONGODB_URI', 'mongodb://localhost:27017')
-db_name = os.environ.get('DB_NAME') or os.environ.get('MONGODB_DB_NAME', 'good_road_db')
+# Priority: MONGODB_URI (deployment) > MONGO_URL (local) > default
+mongo_url = os.environ.get('MONGODB_URI') or os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('MONGODB_DB_NAME') or os.environ.get('DB_NAME', 'good_road_db')
+
+# Log configuration (masked for security)
+if mongo_url and '@' in mongo_url:
+    masked_url = mongo_url.split('@')[0].split('://')[0] + '://***@' + mongo_url.split('@')[-1]
+    logger.info(f"MongoDB URL configured: {masked_url}")
+else:
+    logger.info(f"MongoDB URL configured: {mongo_url}")
 
 # Global MongoDB client (will be initialized in startup event)
 client = None
