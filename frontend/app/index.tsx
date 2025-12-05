@@ -621,6 +621,7 @@ export default function GoodRoadApp() {
             </View>
           </View>
         </View>
+        )}
         
         {/* 🆕 Карточка: Препятствия впереди */}
         {isTracking && (
