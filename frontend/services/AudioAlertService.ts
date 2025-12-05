@@ -43,8 +43,7 @@ class AudioAlertService {
   private lastSpeed: number = 0;
 
   constructor() {
-    this.loadSettings();
-    this.loadSounds();
+    // Не загружаем AsyncStorage в конструкторе - делаем это лениво при первом использовании
   }
 
   /**
