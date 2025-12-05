@@ -133,24 +133,6 @@ async def startup_event():
     logger.info("🚀 Starting Good Road API...")
     try:
         await connect_to_mongodb()
-        
-        # 🆕 Инициализация кластеризатора
-        global obstacle_clusterer
-        obstacle_clusterer = ObstacleClusterer(db)
-        logger.info("✅ Obstacle clusterer initialized")
-        
-        # 🆕 Создание индексов для obstacle_clusters
-        try:
-            await db.obstacle_clusters.create_index([("status", 1)])
-            await db.obstacle_clusters.create_index([("expiresAt", 1)])
-            await db.obstacle_clusters.create_index([
-                ("location.latitude", "2d"),
-                ("location.longitude", "2d")
-            ])
-            logger.info("✅ Created indexes for obstacle_clusters collection")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not create indexes (may already exist): {e}")
-        
         logger.info("✅ All services initialized successfully")
     except Exception as e:
         logger.critical(f"❌ Failed to initialize services: {str(e)}")
