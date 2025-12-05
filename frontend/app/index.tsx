@@ -896,4 +896,38 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
+  statValueWarning: {
+    color: '#f59e0b',
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#333333',
+    marginVertical: 8,
+  },
+  obstacleInfo: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  obstacleType: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  obstacleDistance: {
+    fontSize: 14,
+    color: '#f59e0b',
+    fontWeight: '500',
+  },
+  obstacleConfidence: {
+    fontSize: 12,
+    color: '#4CAF50',
+  },
+  noObstacles: {
+    fontSize: 14,
+    color: '#4CAF50',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 });
