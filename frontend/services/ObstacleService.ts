@@ -56,10 +56,7 @@ class ObstacleService {
   private readonly PASSED_DISTANCE = 50; // метров - считается пройденным
 
   constructor() {
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://road-monitor-4.emergent.host';
-    this.backendUrl = url.endsWith('/') ? url : url + '/';
-    console.log('🚧 ObstacleService initialized with URL:', this.backendUrl);
-    this.loadDriverReactions();
+    // Не загружаем AsyncStorage в конструкторе - делаем это лениво при первом использовании
   }
 
   /**
