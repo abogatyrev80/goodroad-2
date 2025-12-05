@@ -2697,24 +2697,7 @@ async def admin_dashboard_api(request: Request):
     """Serve the admin dashboard web interface via API route"""
     return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for production monitoring"""
-    try:
-        # Test database connection
-        await db.command("ping")
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "message": "Good Road API is running"
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected", 
-            "error": str(e)
-        }
+# Health check is defined earlier in the file (line ~356)
 
 # Legacy route for local access
 @app.get("/admin/dashboard", response_class=HTMLResponse)
