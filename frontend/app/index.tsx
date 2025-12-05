@@ -218,7 +218,7 @@ export default function HomeScreen() {
           style={styles.button}
           onPress={() => router.push('/audio-settings')}
         >
-          <Ionicons name="volume-high" size={32} color="#60a5fa" />
+          <Ionicons name="volume-high" size={34} color="#00d4ff" />
           <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
         </Pressable>
 
@@ -227,7 +227,7 @@ export default function HomeScreen() {
           style={styles.button}
           onPress={() => router.push('/autostart-settings')}
         >
-          <Ionicons name="flash" size={32} color="#60a5fa" />
+          <Ionicons name="flash" size={34} color="#00d4ff" />
           <Text style={styles.buttonText}>АВТОЗАПУСК</Text>
         </Pressable>
 
@@ -236,7 +236,7 @@ export default function HomeScreen() {
           style={styles.button}
           onPress={() => router.push('/admin-simple')}
         >
-          <Ionicons name="analytics" size={32} color="#60a5fa" />
+          <Ionicons name="analytics" size={34} color="#00d4ff" />
           <Text style={styles.buttonText}>СТАТИСТИКА</Text>
         </Pressable>
       </View>
