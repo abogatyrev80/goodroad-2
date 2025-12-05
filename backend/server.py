@@ -692,6 +692,7 @@ async def get_ml_statistics():
 # ==============================================================================
 
 from ml_processor import EventClassifier, WarningGenerator
+from clustering import ObstacleClusterer
 
 # Инициализация ML процессоров
 event_classifier = EventClassifier()
