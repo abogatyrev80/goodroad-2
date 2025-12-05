@@ -567,7 +567,8 @@ export default function GoodRoadApp() {
           <Text style={styles.accidentButtonText}>Сообщить об аварии</Text>
         </Pressable>
         
-        {/* GPS Status */}
+        {/* GPS Status - скрыто для конечных пользователей */}
+        {false && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="location" size={24} color="#4CAF50" />
