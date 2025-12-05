@@ -736,6 +736,148 @@
             }
         }
 
+        // 🆕 Загрузить кластеры препятствий
+        async function loadClusters() {
+            try {
+                console.log('📊 Загрузка кластеров...');
+                
+                const response = await fetch('/api/admin/v2/clusters?limit=1000&status=active');
+                const result = await response.json();
+                
+                allClusters = result.clusters || [];
+                
+                console.log(`✅ Загружено ${allClusters.length} кластеров`);
+                
+                displayClusters();
+                displayClusterMarkers();
+            } catch (error) {
+                console.error('❌ Ошибка загрузки кластеров:', error);
+                alert('Ошибка загрузки кластеров: ' + error.message);
+            }
+        }
+
+        // 🆕 Отобразить список кластеров
+        function displayClusters() {
+            const eventList = document.getElementById('event-list');
+            
+            if (allClusters.length === 0) {
+                eventList.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #64748b;">
+                        <h3>Кластеры не найдены</h3>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">
+                            Пока нет обнаруженных препятствий.<br>
+                            Начните сбор данных для автоматического создания кластеров.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+            
+            eventList.innerHTML = allClusters.slice(0, 50).map(cluster => {
+                const lastReportedDate = new Date(cluster.lastReported).toLocaleString('ru-RU');
+                const icon = getEventIcon(cluster.obstacleType);
+                const confirmationClass = cluster.reportCount >= 3 ? 'severity-1' : 
+                                         cluster.reportCount === 2 ? 'severity-3' : 'severity-5';
+                
+                return `
+                    <div class="event-item" style="cursor: pointer;" 
+                         onclick="map.setView([${cluster.location.latitude}, ${cluster.location.longitude}], 16);">
+                        <div class="event-type" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>${icon} ${cluster.obstacleType}</span>
+                            <span class="severity-badge ${confirmationClass}">
+                                ${cluster.reportCount} ${cluster.reportCount === 1 ? 'отчет' : 'отчета'}
+                            </span>
+                        </div>
+                        <div class="event-details">
+                            <div>Уверенность: ${(cluster.confidence * 100).toFixed(0)}%</div>
+                            <div>Средняя серьезность: ${cluster.severity.average.toFixed(1)}</div>
+                            <div>Устройств: ${cluster.devices.length}</div>
+                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">
+                                Последний: ${lastReportedDate}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            if (allClusters.length > 50) {
+                eventList.innerHTML += `
+                    <div style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.75rem;">
+                        Показаны первые 50 из ${allClusters.length} кластеров.<br>
+                        Используйте карту для просмотра всех.
+                    </div>
+                `;
+            }
+        }
+
+        // 🆕 Отобразить маркеры кластеров на карте
+        function displayClusterMarkers() {
+            // Очистить существующие маркеры и траекторию
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            if (trajectoryLine) {
+                map.removeLayer(trajectoryLine);
+                trajectoryLine = null;
+            }
+
+            allClusters.forEach(cluster => {
+                if (cluster.location && cluster.location.latitude && cluster.location.longitude) {
+                    const color = getMarkerColor(cluster.obstacleType);
+                    const icon = getEventIcon(cluster.obstacleType);
+                    
+                    // Размер маркера зависит от количества подтверждений
+                    const radius = Math.min(8 + cluster.reportCount * 2, 20);
+                    
+                    const marker = L.circleMarker(
+                        [cluster.location.latitude, cluster.location.longitude], 
+                        {
+                            radius: radius,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 3,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }
+                    ).addTo(map);
+
+                    const firstReportedDate = new Date(cluster.firstReported).toLocaleString('ru-RU');
+                    const lastReportedDate = new Date(cluster.lastReported).toLocaleString('ru-RU');
+                    
+                    marker.bindPopup(`
+                        <div style="color: #1e293b; min-width: 250px;">
+                            <h3 style="margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                ${icon} ${cluster.obstacleType}
+                                <span style="background: ${color}; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">
+                                    x${cluster.reportCount}
+                                </span>
+                            </h3>
+                            <p style="margin: 0.25rem 0;"><strong>Уверенность:</strong> ${(cluster.confidence * 100).toFixed(0)}%</p>
+                            <p style="margin: 0.25rem 0;"><strong>Серьезность:</strong> ${cluster.severity.average.toFixed(1)} (мин: ${cluster.severity.min}, макс: ${cluster.severity.max})</p>
+                            <p style="margin: 0.25rem 0;"><strong>Средняя скорость:</strong> ${(cluster.roadInfo.avgSpeed * 3.6).toFixed(1)} км/ч</p>
+                            <p style="margin: 0.25rem 0;"><strong>Устройств:</strong> ${cluster.devices.length}</p>
+                            <p style="margin: 0.25rem 0; font-size: 0.75rem; color: #64748b;">
+                                <strong>Первый отчет:</strong><br>${firstReportedDate}
+                            </p>
+                            <p style="margin: 0.25rem 0; font-size: 0.75rem; color: #64748b;">
+                                <strong>Последний отчет:</strong><br>${lastReportedDate}
+                            </p>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.75rem;">
+                                <strong>GPS:</strong> ${cluster.location.latitude.toFixed(6)}, ${cluster.location.longitude.toFixed(6)}
+                            </p>
+                        </div>
+                    `);
+
+                    markers.push(marker);
+                }
+            });
+
+            // Центрировать карту на маркерах
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
         // Инициализация
         initMap();
         loadData();
