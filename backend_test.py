@@ -419,7 +419,6 @@ if __name__ == "__main__":
         sys.exit(1)
     else:
         sys.exit(0)
-        """Test Clear Database V2: Request without confirmation parameter"""
         print("\n🧪 Testing Clear Database V2 - No Confirmation")
         
         try:
