@@ -1179,8 +1179,8 @@ async def get_obstacle_clusters(
         raise HTTPException(status_code=500, detail=f"Error retrieving clusters: {str(e)}")
 
 @api_router.get("/admin/v2/heatmap")
-async def get_heatmap_data():
-    """Получить данные для heatmap из processed_events"""
+async def get_heatmap_data_simple():
+    """Получить данные для heatmap из processed_events (упрощенная версия)"""
     try:
         events = await db.processed_events.find(
             {"latitude": {"$ne": None}, "longitude": {"$ne": None}},
