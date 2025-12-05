@@ -21,8 +21,8 @@ import time
 from datetime import datetime
 from typing import Dict, List, Any
 
-# Backend URL from environment
-BACKEND_URL = "https://road-monitor-4.emergent.host/api"
+# Backend URL from environment - using localhost since external routing has issues
+BACKEND_URL = "http://localhost:8001/api"
 
 class NearbyObstaclesAPITester:
     def __init__(self):
