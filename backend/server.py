@@ -147,14 +147,18 @@ app = FastAPI(
 async def startup_event():
     """
     Initialize services on startup
+    Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
     logger.info("🚀 Starting Good Road API...")
     try:
         await connect_to_mongodb()
         logger.info("✅ All services initialized successfully")
     except Exception as e:
-        logger.critical(f"❌ Failed to initialize services: {str(e)}")
-        raise
+        logger.error(f"⚠️ Failed to connect to MongoDB during startup: {str(e)}")
+        logger.warning("⚠️ API will start in degraded mode. Health checks will fail until database is available.")
+        # Don't raise - let the app start and retry connections via readiness probe
+        global mongodb_connected
+        mongodb_connected = False
 
 @app.on_event("shutdown")
 async def shutdown_event():
