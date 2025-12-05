@@ -584,11 +584,25 @@
                 
                 console.log(`📊 Загружено ${result.data.length} точек, после фильтров: ${rawData.length} из ${result.total}`);
                 
+                // 🆕 Обновляем счетчик
+                updateDataCounter(rawData.length, result.total);
+                
                 displayRawDataList(rawData);
                 displayRawDataMarkers(rawData);
             } catch (error) {
                 console.error('Error loading raw data:', error);
                 alert('Ошибка загрузки сырых данных: ' + error.message);
+            }
+        }
+        
+        // 🆕 Обновить счетчик отфильтрованных данных
+        function updateDataCounter(filteredCount, totalCount) {
+            const filteredElement = document.getElementById('filtered-count');
+            const totalElement = document.getElementById('total-count');
+            
+            if (filteredElement && totalElement) {
+                filteredElement.textContent = filteredCount;
+                totalElement.textContent = totalCount;
             }
         }
 
