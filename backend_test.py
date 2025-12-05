@@ -366,52 +366,49 @@ class GoodRoadBackendTester:
             return False
     
     def run_all_tests(self):
-        """Add test data with different dates for Clear Database V2 filtering tests"""
-        print("\n🔧 Adding test data with different dates for Clear Database V2 tests...")
+        """Run all backend tests for Phase 1 Clusters"""
+        print("🚀 Starting Good Road App Backend Testing - Phase 1 Clusters")
+        print(f"Backend URL: {BACKEND_URL}")
+        print("=" * 80)
         
-        # Test data for different date ranges
-        test_dates = [
-            "2023-12-15",  # Old data (should be deleted in date range tests)
-            "2024-06-15",  # Mid-range data
-            "2025-01-15",  # Recent data (current month)
-            "2025-02-01",  # Future data
+        # Test in priority order
+        tests = [
+            # HIGH PRIORITY
+            ("API Connectivity", self.test_api_connectivity),
+            ("Clusters Endpoint", self.test_clusters_endpoint),
+            ("Web Admin Dashboard", self.test_web_admin_dashboard),
+            ("CORS Configuration", self.test_cors_configuration),
+            
+            # MEDIUM PRIORITY  
+            ("Analytics V2 Endpoint", self.test_analytics_v2_endpoint),
+            ("Cluster Data Structure", self.test_cluster_data_structure),
+            ("Processed Events Data", self.test_processed_events_data),
+            
+            # LOW PRIORITY
+            ("Obstacle Clusterer", self.test_obstacle_clusterer_initialization),
         ]
         
-        for date_str in test_dates:
-            # Create test sensor data
-            test_data = {
-                "deviceId": f"test-clear-db-{date_str}",
-                "sensorData": [
-                    {
-                        "type": "location",
-                        "timestamp": int(datetime.fromisoformat(date_str + "T12:00:00").timestamp() * 1000),
-                        "data": {
-                            "latitude": 55.7558,
-                            "longitude": 37.6176,
-                            "speed": 25.0,
-                            "accuracy": 5.0
-                        }
-                    },
-                    {
-                        "type": "accelerometer", 
-                        "timestamp": int(datetime.fromisoformat(date_str + "T12:00:01").timestamp() * 1000),
-                        "data": {
-                            "x": 0.2,
-                            "y": 0.4,
-                            "z": 9.8
-                        }
-                    }
-                ]
-            }
-            
+        passed = 0
+        total = len(tests)
+        
+        for test_name, test_func in tests:
             try:
-                response = self.session.post(f"{BACKEND_URL}/sensor-data", json=test_data, timeout=10)
-                if response and response.status_code == 200:
-                    print(f"   ✅ Added test data for {date_str}")
-                else:
-                    print(f"   ❌ Failed to add test data for {date_str}: {response.status_code if response else 'No response'}")
+                if test_func():
+                    passed += 1
             except Exception as e:
-                print(f"   ❌ Error adding test data for {date_str}: {str(e)}")
+                self.log_test(f"{test_name} (Exception)", False, f"Unexpected error: {str(e)}")
+        
+        print("=" * 80)
+        print(f"🎯 TESTING COMPLETE: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
+        
+        if self.failed_tests:
+            print(f"❌ FAILED TESTS ({len(self.failed_tests)}):")
+            for test in self.failed_tests:
+                print(f"   - {test}")
+        else:
+            print("✅ ALL TESTS PASSED!")
+        
+        return passed, total, self.test_results
     
     def test_clear_database_v2_no_confirmation(self):
         """Test Clear Database V2: Request without confirmation parameter"""
