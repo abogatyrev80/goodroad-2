@@ -455,14 +455,91 @@ class EventClassifier:
     
     def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
         """
-        🆕 ОПТИМИЗИРОВАННАЯ классификация на основе анализа 10 реальных препятствий
-        Протестировано: успешно обнаруживает лежачие полицейские и ямы
+        🆕 УЛУЧШЕННАЯ классификация на основе статистики + анализа паттернов
+        Использует форму сигнала для более точного определения типа события
         """
         
         baseline_z = self.thresholds['baseline']['z_mean']
         
         # Вычисляем отклонение Z от базового уровня
         delta_z = abs(stats['max_z'] - baseline_z)
+        
+        # 🆕 ПРИОРИТЕТ 1: АНАЛИЗ ПАТТЕРНОВ (новая логика)
+        # Паттерны дают более точную классификацию и работают при низкой скорости
+        patterns = stats.get('patterns', {})
+        
+        if patterns:
+            # 🔥 ПАТТЕРН "УДАР" - характерно для ямы
+            # Резкий скачок вверх + быстрый спад вниз
+            if patterns.get('impact_detected', False):
+                impact_intensity = patterns.get('impact_intensity', 0)
+                
+                # Определяем severity по интенсивности удара
+                if impact_intensity > 0.30:
+                    severity = 1  # Critical
+                elif impact_intensity > 0.24:
+                    severity = 2  # High
+                elif impact_intensity > 0.18:
+                    severity = 3  # Medium
+                else:
+                    severity = 4  # Low
+                
+                return {
+                    'eventType': 'pothole',
+                    'severity': severity,
+                    'confidence': 0.88,  # Высокая уверенность для паттернов
+                    'magnitude': stats['max_magnitude'],
+                    'delta_z': delta_z,
+                    'impact_intensity': impact_intensity,
+                    'detection_method': 'pattern_analysis',
+                    'note': f'Impact pattern detected (intensity={impact_intensity:.3f})'
+                }
+            
+            # 🌊 ПАТТЕРН "ВОЛНА" - характерно для лежачего полицейского
+            # Плавный подъем → пик → плавный спуск
+            if patterns.get('wave_detected', False):
+                wave_amplitude = patterns.get('wave_amplitude', 0)
+                
+                # Определяем severity по амплитуде волны
+                if wave_amplitude > 0.24:
+                    severity = 1  # Critical
+                elif wave_amplitude > 0.18:
+                    severity = 2  # High
+                elif wave_amplitude > 0.14:
+                    severity = 3  # Medium
+                else:
+                    severity = 4  # Low
+                
+                return {
+                    'eventType': 'speed_bump',
+                    'severity': severity,
+                    'confidence': 0.90,  # Очень высокая уверенность
+                    'magnitude': stats['max_magnitude'],
+                    'delta_z': delta_z,
+                    'wave_amplitude': wave_amplitude,
+                    'detection_method': 'pattern_analysis',
+                    'note': f'Wave pattern detected (amplitude={wave_amplitude:.3f})'
+                }
+            
+            # 〰️〰️ ПАТТЕРН "ВИБРАЦИЯ" - плохое покрытие
+            # Высокочастотные колебания
+            if patterns.get('vibration_detected', False) and speed > 3:
+                vibration_frequency = patterns.get('vibration_frequency', 0)
+                
+                severity = 3 if vibration_frequency > 0.4 else 4
+                
+                return {
+                    'eventType': 'vibration',
+                    'severity': severity,
+                    'confidence': 0.75,
+                    'magnitude': stats['mean_magnitude'],
+                    'vibration_frequency': vibration_frequency,
+                    'detection_method': 'pattern_analysis',
+                    'note': f'Vibration pattern detected (freq={vibration_frequency:.2f})'
+                }
+        
+        # ПРИОРИТЕТ 2: КЛАССИЧЕСКАЯ ЛОГИКА (на основе порогов)
+        # Используется если паттерны не обнаружены
         
         # 🚧 ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ: средняя скорость (10-45 км/ч) + вертикальное отклонение
         speed_bump_threshold = self.thresholds['speed_bump']
