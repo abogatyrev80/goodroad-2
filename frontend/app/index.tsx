@@ -266,7 +266,13 @@ export default function HomeScreen() {
       setIsTracking(false);
       setCurrentLocation(null);
       setWasAutoStarted(false); // Сбрасываем флаг автозапуска
-      Alert.alert('Мониторинг остановлен', 'Приложение больше не отслеживает дорогу');
+      Toast.show({
+        type: 'info',
+        text1: '⏹️ Мониторинг остановлен',
+        text2: 'Приложение больше не отслеживает дорогу',
+        visibilityTime: 3000,
+        position: 'bottom',
+      });
     } catch (error) {
       console.error('Error stopping tracking:', error);
     } finally {
