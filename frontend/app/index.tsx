@@ -73,14 +73,24 @@ export default function HomeScreen() {
   const checkAutostart = async () => {
     try {
       const mode = await AsyncStorage.getItem('autostart_mode');
+      setAutostartMode(mode || 'disabled');
       console.log('🚀 Autostart mode:', mode);
 
-      if (mode === 'onOpen' && !isTracking) {
-        console.log('🚀 Auto-starting monitoring on app open...');
-        setTimeout(() => {
-          startTracking();
-        }, 1000); // Небольшая задержка для инициализации
+      if (mode === 'onCharge' && !isTracking) {
+        // Проверяем подключена ли зарядка
+        const batteryState = await Battery.getBatteryStateAsync();
+        const isCharging = batteryState === Battery.BatteryState.CHARGING;
+        
+        if (isCharging) {
+          console.log('🚀 Auto-starting monitoring - device is charging...');
+          setTimeout(() => {
+            startTracking();
+            setWasAutoStarted(true);
+          }, 1000);
+        }
       }
+      // TODO: Добавить проверку для режимов withApps и onBluetooth
+      // Потребуется интеграция с нативными API для отслеживания запущенных приложений
     } catch (error) {
       console.error('Error checking autostart:', error);
     }
