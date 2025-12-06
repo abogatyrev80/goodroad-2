@@ -18,11 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
-import ObstacleWarningOverlay from '../components/ObstacleWarningOverlay';
+import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 
 // Константы
 const LOCATION_TASK_NAME = 'background-location-task';
