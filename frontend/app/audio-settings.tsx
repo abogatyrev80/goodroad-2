@@ -200,6 +200,57 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* Звуковая тема */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎵 Звуковая тема</Text>
+          
+          <Pressable
+            style={[
+              styles.themeCard,
+              settings.soundTheme === 'motion-tracker' && styles.themeCardActive,
+            ]}
+            onPress={() => handleSettingChange('soundTheme', 'motion-tracker')}
+          >
+            <View style={styles.themeHeader}>
+              <Ionicons name="radio" size={24} color={settings.soundTheme === 'motion-tracker' ? '#00d4ff' : '#8b94a8'} />
+              <View style={styles.themeInfo}>
+                <Text style={[styles.themeTitle, settings.soundTheme === 'motion-tracker' && styles.themeTitleActive]}>
+                  Motion Tracker
+                </Text>
+                <Text style={styles.themeDescription}>
+                  Звук датчика движения из фильма "Чужие" 👽
+                </Text>
+              </View>
+              {settings.soundTheme === 'motion-tracker' && (
+                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+              )}
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.themeCard,
+              settings.soundTheme === 'voice-only' && styles.themeCardActive,
+            ]}
+            onPress={() => handleSettingChange('soundTheme', 'voice-only')}
+          >
+            <View style={styles.themeHeader}>
+              <Ionicons name="mic" size={24} color={settings.soundTheme === 'voice-only' ? '#00d4ff' : '#8b94a8'} />
+              <View style={styles.themeInfo}>
+                <Text style={[styles.themeTitle, settings.soundTheme === 'voice-only' && styles.themeTitleActive]}>
+                  Только голос
+                </Text>
+                <Text style={styles.themeDescription}>
+                  Без звуковых сигналов, только голосовые подсказки 🗣️
+                </Text>
+              </View>
+              {settings.soundTheme === 'voice-only' && (
+                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+              )}
+            </View>
+          </Pressable>
+        </View>
+
         {/* Примеры голосовых фраз */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🗣️ Примеры голосовых фраз</Text>
