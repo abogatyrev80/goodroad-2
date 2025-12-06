@@ -87,6 +87,60 @@ export default function AutostartSettingsScreen() {
     }
   };
 
+  const toggleNavigationApp = async (appId: string) => {
+    const newSelection = selectedNavApps.includes(appId)
+      ? selectedNavApps.filter(id => id !== appId)
+      : [...selectedNavApps, appId];
+    
+    setSelectedNavApps(newSelection);
+    await AsyncStorage.setItem('autostart_nav_apps', JSON.stringify(newSelection));
+  };
+
+  const scanBluetoothDevices = async () => {
+    setScanningBluetooth(true);
+    try {
+      // Имитация сканирования (в реальном приложении здесь будет expo-bluetooth)
+      // Для MVP показываем заглушку
+      Alert.alert(
+        'Сканирование Bluetooth',
+        'Функция сканирования Bluetooth устройств будет доступна в следующей версии. ' +
+        'Пока вы можете добавить устройство вручную по имени.',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          {
+            text: 'Добавить вручную',
+            onPress: () => {
+              Alert.prompt(
+                'Имя устройства',
+                'Введите имя вашего Bluetooth устройства (например, Car Audio)',
+                async (deviceName) => {
+                  if (deviceName) {
+                    const device: BluetoothDevice = {
+                      id: Date.now().toString(),
+                      name: deviceName,
+                    };
+                    setSelectedBluetoothDevice(device);
+                    await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
+                  }
+                }
+              );
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error scanning Bluetooth:', error);
+      Alert.alert('Ошибка', 'Не удалось отсканировать Bluetooth устройства');
+    } finally {
+      setScanningBluetooth(false);
+    }
+  };
+
+  const clearBluetoothDevice = async () => {
+    setSelectedBluetoothDevice(null);
+    await AsyncStorage.removeItem('autostart_bluetooth_device');
+  };
+
   const getModeText = (mode: AutostartMode): string => {
     switch (mode) {
       case 'disabled':
