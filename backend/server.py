@@ -65,15 +65,17 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
         try:
             # Create MongoDB client with proper timeout settings
             client_options = {
-                'serverSelectionTimeoutMS': 5000,
-                'connectTimeoutMS': 10000,
-                'socketTimeoutMS': 10000,
+                'serverSelectionTimeoutMS': 10000,  # Increased for Atlas
+                'connectTimeoutMS': 20000,  # Increased for Atlas
+                'socketTimeoutMS': 20000,  # Increased for Atlas
             }
             
             # Add SSL/TLS settings for MongoDB Atlas
             if 'mongodb+srv://' in mongo_url or 'mongodb.net' in mongo_url:
                 client_options['tls'] = True
                 client_options['tlsAllowInvalidCertificates'] = False
+                client_options['retryWrites'] = True  # Enable retryable writes for Atlas
+                client_options['w'] = 'majority'  # Write concern for Atlas
                 logger.info("Using MongoDB Atlas with SSL/TLS enabled")
             
             client = AsyncIOMotorClient(mongo_url, **client_options)
