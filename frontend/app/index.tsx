@@ -20,6 +20,7 @@ import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Battery from 'expo-battery';
+import Toast from 'react-native-toast-message';
 
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
