@@ -82,23 +82,13 @@ export default function HomeScreen() {
       // Если отключили от зарядки во время мониторинга - предупреждаем
       if (batteryState !== Battery.BatteryState.CHARGING) {
         console.log('⚠️ Warning - device unplugged during monitoring');
-        Alert.alert(
-          '⚠️ Зарядка отключена',
-          'Мониторинг дороги активен и расходует больше энергии. Телефон может быстро разрядиться.\n\nВы можете остановить мониторинг вручную, если это необходимо.',
-          [
-            {
-              text: 'Продолжить мониторинг',
-              style: 'cancel',
-            },
-            {
-              text: 'Остановить',
-              style: 'destructive',
-              onPress: () => {
-                stopTracking();
-              },
-            },
-          ]
-        );
+        Toast.show({
+          type: 'error',
+          text1: '⚠️ Зарядка отключена',
+          text2: 'Мониторинг активен и расходует больше энергии. Телефон может быстро разрядиться.',
+          visibilityTime: 8000,
+          position: 'top',
+        });
       } else {
         // Подключили зарядку - можно показать позитивное уведомление
         console.log('✅ Device plugged in - battery charging');
