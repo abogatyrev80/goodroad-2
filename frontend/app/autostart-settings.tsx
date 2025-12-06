@@ -18,11 +18,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type AutostartMode = 'disabled' | 'onCharge' | 'onOpen';
+type AutostartMode = 'disabled' | 'onCharge' | 'withNavigation' | 'onBluetooth';
+
+interface NavigationApp {
+  id: string;
+  name: string;
+  packageName: string;
+  icon: string;
+}
+
+interface BluetoothDevice {
+  id: string;
+  name: string;
+  address?: string;
+}
+
+const NAVIGATION_APPS: NavigationApp[] = [
+  { id: 'google-maps', name: 'Google Maps', packageName: 'com.google.android.apps.maps', icon: '🗺️' },
+  { id: 'yandex-maps', name: 'Яндекс.Карты', packageName: 'ru.yandex.yandexmaps', icon: '🗺️' },
+  { id: 'yandex-navi', name: 'Яндекс.Навигатор', packageName: 'ru.yandex.yandexnavi', icon: '🧭' },
+  { id: 'waze', name: 'Waze', packageName: 'com.waze', icon: '🚗' },
+  { id: '2gis', name: '2GIS', packageName: 'ru.dublgis.dgismobile', icon: '🗺️' },
+];
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
+  const [selectedNavApps, setSelectedNavApps] = useState<string[]>([]);
+  const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
+  const [availableBluetoothDevices, setAvailableBluetoothDevices] = useState<BluetoothDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanningBluetooth, setScanningBluetooth] = useState(false);
 
   useEffect(() => {
     loadSettings();
