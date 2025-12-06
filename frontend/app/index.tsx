@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Battery from 'expo-battery';
 
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
