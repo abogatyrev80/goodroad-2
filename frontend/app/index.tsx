@@ -34,6 +34,10 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<any>(null);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  
+  // Настройки предупреждений
+  const [warningSize, setWarningSize] = useState<WarningSize>('medium');
+  const [warningPosition, setWarningPosition] = useState<WarningPosition>('top');
 
   // Refs
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
