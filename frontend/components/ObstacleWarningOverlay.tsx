@@ -10,9 +10,14 @@ import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Obstacle } from '../services/ObstacleService';
 
+export type WarningSize = 'small' | 'medium' | 'large';
+export type WarningPosition = 'top' | 'center' | 'bottom';
+
 interface ObstacleWarningOverlayProps {
   obstacle: Obstacle | null;
   visible: boolean;
+  size?: WarningSize;
+  position?: WarningPosition;
 }
 
 export default function ObstacleWarningOverlay({
