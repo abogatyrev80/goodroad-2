@@ -241,8 +241,7 @@ export default function AutostartSettingsScreen() {
     }
   };
 
-  const allApps = [...POPULAR_APPS, ...customApps];
-  const appsByCategory = allApps.filter(app => app.category === selectedCategory);
+  // Только пользовательские приложения
 
   if (loading) {
     return (
