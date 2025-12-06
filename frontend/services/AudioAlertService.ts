@@ -36,6 +36,7 @@ class AudioAlertService {
     volume: 0.7,
     minConfirmations: 1,
     language: 'ru',
+    soundTheme: 'motion-tracker',
   };
 
   private alertHistory: Map<string, AlertHistory[]> = new Map();
