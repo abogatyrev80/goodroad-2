@@ -226,10 +226,22 @@ export default function HomeScreen() {
       accelerometerSubscription.current = accelSubscription;
 
       setIsTracking(true);
-      Alert.alert('Мониторинг запущен', 'Приложение отслеживает состояние дороги');
+      Toast.show({
+        type: 'success',
+        text1: '✅ Мониторинг запущен',
+        text2: 'Приложение отслеживает состояние дороги',
+        visibilityTime: 3000,
+        position: 'bottom',
+      });
     } catch (error) {
       console.error('Error starting tracking:', error);
-      Alert.alert('Ошибка', 'Не удалось запустить мониторинг');
+      Toast.show({
+        type: 'error',
+        text1: '❌ Ошибка',
+        text2: 'Не удалось запустить мониторинг',
+        visibilityTime: 3000,
+        position: 'bottom',
+      });
     } finally {
       setIsLoading(false);
     }
