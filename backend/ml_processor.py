@@ -327,6 +327,128 @@ class EventClassifier:
                 peaks += 1
         return peaks
     
+    def _detect_impact_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
+        """
+        🆕 ДЕТЕКТОР ПАТТЕРНА "УДАР"
+        Ищет характерный паттерн удара в последовательности Z значений
+        Паттерн: ↑↑↑ резко вверх → ↓↓↓ резко вниз (характерно для ямы)
+        
+        Args:
+            z_values: массив значений по оси Z
+            threshold: минимальная скорость изменения для обнаружения
+            
+        Returns:
+            (обнаружен, максимальная_интенсивность)
+        """
+        if len(z_values) < 5:
+            return False, 0.0
+        
+        max_impact_intensity = 0.0
+        
+        for i in range(2, len(z_values) - 2):
+            # Вычисляем скорость изменения (производная)
+            rising_rate = z_values[i] - z_values[i-2]   # Подъем
+            falling_rate = z_values[i+2] - z_values[i]  # Спад
+            
+            # Паттерн удара: резкий подъем + резкий спад
+            if rising_rate > threshold and falling_rate < -threshold:
+                impact_intensity = rising_rate + abs(falling_rate)
+                max_impact_intensity = max(max_impact_intensity, impact_intensity)
+        
+        detected = max_impact_intensity > threshold * 2
+        return detected, max_impact_intensity
+    
+    def _detect_wave_pattern(self, z_values: List[float], threshold: float = 0.06) -> Tuple[bool, float]:
+        """
+        🆕 ДЕТЕКТОР ПАТТЕРНА "ВОЛНА"
+        Ищет плавную волну в последовательности (характерно для лежачего полицейского)
+        Паттерн: ↗ плавно вверх → ↘ плавно вниз
+        
+        Args:
+            z_values: массив значений по оси Z
+            threshold: минимальный тренд для обнаружения
+            
+        Returns:
+            (обнаружен, амплитуда_волны)
+        """
+        if len(z_values) < 10:
+            return False, 0.0
+        
+        # Делим массив на 3 части: начало, пик, конец
+        third = len(z_values) // 3
+        
+        start_avg = sum(z_values[:third]) / third
+        middle_avg = sum(z_values[third:2*third]) / third
+        end_avg = sum(z_values[2*third:]) / (len(z_values) - 2*third)
+        
+        # Проверяем паттерн "волна": подъем → пик → спуск
+        rising_trend = middle_avg - start_avg
+        falling_trend = end_avg - middle_avg
+        
+        # Волна: плавный подъем + плавный спуск
+        wave_detected = (rising_trend > threshold and falling_trend < -threshold)
+        wave_amplitude = rising_trend + abs(falling_trend)
+        
+        return wave_detected, wave_amplitude
+    
+    def _detect_vibration_pattern(self, magnitude_values: List[float]) -> Tuple[bool, float]:
+        """
+        🆕 ДЕТЕКТОР ПАТТЕРНА "ВИБРАЦИЯ"
+        Ищет постоянные высокочастотные колебания (плохое покрытие)
+        
+        Args:
+            magnitude_values: массив значений magnitude
+            
+        Returns:
+            (обнаружен, интенсивность_вибрации)
+        """
+        if len(magnitude_values) < 10:
+            return False, 0.0
+        
+        # Подсчитываем количество изменений направления (зиг-заг паттерн)
+        direction_changes = 0
+        for i in range(1, len(magnitude_values) - 1):
+            prev_diff = magnitude_values[i] - magnitude_values[i-1]
+            next_diff = magnitude_values[i+1] - magnitude_values[i]
+            
+            # Изменение направления
+            if prev_diff * next_diff < 0:
+                direction_changes += 1
+        
+        # Высокая частота изменений = вибрация
+        vibration_frequency = direction_changes / len(magnitude_values)
+        vibration_detected = vibration_frequency > 0.3  # >30% точек меняют направление
+        
+        return vibration_detected, vibration_frequency
+    
+    def _analyze_patterns(self, x_values: List[float], y_values: List[float], z_values: List[float]) -> Dict:
+        """
+        🆕 АНАЛИЗ ВСЕХ ПАТТЕРНОВ
+        Анализирует форму сигнала для определения типа события
+        
+        Returns:
+            Dictionary с результатами анализа всех паттернов
+        """
+        # Вычисляем magnitude для каждого значения
+        magnitudes = [
+            math.sqrt(x**2 + y**2 + z**2)
+            for x, y, z in zip(x_values, y_values, z_values)
+        ]
+        
+        # Анализируем каждый паттерн
+        impact_detected, impact_intensity = self._detect_impact_pattern(z_values)
+        wave_detected, wave_amplitude = self._detect_wave_pattern(z_values)
+        vibration_detected, vibration_frequency = self._detect_vibration_pattern(magnitudes)
+        
+        return {
+            'impact_detected': impact_detected,
+            'impact_intensity': impact_intensity,
+            'wave_detected': wave_detected,
+            'wave_amplitude': wave_amplitude,
+            'vibration_detected': vibration_detected,
+            'vibration_frequency': vibration_frequency
+        }
+    
     def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
         """
         🆕 ОПТИМИЗИРОВАННАЯ классификация на основе анализа 10 реальных препятствий
