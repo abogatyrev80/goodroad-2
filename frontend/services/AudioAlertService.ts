@@ -455,6 +455,24 @@ class AudioAlertService {
   }
 
   /**
+   * Произнести текст напрямую (для превью)
+   */
+  async speakDirect(message: string): Promise<void> {
+    try {
+      await this.ensureInitialized();
+      const options: Speech.SpeechOptions = {
+        language: this.settings.language === 'ru' ? 'ru-RU' : 'en-US',
+        pitch: 1.0,
+        rate: 0.9,
+        volume: this.settings.volume,
+      };
+      await Speech.speak(message, options);
+    } catch (error) {
+      console.error('❌ Error speaking direct:', error);
+    }
+  }
+
+  /**
    * Тестовое оповещение
    */
   async testAlert(): Promise<void> {
