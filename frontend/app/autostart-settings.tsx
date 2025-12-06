@@ -1,6 +1,6 @@
 /**
- * AutostartSettings - Продвинутые настройки автозапуска мониторинга
- * Поддержка запуска с навигацией и при подключении Bluetooth устройств
+ * AutostartSettings V3 - Продвинутые настройки с выбором любых приложений
+ * Пользователь может выбрать из популярных приложений или добавить свое
  */
 
 import React, { useState, useEffect } from 'react';
@@ -8,19 +8,19 @@ import {
   View,
   Text,
   StyleSheet,
-  Switch,
   ScrollView,
   Pressable,
   StatusBar,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type AutostartMode = 'disabled' | 'onCharge' | 'withNavigation' | 'onBluetooth';
+type AutostartMode = 'disabled' | 'onCharge' | 'withApps' | 'onBluetooth';
 
 interface TriggerApp {
   id: string;
@@ -61,15 +61,17 @@ const POPULAR_APPS: TriggerApp[] = [
   { id: 'spotify', name: 'Spotify', packageName: 'com.spotify.music', icon: '🎵', category: 'Музыка' },
   { id: 'yandex-music', name: 'Яндекс Музыка', packageName: 'ru.yandex.music', icon: '🎵', category: 'Музыка' },
   { id: 'apple-music', name: 'Apple Music', packageName: 'com.apple.android.music', icon: '🎵', category: 'Музыка' },
+  { id: 'youtube-music', name: 'YouTube Music', packageName: 'com.google.android.apps.youtube.music', icon: '🎵', category: 'Музыка' },
 ];
+
+const CATEGORIES = ['Навигация', 'Такси', 'Каршеринг', 'Музыка'];
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
-  const [customApps, setCustomApps] = useState<TriggerApp[]>([]); // Пользовательские приложения
+  const [customApps, setCustomApps] = useState<TriggerApp[]>([]);
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scanningBluetooth, setScanningBluetooth] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('Навигация');
 
   useEffect(() => {
@@ -115,39 +117,108 @@ export default function AutostartSettingsScreen() {
     }
   };
 
-  const toggleNavigationApp = async (appId: string) => {
-    const newSelection = selectedNavApps.includes(appId)
-      ? selectedNavApps.filter(id => id !== appId)
-      : [...selectedNavApps, appId];
+  const toggleApp = async (appId: string) => {
+    const newSelection = selectedApps.includes(appId)
+      ? selectedApps.filter(id => id !== appId)
+      : [...selectedApps, appId];
     
-    setSelectedNavApps(newSelection);
-    await AsyncStorage.setItem('autostart_nav_apps', JSON.stringify(newSelection));
+    setSelectedApps(newSelection);
+    await AsyncStorage.setItem('autostart_trigger_apps', JSON.stringify(newSelection));
   };
 
-  const scanBluetoothDevices = async () => {
+  const addCustomApp = () => {
+    Alert.prompt(
+      'Добавить приложение',
+      'Введите название приложения:',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Далее',
+          onPress: (appName) => {
+            if (!appName || !appName.trim()) return;
+            
+            Alert.prompt(
+              'Имя пакета',
+              'Введите имя пакета (Package Name):\n\nНапример:\ncom.google.android.apps.maps\nru.yandex.yandexnavi',
+              [
+                { text: 'Отмена', style: 'cancel' },
+                {
+                  text: 'Добавить',
+                  onPress: async (packageName) => {
+                    if (!packageName || !packageName.trim()) return;
+                    
+                    const customApp: TriggerApp = {
+                      id: `custom-${Date.now()}`,
+                      name: appName.trim(),
+                      packageName: packageName.trim(),
+                      icon: '📱',
+                      category: 'Пользовательские',
+                      isCustom: true,
+                    };
+                    
+                    const newCustomApps = [...customApps, customApp];
+                    setCustomApps(newCustomApps);
+                    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
+                    
+                    // Автоматически выбираем добавленное приложение
+                    await toggleApp(customApp.id);
+                    
+                    Alert.alert('Успех ✅', `Приложение "${appName}" добавлено`);
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const removeCustomApp = async (appId: string) => {
+    const app = customApps.find(a => a.id === appId);
+    if (!app) return;
+
     Alert.alert(
+      'Удалить приложение?',
+      `Вы уверены что хотите удалить "${app.name}"?`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            const newCustomApps = customApps.filter(a => a.id !== appId);
+            setCustomApps(newCustomApps);
+            await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
+            
+            // Убираем из выбранных
+            const newSelection = selectedApps.filter(id => id !== appId);
+            setSelectedApps(newSelection);
+            await AsyncStorage.setItem('autostart_trigger_apps', JSON.stringify(newSelection));
+          },
+        },
+      ]
+    );
+  };
+
+  const scanBluetoothDevices = () => {
+    Alert.prompt(
       'Добавить Bluetooth устройство',
-      'Введите имя вашего Bluetooth устройства (например: "Car Audio", "Toyota Camry", "My Headset")',
+      'Введите имя вашего Bluetooth устройства\n(например: "Car Audio", "Toyota Camry")',
       [
         { text: 'Отмена', style: 'cancel' },
         {
           text: 'Добавить',
-          onPress: () => {
-            Alert.prompt(
-              'Имя устройства',
-              'Введите имя устройства:',
-              async (deviceName) => {
-                if (deviceName && deviceName.trim()) {
-                  const device: BluetoothDevice = {
-                    id: Date.now().toString(),
-                    name: deviceName.trim(),
-                  };
-                  setSelectedBluetoothDevice(device);
-                  await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
-                  Alert.alert('Успех ✅', `Устройство "${deviceName}" добавлено`);
-                }
-              }
-            );
+          onPress: async (deviceName) => {
+            if (deviceName && deviceName.trim()) {
+              const device: BluetoothDevice = {
+                id: Date.now().toString(),
+                name: deviceName.trim(),
+              };
+              setSelectedBluetoothDevice(device);
+              await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
+              Alert.alert('Успех ✅', `Устройство "${deviceName}" добавлено`);
+            }
           },
         },
       ]
@@ -178,8 +249,8 @@ export default function AutostartSettingsScreen() {
         return 'Выключен';
       case 'onCharge':
         return 'При зарядке';
-      case 'withNavigation':
-        return 'С навигацией';
+      case 'withApps':
+        return 'С приложениями';
       case 'onBluetooth':
         return 'Bluetooth';
     }
@@ -191,12 +262,15 @@ export default function AutostartSettingsScreen() {
         return 'Запуск только вручную';
       case 'onCharge':
         return 'Автозапуск при подключении к зарядке';
-      case 'withNavigation':
-        return 'Автозапуск с выбранными навигационными приложениями';
+      case 'withApps':
+        return 'Автозапуск при открытии выбранных приложений';
       case 'onBluetooth':
-        return 'Автозапуск при подключении к выбранному Bluetooth устройству';
+        return 'Автозапуск при подключении к Bluetooth устройству';
     }
   };
+
+  const allApps = [...POPULAR_APPS, ...customApps];
+  const appsByCategory = allApps.filter(app => app.category === selectedCategory);
 
   if (loading) {
     return (
@@ -228,8 +302,8 @@ export default function AutostartSettingsScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={20} color="#00d4ff" />
           <Text style={styles.infoText}>
-            Выберите когда мониторинг дороги должен запускаться автоматически. 
-            Вы всегда можете запустить или остановить его вручную.
+            Выберите когда мониторинг должен запускаться автоматически.
+            Можете выбрать популярные приложения или добавить свое.
           </Text>
         </View>
 
@@ -248,19 +322,12 @@ export default function AutostartSettingsScreen() {
               color={autostartMode === 'disabled' ? '#00d4ff' : '#8b94a8'}
             />
             <View style={styles.modeInfo}>
-              <Text
-                style={[
-                  styles.modeTitle,
-                  autostartMode === 'disabled' && styles.modeTitleActive,
-                ]}
-              >
+              <Text style={[styles.modeTitle, autostartMode === 'disabled' && styles.modeTitleActive]}>
                 Выключен
               </Text>
               <Text style={styles.modeDescription}>{getModeDescription('disabled')}</Text>
             </View>
-            {autostartMode === 'disabled' && (
-              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-            )}
+            {autostartMode === 'disabled' && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
           </Pressable>
 
           {/* При зарядке */}
@@ -274,71 +341,88 @@ export default function AutostartSettingsScreen() {
               color={autostartMode === 'onCharge' ? '#00d4ff' : '#8b94a8'}
             />
             <View style={styles.modeInfo}>
-              <Text
-                style={[
-                  styles.modeTitle,
-                  autostartMode === 'onCharge' && styles.modeTitleActive,
-                ]}
-              >
+              <Text style={[styles.modeTitle, autostartMode === 'onCharge' && styles.modeTitleActive]}>
                 При зарядке
               </Text>
               <Text style={styles.modeDescription}>{getModeDescription('onCharge')}</Text>
             </View>
-            {autostartMode === 'onCharge' && (
-              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-            )}
+            {autostartMode === 'onCharge' && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
           </Pressable>
 
-          {/* С навигацией */}
+          {/* С приложениями */}
           <Pressable
-            style={[
-              styles.modeOption,
-              autostartMode === 'withNavigation' && styles.modeOptionActive,
-            ]}
-            onPress={() => saveSettings('withNavigation')}
+            style={[styles.modeOption, autostartMode === 'withApps' && styles.modeOptionActive]}
+            onPress={() => saveSettings('withApps')}
           >
             <Ionicons
-              name="navigate"
+              name="apps"
               size={32}
-              color={autostartMode === 'withNavigation' ? '#00d4ff' : '#8b94a8'}
+              color={autostartMode === 'withApps' ? '#00d4ff' : '#8b94a8'}
             />
             <View style={styles.modeInfo}>
-              <Text
-                style={[
-                  styles.modeTitle,
-                  autostartMode === 'withNavigation' && styles.modeTitleActive,
-                ]}
-              >
-                С навигацией
+              <Text style={[styles.modeTitle, autostartMode === 'withApps' && styles.modeTitleActive]}>
+                С приложениями
               </Text>
-              <Text style={styles.modeDescription}>{getModeDescription('withNavigation')}</Text>
+              <Text style={styles.modeDescription}>{getModeDescription('withApps')}</Text>
             </View>
-            {autostartMode === 'withNavigation' && (
-              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-            )}
+            {autostartMode === 'withApps' && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
           </Pressable>
 
-          {/* Выбор навигационных приложений */}
-          {autostartMode === 'withNavigation' && (
+          {/* Выбор приложений */}
+          {autostartMode === 'withApps' && (
             <View style={styles.subSettings}>
-              <Text style={styles.subSettingsTitle}>Выберите приложения:</Text>
-              {NAVIGATION_APPS.map((app) => (
+              <View style={styles.subSettingsHeader}>
+                <Text style={styles.subSettingsTitle}>Выберите приложения:</Text>
+                <Text style={styles.selectedCount}>
+                  {selectedApps.length} выбрано
+                </Text>
+              </View>
+
+              {/* Табы категорий */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
+                {[...CATEGORIES, ...(customApps.length > 0 ? ['Пользовательские'] : [])].map((category) => (
+                  <Pressable
+                    key={category}
+                    style={[styles.categoryTab, selectedCategory === category && styles.categoryTabActive]}
+                    onPress={() => setSelectedCategory(category)}
+                  >
+                    <Text style={[styles.categoryText, selectedCategory === category && styles.categoryTextActive]}>
+                      {category}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {/* Список приложений */}
+              {appsByCategory.map((app) => (
                 <Pressable
                   key={app.id}
-                  style={[
-                    styles.appOption,
-                    selectedNavApps.includes(app.id) && styles.appOptionActive,
-                  ]}
-                  onPress={() => toggleNavigationApp(app.id)}
+                  style={[styles.appOption, selectedApps.includes(app.id) && styles.appOptionActive]}
+                  onPress={() => toggleApp(app.id)}
                 >
                   <Text style={styles.appIcon}>{app.icon}</Text>
-                  <Text style={styles.appName}>{app.name}</Text>
-                  {selectedNavApps.includes(app.id) && (
-                    <Ionicons name="checkmark-circle" size={20} color="#00ff88" />
+                  <View style={styles.appInfo}>
+                    <Text style={styles.appName}>{app.name}</Text>
+                    {app.isCustom && (
+                      <Text style={styles.packageName}>{app.packageName}</Text>
+                    )}
+                  </View>
+                  {app.isCustom && (
+                    <Pressable onPress={() => removeCustomApp(app.id)} style={styles.removeAppButton}>
+                      <Ionicons name="close-circle" size={20} color="#ff3b30" />
+                    </Pressable>
                   )}
+                  {selectedApps.includes(app.id) && <Ionicons name="checkmark-circle" size={20} color="#00ff88" />}
                 </Pressable>
               ))}
-              {selectedNavApps.length === 0 && (
+
+              {/* Кнопка добавления пользовательского приложения */}
+              <Pressable style={styles.addAppButton} onPress={addCustomApp}>
+                <Ionicons name="add-circle" size={24} color="#00d4ff" />
+                <Text style={styles.addAppText}>Добавить свое приложение</Text>
+              </Pressable>
+
+              {selectedApps.length === 0 && (
                 <Text style={styles.warningText}>⚠️ Выберите хотя бы одно приложение</Text>
               )}
             </View>
@@ -346,10 +430,7 @@ export default function AutostartSettingsScreen() {
 
           {/* При Bluetooth */}
           <Pressable
-            style={[
-              styles.modeOption,
-              autostartMode === 'onBluetooth' && styles.modeOptionActive,
-            ]}
+            style={[styles.modeOption, autostartMode === 'onBluetooth' && styles.modeOptionActive]}
             onPress={() => saveSettings('onBluetooth')}
           >
             <Ionicons
@@ -358,19 +439,12 @@ export default function AutostartSettingsScreen() {
               color={autostartMode === 'onBluetooth' ? '#00d4ff' : '#8b94a8'}
             />
             <View style={styles.modeInfo}>
-              <Text
-                style={[
-                  styles.modeTitle,
-                  autostartMode === 'onBluetooth' && styles.modeTitleActive,
-                ]}
-              >
+              <Text style={[styles.modeTitle, autostartMode === 'onBluetooth' && styles.modeTitleActive]}>
                 Bluetooth устройство
               </Text>
               <Text style={styles.modeDescription}>{getModeDescription('onBluetooth')}</Text>
             </View>
-            {autostartMode === 'onBluetooth' && (
-              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-            )}
+            {autostartMode === 'onBluetooth' && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
           </Pressable>
 
           {/* Выбор Bluetooth устройства */}
@@ -405,21 +479,21 @@ export default function AutostartSettingsScreen() {
           <View style={styles.tipItem}>
             <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
             <Text style={styles.tipText}>
-              Режим "С навигацией" идеален для постоянного использования - мониторинг запустится только когда вы начнете навигацию
+              Режим "С приложениями" - можете выбрать навигацию, такси или любые другие приложения
             </Text>
           </View>
 
           <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Ionicons name="add-circle" size={16} color="#00d4ff" />
             <Text style={styles.tipText}>
-              Режим "Bluetooth" удобен если ваш телефон автоматически подключается к аудиосистеме автомобиля
+              Не нашли свое приложение? Добавьте его вручную через кнопку "Добавить свое приложение"
             </Text>
           </View>
 
           <View style={styles.tipItem}>
             <Ionicons name="battery-charging" size={16} color="#f59e0b" />
             <Text style={styles.tipText}>
-              Мониторинг потребляет больше энергии из-за постоянного использования GPS и акселерометра
+              Мониторинг потребляет больше энергии из-за GPS и акселерометра
             </Text>
           </View>
         </View>
@@ -536,11 +610,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2d2d5f',
   },
+  subSettingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   subSettingsTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#c7cad9',
-    marginBottom: 12,
+  },
+  selectedCount: {
+    fontSize: 13,
+    color: '#00d4ff',
+    fontWeight: '600',
+  },
+  categories: {
+    marginBottom: 16,
+  },
+  categoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    backgroundColor: '#1a1a3e',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2d2d5f',
+  },
+  categoryTabActive: {
+    backgroundColor: '#00d4ff',
+    borderColor: '#00d4ff',
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#8b94a8',
+    fontWeight: '600',
+  },
+  categoryTextActive: {
+    color: '#0f0f23',
   },
   appOption: {
     flexDirection: 'row',
@@ -560,10 +668,39 @@ const styles = StyleSheet.create({
   appIcon: {
     fontSize: 24,
   },
-  appName: {
+  appInfo: {
     flex: 1,
+  },
+  appName: {
     fontSize: 16,
     color: '#c7cad9',
+    fontWeight: '500',
+  },
+  packageName: {
+    fontSize: 12,
+    color: '#8b94a8',
+    marginTop: 2,
+  },
+  removeAppButton: {
+    padding: 4,
+  },
+  addAppButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a3e',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#00d4ff',
+    gap: 12,
+    marginTop: 8,
+  },
+  addAppText: {
+    fontSize: 16,
+    color: '#00d4ff',
+    fontWeight: '600',
   },
   deviceCard: {
     flexDirection: 'row',
