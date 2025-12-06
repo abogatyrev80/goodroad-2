@@ -730,6 +730,23 @@ const styles = StyleSheet.create({
     color: '#8b94a8',
     lineHeight: 20,
   },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8b94a8',
+    marginTop: 8,
+  },
+  emptyHint: {
+    fontSize: 14,
+    color: '#5a5f73',
+    textAlign: 'center',
+  },
   bottomSpacer: {
     height: 32,
   },
