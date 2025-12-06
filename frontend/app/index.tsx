@@ -59,6 +59,27 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // Проверка автозапуска
+  useEffect(() => {
+    checkAutostart();
+  }, []);
+
+  const checkAutostart = async () => {
+    try {
+      const mode = await AsyncStorage.getItem('autostart_mode');
+      console.log('🚀 Autostart mode:', mode);
+
+      if (mode === 'onOpen' && !isTracking) {
+        console.log('🚀 Auto-starting monitoring on app open...');
+        setTimeout(() => {
+          startTracking();
+        }, 1000); // Небольшая задержка для инициализации
+      }
+    } catch (error) {
+      console.error('Error checking autostart:', error);
+    }
+  };
+
   const initializeServices = async () => {
     try {
       // Проверяем разрешения
