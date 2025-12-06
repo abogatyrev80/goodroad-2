@@ -23,9 +23,28 @@ interface ObstacleWarningOverlayProps {
 export default function ObstacleWarningOverlay({
   obstacle,
   visible,
+  size = 'medium',
+  position = 'top',
 }: ObstacleWarningOverlayProps) {
   const [pulseAnim] = useState(new Animated.Value(1));
   const [fadeAnim] = useState(new Animated.Value(0));
+
+  // Размеры в зависимости от настройки
+  const sizeConfig = {
+    small: { icon: 28, distance: 32, padding: 12, iconBg: 50 },
+    medium: { icon: 40, distance: 48, padding: 16, iconBg: 70 },
+    large: { icon: 52, distance: 64, padding: 20, iconBg: 90 },
+  };
+
+  // Позиция в зависимости от настройки
+  const positionStyle = {
+    top: { top: 100 },
+    center: { top: '40%' as any },
+    bottom: { bottom: 150 },
+  };
+
+  const currentSize = sizeConfig[size];
+  const currentPosition = positionStyle[position];
 
   useEffect(() => {
     if (visible && obstacle) {
