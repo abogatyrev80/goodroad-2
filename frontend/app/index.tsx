@@ -229,13 +229,7 @@ export default function HomeScreen() {
       accelerometerSubscription.current = accelSubscription;
 
       setIsTracking(true);
-      Toast.show({
-        type: 'success',
-        text1: '✅ Мониторинг запущен',
-        text2: 'Приложение отслеживает состояние дороги',
-        visibilityTime: 3000,
-        position: 'bottom',
-      });
+      showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
     } catch (error) {
       console.error('Error starting tracking:', error);
       Toast.show({
