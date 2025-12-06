@@ -41,11 +41,10 @@ interface BluetoothDevice {
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
-  const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [customApps, setCustomApps] = useState<TriggerApp[]>([]);
+  const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Навигация');
 
   useEffect(() => {
     loadSettings();
