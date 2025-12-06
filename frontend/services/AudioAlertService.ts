@@ -275,16 +275,27 @@ class AudioAlertService {
       return null;
     }
 
-    // Звуковые файлы для каждого уровня срочности
-    // Тема "motion-tracker" - звук датчика движения из фильма "Чужие"
-    const soundMap: Record<string, any> = {
+    // Выбор звуковых файлов в зависимости от темы
+    if (this.settings.soundTheme === 'radar-detector') {
+      // Тема "radar-detector" - звуки автомобильного радар-детектора
+      const radarSounds: Record<string, any> = {
+        info: require('../assets/sounds/radar-info.mp3'),
+        warning: require('../assets/sounds/radar-warning.mp3'),
+        critical: require('../assets/sounds/radar-critical.mp3'),
+        emergency: require('../assets/sounds/radar-emergency.mp3'),
+      };
+      return radarSounds[urgency] || radarSounds.warning;
+    }
+
+    // Тема "motion-tracker" (по умолчанию) - звук датчика движения из фильма "Чужие"
+    const motionTrackerSounds: Record<string, any> = {
       info: require('../assets/sounds/info.mp3'),
       warning: require('../assets/sounds/warning.mp3'),
       critical: require('../assets/sounds/critical.mp3'),
       emergency: require('../assets/sounds/emergency.mp3'),
     };
 
-    return soundMap[urgency] || soundMap.warning;
+    return motionTrackerSounds[urgency] || motionTrackerSounds.warning;
   }
 
   /**
