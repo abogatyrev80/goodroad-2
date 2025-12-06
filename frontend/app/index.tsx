@@ -246,6 +246,15 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
         </Pressable>
 
+        {/* Настройки предупреждений */}
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push('/warning-settings')}
+        >
+          <Ionicons name="resize" size={34} color="#00d4ff" />
+          <Text style={styles.buttonText}>ВИЗУАЛЬНЫЕ ОПОВЕЩЕНИЯ</Text>
+        </Pressable>
+
         {/* Автозапуск */}
         <Pressable
           style={styles.button}
