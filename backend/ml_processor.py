@@ -609,7 +609,7 @@ class EventClassifier:
             stats['max_magnitude'] >= vibration_threshold['magnitude']):
             
             return {
-                'event_type': 'vibration',
+                'eventType': 'vibration',
                 'severity': self._calculate_severity(stats['std_magnitude'], 0.08, 0.15),
                 'confidence': 0.65,
                 'magnitude': stats['mean_magnitude'],
