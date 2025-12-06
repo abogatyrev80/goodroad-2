@@ -870,23 +870,26 @@ async def process_raw_data(batch: RawDataBatch):
                         'variance': event.get('variance', 0),
                     }
             
-            if event:
+            if event and event.get('eventType'):
                 # 🆕 КЛАСТЕРИЗАЦИЯ: Находим или создаём кластер для события
                 cluster_id = None
                 if obstacle_clusterer:
                     try:
                         cluster_id = await obstacle_clusterer.process_event(
                             event={
-                                'eventType': event['eventType'],
-                                'severity': event['severity'],
+                                'eventType': event.get('eventType'),
+                                'severity': event.get('severity', 3),
                                 'latitude': gps.get("latitude"),
                                 'longitude': gps.get("longitude"),
                                 'speed': gps.get("speed", 0)
                             },
                             device_id=device_id
                         )
+                        print(f"✅ Кластеризация: событие {event.get('eventType')} → cluster {cluster_id}")
                     except Exception as e:
                         print(f"⚠️ Ошибка кластеризации: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # Событие обнаружено - сохраняем с clusterId
                 processed_event = {
