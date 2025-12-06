@@ -183,6 +183,8 @@ export default function HomeScreen() {
       <ObstacleWarningOverlay
         obstacle={closestObstacle}
         visible={isTracking && closestObstacle !== null && closestObstacle.distance < 1000}
+        size={warningSize}
+        position={warningPosition}
       />
 
       {/* Заголовок */}
