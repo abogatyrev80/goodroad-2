@@ -259,6 +259,53 @@ export default function HomeScreen() {
     }
   };
 
+  // Ручная отметка препятствия
+  const reportObstacle = async () => {
+    if (!currentLocation) {
+      showToast('warning', '⚠️ Нет GPS', 'Невозможно определить местоположение', 3000);
+      return;
+    }
+
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+      
+      // Отправляем ручную отметку на сервер
+      const response = await fetch(`${backendUrl}/api/raw-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: rawDataCollector.current?.deviceId || 'manual-report',
+          data: [{
+            deviceId: rawDataCollector.current?.deviceId || 'manual-report',
+            timestamp: Date.now(),
+            gps: {
+              latitude: currentLocation.coords.latitude,
+              longitude: currentLocation.coords.longitude,
+              speed: currentLocation.coords.speed || 0,
+              accuracy: currentLocation.coords.accuracy || 0,
+              altitude: currentLocation.coords.altitude || 0,
+            },
+            accelerometer: [
+              { x: 0, y: 0, z: 1.0, timestamp: Date.now() }
+            ],
+            userReported: true,
+            eventType: 'pothole', // По умолчанию "яма", можно расширить выбором
+            severity: 2,
+          }]
+        }),
+      });
+
+      if (response.ok) {
+        showToast('success', '✅ Препятствие отмечено', 'Спасибо за вклад в безопасность дорог!', 3000);
+      } else {
+        throw new Error('Server error');
+      }
+    } catch (error) {
+      console.error('Error reporting obstacle:', error);
+      showToast('error', '❌ Ошибка', 'Не удалось отметить препятствие', 3000);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" />
