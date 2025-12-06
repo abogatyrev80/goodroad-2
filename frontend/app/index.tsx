@@ -148,13 +148,7 @@ export default function HomeScreen() {
       const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
       
       if (locationStatus !== 'granted' || bgStatus !== 'granted') {
-        Toast.show({
-          type: 'error',
-          text1: '⚠️ Разрешения необходимы',
-          text2: 'Для работы приложения нужны разрешения на GPS и фоновую работу',
-          visibilityTime: 5000,
-          position: 'bottom',
-        });
+        showToast('error', '⚠️ Разрешения необходимы', 'Для работы приложения нужны разрешения на GPS и фоновую работу', 5000);
       }
 
       // Инициализируем коллектор данных
