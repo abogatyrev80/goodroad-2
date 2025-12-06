@@ -562,6 +562,13 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.4,
   },
+  reportButton: {
+    borderColor: '#ff3b30', // Красная рамка для кнопки отчета
+    backgroundColor: 'rgba(255, 59, 48, 0.1)', // Слегка красноватый фон
+  },
+  reportButtonText: {
+    color: '#ff3b30', // Красный текст
+  },
   footer: {
     alignItems: 'center',
     paddingVertical: 16,
