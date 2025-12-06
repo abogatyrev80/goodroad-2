@@ -268,9 +268,15 @@ class AudioAlertService {
    * Получить URI звука для уровня срочности
    */
   private getSoundUri(urgency: string): any {
-    // В реальном приложении здесь были бы require('./assets/sounds/...')
-    // Пока возвращаем null - будет только голос
-    return null;
+    // Звуковые файлы для каждого уровня срочности
+    const soundMap: Record<string, any> = {
+      info: require('../assets/sounds/info.mp3'),
+      warning: require('../assets/sounds/warning.mp3'),
+      critical: require('../assets/sounds/critical.mp3'),
+      emergency: require('../assets/sounds/emergency.mp3'),
+    };
+
+    return soundMap[urgency] || soundMap.warning;
   }
 
   /**
