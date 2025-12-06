@@ -70,6 +70,43 @@ export default function HomeScreen() {
     checkAutostart();
   }, []);
 
+  // Отслеживание изменений состояния для автоотключения
+  useEffect(() => {
+    if (!isTracking || !wasAutoStarted) return;
+    
+    // Автоотключение для режима "При зарядке"
+    if (autostartMode === 'onCharge') {
+      const subscription = Battery.addBatteryStateListener(({ batteryState }) => {
+        console.log('🔋 Battery state changed:', batteryState);
+        
+        // Если отключили от зарядки - останавливаем мониторинг
+        if (batteryState !== Battery.BatteryState.CHARGING) {
+          console.log('⛔ Auto-stopping monitoring - device unplugged');
+          stopTracking();
+          setWasAutoStarted(false);
+          Alert.alert(
+            'Мониторинг остановлен',
+            'Устройство отключено от зарядки. Мониторинг автоматически остановлен.'
+          );
+        }
+      });
+      
+      batterySubscription.current = subscription;
+      
+      return () => {
+        if (batterySubscription.current) {
+          batterySubscription.current.remove();
+        }
+      };
+    }
+    
+    // TODO: Автоотключение для режима "С приложениями"
+    // Потребуется отслеживание закрытия приложений через нативные API
+    
+    // TODO: Автоотключение для режима "Bluetooth"
+    // Потребуется отслеживание отключения Bluetooth устройств
+  }, [isTracking, wasAutoStarted, autostartMode]);
+
   const checkAutostart = async () => {
     try {
       const mode = await AsyncStorage.getItem('autostart_mode');
