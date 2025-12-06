@@ -17,6 +17,8 @@ export function useObstacleAlerts(
   const [closestObstacle, setClosestObstacle] = useState<Obstacle | null>(null);
   const fetchInterval = useRef<NodeJS.Timeout | null>(null);
   const lastAlertedObstacles = useRef<Set<string>>(new Set());
+  const previousSpeed = useRef<number>(0);
+  const alertedObstaclesForReaction = useRef<Map<string, { obstacle: Obstacle; alerted: boolean }>>(new Map());
 
   // Загрузка препятствий каждые 30 секунд
   useEffect(() => {
