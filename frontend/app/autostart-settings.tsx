@@ -1,5 +1,6 @@
 /**
- * AutostartSettings - Настройки автозапуска мониторинга
+ * AutostartSettings - Продвинутые настройки автозапуска мониторинга
+ * Поддержка запуска с навигацией и при подключении Bluetooth устройств
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,6 +13,7 @@ import {
   Pressable,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,7 +47,6 @@ export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
   const [selectedNavApps, setSelectedNavApps] = useState<string[]>([]);
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
-  const [availableBluetoothDevices, setAvailableBluetoothDevices] = useState<BluetoothDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanningBluetooth, setScanningBluetooth] = useState(false);
 
@@ -80,7 +81,7 @@ export default function AutostartSettingsScreen() {
     try {
       await AsyncStorage.setItem('autostart_mode', mode);
       setAutostartMode(mode);
-      Alert.alert('Сохранено', `Автозапуск: ${getModeText(mode)}`);
+      Alert.alert('Сохранено ✅', `Автозапуск: ${getModeText(mode)}`);
     } catch (error) {
       console.error('Error saving autostart settings:', error);
       Alert.alert('Ошибка', 'Не удалось сохранить настройки');
@@ -97,48 +98,51 @@ export default function AutostartSettingsScreen() {
   };
 
   const scanBluetoothDevices = async () => {
-    setScanningBluetooth(true);
-    try {
-      // Имитация сканирования (в реальном приложении здесь будет expo-bluetooth)
-      // Для MVP показываем заглушку
-      Alert.alert(
-        'Сканирование Bluetooth',
-        'Функция сканирования Bluetooth устройств будет доступна в следующей версии. ' +
-        'Пока вы можете добавить устройство вручную по имени.',
-        [
-          { text: 'Отмена', style: 'cancel' },
-          {
-            text: 'Добавить вручную',
-            onPress: () => {
-              Alert.prompt(
-                'Имя устройства',
-                'Введите имя вашего Bluetooth устройства (например, Car Audio)',
-                async (deviceName) => {
-                  if (deviceName) {
-                    const device: BluetoothDevice = {
-                      id: Date.now().toString(),
-                      name: deviceName,
-                    };
-                    setSelectedBluetoothDevice(device);
-                    await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
-                  }
+    Alert.alert(
+      'Добавить Bluetooth устройство',
+      'Введите имя вашего Bluetooth устройства (например: "Car Audio", "Toyota Camry", "My Headset")',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Добавить',
+          onPress: () => {
+            Alert.prompt(
+              'Имя устройства',
+              'Введите имя устройства:',
+              async (deviceName) => {
+                if (deviceName && deviceName.trim()) {
+                  const device: BluetoothDevice = {
+                    id: Date.now().toString(),
+                    name: deviceName.trim(),
+                  };
+                  setSelectedBluetoothDevice(device);
+                  await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
+                  Alert.alert('Успех ✅', `Устройство "${deviceName}" добавлено`);
                 }
-              );
-            },
+              }
+            );
           },
-        ]
-      );
-    } catch (error) {
-      console.error('Error scanning Bluetooth:', error);
-      Alert.alert('Ошибка', 'Не удалось отсканировать Bluetooth устройства');
-    } finally {
-      setScanningBluetooth(false);
-    }
+        },
+      ]
+    );
   };
 
   const clearBluetoothDevice = async () => {
-    setSelectedBluetoothDevice(null);
-    await AsyncStorage.removeItem('autostart_bluetooth_device');
+    Alert.alert(
+      'Удалить устройство?',
+      `Вы уверены что хотите удалить "${selectedBluetoothDevice?.name}"?`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            setSelectedBluetoothDevice(null);
+            await AsyncStorage.removeItem('autostart_bluetooth_device');
+          },
+        },
+      ]
+    );
   };
 
   const getModeText = (mode: AutostartMode): string => {
@@ -146,24 +150,24 @@ export default function AutostartSettingsScreen() {
       case 'disabled':
         return 'Выключен';
       case 'onCharge':
-        return 'При подключении зарядки';
+        return 'При зарядке';
       case 'withNavigation':
         return 'С навигацией';
       case 'onBluetooth':
-        return 'При подключении Bluetooth';
+        return 'Bluetooth';
     }
   };
 
   const getModeDescription = (mode: AutostartMode): string => {
     switch (mode) {
       case 'disabled':
-        return 'Мониторинг запускается только вручную';
+        return 'Запуск только вручную';
       case 'onCharge':
-        return 'Мониторинг автоматически запускается когда устройство подключено к зарядке (удобно для использования в автомобиле)';
+        return 'Автозапуск при подключении к зарядке';
       case 'withNavigation':
-        return 'Мониторинг запускается автоматически при запуске выбранных навигационных приложений';
+        return 'Автозапуск с выбранными навигационными приложениями';
       case 'onBluetooth':
-        return 'Мониторинг запускается при подключении к выбранному Bluetooth устройству (например, автомобильная аудиосистема)';
+        return 'Автозапуск при подключении к выбранному Bluetooth устройству';
     }
   };
 
@@ -172,6 +176,7 @@ export default function AutostartSettingsScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00d4ff" />
           <Text style={styles.loadingText}>Загрузка...</Text>
         </View>
       </SafeAreaView>
@@ -185,146 +190,202 @@ export default function AutostartSettingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color="#00d4ff" />
         </Pressable>
         <Text style={styles.headerTitle}>Автозапуск</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Описание */}
+        {/* Информация */}
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={20} color="#60a5fa" />
+          <Ionicons name="information-circle" size={20} color="#00d4ff" />
           <Text style={styles.infoText}>
-            Настройте когда мониторинг дороги должен запускаться автоматически.
-            Вы всегда можете запустить или остановить мониторинг вручную.
+            Выберите когда мониторинг дороги должен запускаться автоматически. 
+            Вы всегда можете запустить или остановить его вручную.
           </Text>
         </View>
 
         {/* Режимы */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Выберите режим автозапуска</Text>
+          <Text style={styles.sectionTitle}>Режим автозапуска</Text>
 
           {/* Выключен */}
           <Pressable
-            style={[
-              styles.modeOption,
-              autostartMode === 'disabled' && styles.modeOptionActive,
-            ]}
+            style={[styles.modeOption, autostartMode === 'disabled' && styles.modeOptionActive]}
             onPress={() => saveSettings('disabled')}
           >
-            <View style={styles.modeHeader}>
-              <Ionicons
-                name="close-circle"
-                size={32}
-                color={autostartMode === 'disabled' ? '#3b82f6' : '#64748b'}
-              />
-              <View style={styles.modeInfo}>
-                <Text
-                  style={[
-                    styles.modeTitle,
-                    autostartMode === 'disabled' && styles.modeTitleActive,
-                  ]}
-                >
-                  Выключен
-                </Text>
-                <Text style={styles.modeDescription}>
-                  {getModeDescription('disabled')}
-                </Text>
-              </View>
-              {autostartMode === 'disabled' && (
-                <Ionicons name="checkmark-circle" size={24} color="#3b82f6" />
-              )}
+            <Ionicons
+              name="close-circle"
+              size={32}
+              color={autostartMode === 'disabled' ? '#00d4ff' : '#8b94a8'}
+            />
+            <View style={styles.modeInfo}>
+              <Text
+                style={[
+                  styles.modeTitle,
+                  autostartMode === 'disabled' && styles.modeTitleActive,
+                ]}
+              >
+                Выключен
+              </Text>
+              <Text style={styles.modeDescription}>{getModeDescription('disabled')}</Text>
             </View>
+            {autostartMode === 'disabled' && (
+              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+            )}
           </Pressable>
 
           {/* При зарядке */}
           <Pressable
-            style={[
-              styles.modeOption,
-              autostartMode === 'onCharge' && styles.modeOptionActive,
-            ]}
+            style={[styles.modeOption, autostartMode === 'onCharge' && styles.modeOptionActive]}
             onPress={() => saveSettings('onCharge')}
           >
-            <View style={styles.modeHeader}>
-              <Ionicons
-                name="flash"
-                size={32}
-                color={autostartMode === 'onCharge' ? '#3b82f6' : '#64748b'}
-              />
-              <View style={styles.modeInfo}>
-                <Text
-                  style={[
-                    styles.modeTitle,
-                    autostartMode === 'onCharge' && styles.modeTitleActive,
-                  ]}
-                >
-                  При зарядке
-                </Text>
-                <Text style={styles.modeDescription}>
-                  {getModeDescription('onCharge')}
-                </Text>
-              </View>
-              {autostartMode === 'onCharge' && (
-                <Ionicons name="checkmark-circle" size={24} color="#3b82f6" />
-              )}
+            <Ionicons
+              name="flash"
+              size={32}
+              color={autostartMode === 'onCharge' ? '#00d4ff' : '#8b94a8'}
+            />
+            <View style={styles.modeInfo}>
+              <Text
+                style={[
+                  styles.modeTitle,
+                  autostartMode === 'onCharge' && styles.modeTitleActive,
+                ]}
+              >
+                При зарядке
+              </Text>
+              <Text style={styles.modeDescription}>{getModeDescription('onCharge')}</Text>
             </View>
-
-            <View style={styles.recommendedBadge}>
-              <Ionicons name="star" size={14} color="#fbbf24" />
-              <Text style={styles.recommendedText}>Рекомендуется</Text>
-            </View>
+            {autostartMode === 'onCharge' && (
+              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+            )}
           </Pressable>
 
-          {/* При запуске */}
+          {/* С навигацией */}
           <Pressable
             style={[
               styles.modeOption,
-              autostartMode === 'onOpen' && styles.modeOptionActive,
+              autostartMode === 'withNavigation' && styles.modeOptionActive,
             ]}
-            onPress={() => saveSettings('onOpen')}
+            onPress={() => saveSettings('withNavigation')}
           >
-            <View style={styles.modeHeader}>
-              <Ionicons
-                name="play-circle"
-                size={32}
-                color={autostartMode === 'onOpen' ? '#3b82f6' : '#64748b'}
-              />
-              <View style={styles.modeInfo}>
-                <Text
+            <Ionicons
+              name="navigate"
+              size={32}
+              color={autostartMode === 'withNavigation' ? '#00d4ff' : '#8b94a8'}
+            />
+            <View style={styles.modeInfo}>
+              <Text
+                style={[
+                  styles.modeTitle,
+                  autostartMode === 'withNavigation' && styles.modeTitleActive,
+                ]}
+              >
+                С навигацией
+              </Text>
+              <Text style={styles.modeDescription}>{getModeDescription('withNavigation')}</Text>
+            </View>
+            {autostartMode === 'withNavigation' && (
+              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+            )}
+          </Pressable>
+
+          {/* Выбор навигационных приложений */}
+          {autostartMode === 'withNavigation' && (
+            <View style={styles.subSettings}>
+              <Text style={styles.subSettingsTitle}>Выберите приложения:</Text>
+              {NAVIGATION_APPS.map((app) => (
+                <Pressable
+                  key={app.id}
                   style={[
-                    styles.modeTitle,
-                    autostartMode === 'onOpen' && styles.modeTitleActive,
+                    styles.appOption,
+                    selectedNavApps.includes(app.id) && styles.appOptionActive,
                   ]}
+                  onPress={() => toggleNavigationApp(app.id)}
                 >
-                  При запуске
-                </Text>
-                <Text style={styles.modeDescription}>
-                  {getModeDescription('onOpen')}
-                </Text>
-              </View>
-              {autostartMode === 'onOpen' && (
-                <Ionicons name="checkmark-circle" size={24} color="#3b82f6" />
+                  <Text style={styles.appIcon}>{app.icon}</Text>
+                  <Text style={styles.appName}>{app.name}</Text>
+                  {selectedNavApps.includes(app.id) && (
+                    <Ionicons name="checkmark-circle" size={20} color="#00ff88" />
+                  )}
+                </Pressable>
+              ))}
+              {selectedNavApps.length === 0 && (
+                <Text style={styles.warningText}>⚠️ Выберите хотя бы одно приложение</Text>
               )}
             </View>
+          )}
+
+          {/* При Bluetooth */}
+          <Pressable
+            style={[
+              styles.modeOption,
+              autostartMode === 'onBluetooth' && styles.modeOptionActive,
+            ]}
+            onPress={() => saveSettings('onBluetooth')}
+          >
+            <Ionicons
+              name="bluetooth"
+              size={32}
+              color={autostartMode === 'onBluetooth' ? '#00d4ff' : '#8b94a8'}
+            />
+            <View style={styles.modeInfo}>
+              <Text
+                style={[
+                  styles.modeTitle,
+                  autostartMode === 'onBluetooth' && styles.modeTitleActive,
+                ]}
+              >
+                Bluetooth устройство
+              </Text>
+              <Text style={styles.modeDescription}>{getModeDescription('onBluetooth')}</Text>
+            </View>
+            {autostartMode === 'onBluetooth' && (
+              <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+            )}
           </Pressable>
+
+          {/* Выбор Bluetooth устройства */}
+          {autostartMode === 'onBluetooth' && (
+            <View style={styles.subSettings}>
+              <Text style={styles.subSettingsTitle}>Устройство:</Text>
+              {selectedBluetoothDevice ? (
+                <View style={styles.deviceCard}>
+                  <Ionicons name="bluetooth" size={24} color="#00d4ff" />
+                  <Text style={styles.deviceName}>{selectedBluetoothDevice.name}</Text>
+                  <Pressable onPress={clearBluetoothDevice} style={styles.removeButton}>
+                    <Ionicons name="close-circle" size={24} color="#ff3b30" />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable style={styles.addDeviceButton} onPress={scanBluetoothDevices}>
+                  <Ionicons name="add-circle" size={24} color="#00d4ff" />
+                  <Text style={styles.addDeviceText}>Добавить устройство</Text>
+                </Pressable>
+              )}
+              {!selectedBluetoothDevice && (
+                <Text style={styles.warningText}>⚠️ Добавьте Bluetooth устройство</Text>
+              )}
+            </View>
+          )}
         </View>
 
-        {/* Дополнительная информация */}
+        {/* Советы */}
         <View style={styles.tipsSection}>
           <Text style={styles.tipsTitle}>💡 Советы</Text>
           
           <View style={styles.tipItem}>
             <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
             <Text style={styles.tipText}>
-              Режим "При зарядке" идеален для использования в автомобиле
+              Режим "С навигацией" идеален для постоянного использования - мониторинг запустится только когда вы начнете навигацию
             </Text>
           </View>
 
           <View style={styles.tipItem}>
             <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
             <Text style={styles.tipText}>
-              Мониторинг автоматически остановится при выключении зарядки (в режиме "При зарядке")
+              Режим "Bluetooth" удобен если ваш телефон автоматически подключается к аудиосистеме автомобиля
             </Text>
           </View>
 
@@ -345,7 +406,7 @@ export default function AutostartSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0f0f23',
   },
   header: {
     flexDirection: 'row',
@@ -353,9 +414,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#1e293b',
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    backgroundColor: '#1a1a3e',
+    borderBottomWidth: 2,
+    borderBottomColor: '#2d2d5f',
   },
   backButton: {
     padding: 8,
@@ -363,7 +424,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#00d4ff',
   },
   placeholder: {
     width: 40,
@@ -372,10 +433,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
   },
   loadingText: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: '#8b94a8',
   },
   content: {
     flex: 1,
@@ -384,41 +446,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     margin: 16,
     padding: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#1a1a3e',
     borderRadius: 12,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#2d2d5f',
   },
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#c7cad9',
     lineHeight: 20,
   },
   section: {
     padding: 16,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#e2e8f0',
+    color: '#00d4ff',
     marginBottom: 16,
   },
   modeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#1a1a3e',
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#334155',
+    borderColor: '#2d2d5f',
+    gap: 12,
   },
   modeOptionActive: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#1e40af',
-  },
-  modeHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    borderColor: '#00d4ff',
+    backgroundColor: '#1e2547',
   },
   modeInfo: {
     flex: 1,
@@ -426,43 +488,110 @@ const styles = StyleSheet.create({
   modeTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#e2e8f0',
+    color: '#c7cad9',
     marginBottom: 4,
   },
   modeTitleActive: {
-    color: '#fff',
+    color: '#00d4ff',
   },
   modeDescription: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#8b94a8',
     lineHeight: 20,
   },
-  recommendedBadge: {
+  subSettings: {
+    marginLeft: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#0f0f23',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2d2d5f',
+  },
+  subSettingsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#c7cad9',
+    marginBottom: 12,
+  },
+  appOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    padding: 12,
+    backgroundColor: '#1a1a3e',
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#2d2d5f',
+    gap: 12,
   },
-  recommendedText: {
-    fontSize: 12,
+  appOptionActive: {
+    borderColor: '#00ff88',
+    backgroundColor: '#1e3a2f',
+  },
+  appIcon: {
+    fontSize: 24,
+  },
+  appName: {
+    flex: 1,
+    fontSize: 16,
+    color: '#c7cad9',
+  },
+  deviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a3e',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00d4ff',
+    gap: 12,
+  },
+  deviceName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#00d4ff',
+  },
+  removeButton: {
+    padding: 4,
+  },
+  addDeviceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a3e',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#2d2d5f',
+    gap: 12,
+  },
+  addDeviceText: {
+    fontSize: 16,
+    color: '#00d4ff',
     fontWeight: '600',
-    color: '#fbbf24',
+  },
+  warningText: {
+    fontSize: 13,
+    color: '#ff9500',
+    marginTop: 8,
+    fontWeight: '600',
   },
   tipsSection: {
     margin: 16,
     padding: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#1a1a3e',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2d2d5f',
   },
   tipsTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#e2e8f0',
+    color: '#c7cad9',
     marginBottom: 12,
   },
   tipItem: {
@@ -474,7 +603,7 @@ const styles = StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#8b94a8',
     lineHeight: 20,
   },
   bottomSpacer: {
