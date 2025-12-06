@@ -65,10 +65,12 @@ const POPULAR_APPS: TriggerApp[] = [
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
-  const [selectedNavApps, setSelectedNavApps] = useState<string[]>([]);
+  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [customApps, setCustomApps] = useState<TriggerApp[]>([]); // Пользовательские приложения
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanningBluetooth, setScanningBluetooth] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Навигация');
 
   useEffect(() => {
     loadSettings();
