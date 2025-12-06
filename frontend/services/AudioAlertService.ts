@@ -19,7 +19,7 @@ export interface AudioSettings {
   volume: number; // 0.0 - 1.0
   minConfirmations: number; // 1, 2, 3
   language: 'ru' | 'en';
-  soundTheme: 'motion-tracker' | 'beep' | 'voice-only'; // Звуковая схема
+  soundTheme: 'motion-tracker' | 'radar-detector' | 'voice-only'; // Звуковая схема
 }
 
 export interface AlertHistory {
