@@ -386,6 +386,9 @@ export default function HomeScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>GoodRoad v2.0</Text>
       </View>
+      
+      {/* Toast notifications */}
+      <Toast />
     </SafeAreaView>
   );
 }
