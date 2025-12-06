@@ -382,7 +382,7 @@ export default function HomeScreen() {
       </View>
       
       {/* Toast notifications */}
-      <Toast />
+      <SimpleToast />
     </SafeAreaView>
   );
 }
