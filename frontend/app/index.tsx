@@ -79,8 +79,25 @@ export default function HomeScreen() {
           'mobile-device-' + Math.random().toString(36).substr(2, 9)
         );
       }
+
+      // Загружаем настройки предупреждений
+      await loadWarningSettings();
     } catch (error) {
       console.error('Error initializing services:', error);
+    }
+  };
+
+  const loadWarningSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('warning_settings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        setWarningSize(settings.size || 'medium');
+        setWarningPosition(settings.position || 'top');
+        console.log('📐 Loaded warning settings:', settings);
+      }
+    } catch (error) {
+      console.error('Error loading warning settings:', error);
     }
   };
 
