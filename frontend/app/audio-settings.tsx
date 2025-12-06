@@ -200,6 +200,72 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* Примеры голосовых фраз */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🗣️ Примеры голосовых фраз</Text>
+          
+          <Text style={styles.examplesHint}>
+            Система произносит разные фразы в зависимости от расстояния и опасности препятствия. Нажмите для прослушивания:
+          </Text>
+
+          {/* Info - далеко */}
+          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('info')}>
+            <View style={[styles.exampleBadge, { backgroundColor: '#3b82f6' }]}>
+              <Text style={styles.exampleBadgeText}>800м+</Text>
+            </View>
+            <View style={styles.exampleContent}>
+              <Text style={styles.exampleTitle}>Информационное</Text>
+              <Text style={styles.exampleText}>
+                {settings.language === 'ru' ? '"Яма на расстоянии 800 метров"' : '"Pothole at 800 meters"'}
+              </Text>
+            </View>
+            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
+          </Pressable>
+
+          {/* Warning - средняя дистанция */}
+          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('warning')}>
+            <View style={[styles.exampleBadge, { backgroundColor: '#f59e0b' }]}>
+              <Text style={styles.exampleBadgeText}>400м</Text>
+            </View>
+            <View style={styles.exampleContent}>
+              <Text style={styles.exampleTitle}>Предупреждение</Text>
+              <Text style={styles.exampleText}>
+                {settings.language === 'ru' ? '"Впереди яма, 400 метров"' : '"Pothole ahead, 400 meters"'}
+              </Text>
+            </View>
+            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
+          </Pressable>
+
+          {/* Critical - близко */}
+          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('critical')}>
+            <View style={[styles.exampleBadge, { backgroundColor: '#ef4444' }]}>
+              <Text style={styles.exampleBadgeText}>200м</Text>
+            </View>
+            <View style={styles.exampleContent}>
+              <Text style={styles.exampleTitle}>Критическое</Text>
+              <Text style={styles.exampleText}>
+                {settings.language === 'ru' ? '"Внимание! Яма через 200 метров"' : '"Warning! Pothole in 200 meters"'}
+              </Text>
+            </View>
+            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
+          </Pressable>
+
+          {/* Emergency - очень близко */}
+          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('emergency')}>
+            <View style={[styles.exampleBadge, { backgroundColor: '#dc2626' }]}>
+              <Text style={styles.exampleBadgeText}>100м!</Text>
+            </View>
+            <View style={styles.exampleContent}>
+              <Text style={styles.exampleTitle}>Экстренное</Text>
+              <Text style={styles.exampleText}>
+                {settings.language === 'ru' ? '"ОПАСНОСТЬ! Яма через 100 метров!"' : '"DANGER! Pothole in 100 meters!"'}
+              </Text>
+              <Text style={styles.exampleNote}>Громче и быстрее</Text>
+            </View>
+            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
+          </Pressable>
+        </View>
+
         {/* Статистика эффективности */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📊 Статистика</Text>
