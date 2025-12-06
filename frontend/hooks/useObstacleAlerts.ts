@@ -72,6 +72,8 @@ export function useObstacleAlerts(
     for (const obstacle of obstacleList) {
       // Пропускаем если уже оповещали
       if (lastAlertedObstacles.current.has(obstacle.id)) {
+        // Проверяем реакцию водителя
+        checkDriverReaction(obstacle);
         continue;
       }
 
@@ -82,13 +84,46 @@ export function useObstacleAlerts(
         
         // Помечаем как оповещенное
         lastAlertedObstacles.current.add(obstacle.id);
+        
+        // Сохраняем для отслеживания реакции
+        alertedObstaclesForReaction.current.set(obstacle.id, {
+          obstacle,
+          alerted: true,
+        });
 
         // Очищаем через 60 секунд (чтобы не повторять слишком часто)
         setTimeout(() => {
           lastAlertedObstacles.current.delete(obstacle.id);
           audioAlertService.clearAlert(obstacle.id);
+          alertedObstaclesForReaction.current.delete(obstacle.id);
         }, 60000);
       }
+    }
+  };
+
+  // Проверка реакции водителя
+  const checkDriverReaction = async (obstacle: Obstacle) => {
+    const alertData = alertedObstaclesForReaction.current.get(obstacle.id);
+    if (!alertData || !alertData.alerted) return;
+
+    // Проверяем снизил ли водитель скорость
+    const speedDelta = previousSpeed.current - currentSpeed;
+    
+    if (speedDelta > 5) {
+      // Водитель отреагировал (снизил скорость более чем на 5 км/ч)
+      await obstacleService.recordDriverReaction(obstacle, 'confirmed');
+      console.log(`👍 Driver reacted to ${obstacle.type} at ${obstacle.distance}m`);
+      
+      // Удаляем из отслеживания
+      alertedObstaclesForReaction.current.delete(obstacle.id);
+    } else if (obstacle.distance < 50) {
+      // Препятствие пройдено без снижения скорости - проигнорировано
+      await obstacleService.recordDriverReaction(obstacle, 'ignored');
+      console.log(`😐 Driver ignored ${obstacle.type}`);
+      
+      // Удаляем из отслеживания
+      alertedObstaclesForReaction.current.delete(obstacle.id);
+      obstacleService.markAsPassed(obstacle.id);
     }
   };
 
