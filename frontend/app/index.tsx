@@ -39,11 +39,16 @@ export default function HomeScreen() {
   // Настройки предупреждений
   const [warningSize, setWarningSize] = useState<WarningSize>('medium');
   const [warningPosition, setWarningPosition] = useState<WarningPosition>('top');
+  
+  // Автозапуск/автоотключение
+  const [autostartMode, setAutostartMode] = useState<string>('disabled');
+  const [wasAutoStarted, setWasAutoStarted] = useState(false); // Флаг что мониторинг был запущен автоматически
 
   // Refs
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const accelerometerSubscription = useRef<any>(null);
   const rawDataCollector = useRef<RawDataCollector | null>(null);
+  const batterySubscription = useRef<any>(null);
 
   // Хук для препятствий
   const { obstacles, closestObstacle, obstaclesCount } = useObstacleAlerts(
