@@ -609,6 +609,39 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 4,
   },
+  themeCard: {
+    padding: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#334155',
+  },
+  themeCardActive: {
+    borderColor: '#00d4ff',
+    backgroundColor: '#1e2547',
+  },
+  themeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  themeInfo: {
+    flex: 1,
+  },
+  themeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#e2e8f0',
+    marginBottom: 4,
+  },
+  themeTitleActive: {
+    color: '#00d4ff',
+  },
+  themeDescription: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
   bottomSpacer: {
     height: 32,
   },
