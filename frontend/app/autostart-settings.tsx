@@ -437,16 +437,16 @@ export default function AutostartSettingsScreen() {
           <Text style={styles.tipsTitle}>💡 Советы</Text>
           
           <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Ionicons name="add-circle" size={16} color="#00d4ff" />
             <Text style={styles.tipText}>
-              Режим "С приложениями" - можете выбрать навигацию, такси или любые другие приложения
+              Добавьте любое приложение вручную - навигацию, такси, музыку или что угодно
             </Text>
           </View>
 
           <View style={styles.tipItem}>
-            <Ionicons name="add-circle" size={16} color="#00d4ff" />
+            <Ionicons name="information-circle" size={16} color="#00d4ff" />
             <Text style={styles.tipText}>
-              Не нашли свое приложение? Добавьте его вручную через кнопку "Добавить свое приложение"
+              Имя пакета можно найти в настройках устройства или в Google Play / App Store
             </Text>
           </View>
 
