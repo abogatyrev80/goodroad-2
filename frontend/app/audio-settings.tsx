@@ -43,6 +43,18 @@ export default function AudioSettingsScreen() {
     Alert.alert('Тест', 'Тестовое оповещение воспроизведено');
   };
 
+  const playExamplePhrase = async (urgency: string) => {
+    const examples = {
+      emergency: { ru: 'ОПАСНОСТЬ! Яма через 100 метров!', en: 'DANGER! Pothole in 100 meters!' },
+      critical: { ru: 'Внимание! Яма через 200 метров', en: 'Warning! Pothole in 200 meters' },
+      warning: { ru: 'Впереди яма, 400 метров', en: 'Pothole ahead, 400 meters' },
+      info: { ru: 'Яма на расстоянии 800 метров', en: 'Pothole at 800 meters' },
+    };
+
+    const message = examples[urgency as keyof typeof examples][settings.language];
+    await audioAlertService.speakDirect(message);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" />
