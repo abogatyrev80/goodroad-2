@@ -395,6 +395,18 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>АВТОЗАПУСК</Text>
         </Pressable>
 
+        {/* Ручная отметка препятствия */}
+        <Pressable
+          style={[styles.button, styles.reportButton]}
+          onPress={reportObstacle}
+          disabled={!currentLocation}
+        >
+          <Ionicons name="alert-circle" size={34} color="#ff3b30" />
+          <Text style={[styles.buttonText, styles.reportButtonText]}>
+            ОТМЕТИТЬ ПРЕПЯТСТВИЕ
+          </Text>
+        </Pressable>
+
         {/* Админ панель */}
         <Pressable
           style={styles.button}
