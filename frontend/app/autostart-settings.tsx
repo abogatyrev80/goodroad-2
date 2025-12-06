@@ -147,8 +147,10 @@ export default function AutostartSettingsScreen() {
         return 'Выключен';
       case 'onCharge':
         return 'При подключении зарядки';
-      case 'onOpen':
-        return 'При запуске приложения';
+      case 'withNavigation':
+        return 'С навигацией';
+      case 'onBluetooth':
+        return 'При подключении Bluetooth';
     }
   };
 
@@ -157,9 +159,11 @@ export default function AutostartSettingsScreen() {
       case 'disabled':
         return 'Мониторинг запускается только вручную';
       case 'onCharge':
-        return 'Мониторинг автоматически запускается когда устройство подключено к зарядке (например, в автомобиле)';
-      case 'onOpen':
-        return 'Мониторинг автоматически запускается при каждом открытии приложения';
+        return 'Мониторинг автоматически запускается когда устройство подключено к зарядке (удобно для использования в автомобиле)';
+      case 'withNavigation':
+        return 'Мониторинг запускается автоматически при запуске выбранных навигационных приложений';
+      case 'onBluetooth':
+        return 'Мониторинг запускается при подключении к выбранному Bluetooth устройству (например, автомобильная аудиосистема)';
     }
   };
 
