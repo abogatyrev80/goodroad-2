@@ -343,57 +343,46 @@ export default function AutostartSettingsScreen() {
           {autostartMode === 'withApps' && (
             <View style={styles.subSettings}>
               <View style={styles.subSettingsHeader}>
-                <Text style={styles.subSettingsTitle}>Выберите приложения:</Text>
+                <Text style={styles.subSettingsTitle}>Ваши приложения:</Text>
                 <Text style={styles.selectedCount}>
                   {selectedApps.length} выбрано
                 </Text>
               </View>
 
-              {/* Табы категорий */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
-                {[...CATEGORIES, ...(customApps.length > 0 ? ['Пользовательские'] : [])].map((category) => (
+              {/* Список добавленных приложений */}
+              {customApps.length > 0 ? (
+                customApps.map((app) => (
                   <Pressable
-                    key={category}
-                    style={[styles.categoryTab, selectedCategory === category && styles.categoryTabActive]}
-                    onPress={() => setSelectedCategory(category)}
+                    key={app.id}
+                    style={[styles.appOption, selectedApps.includes(app.id) && styles.appOptionActive]}
+                    onPress={() => toggleApp(app.id)}
                   >
-                    <Text style={[styles.categoryText, selectedCategory === category && styles.categoryTextActive]}>
-                      {category}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              {/* Список приложений */}
-              {appsByCategory.map((app) => (
-                <Pressable
-                  key={app.id}
-                  style={[styles.appOption, selectedApps.includes(app.id) && styles.appOptionActive]}
-                  onPress={() => toggleApp(app.id)}
-                >
-                  <Text style={styles.appIcon}>{app.icon}</Text>
-                  <View style={styles.appInfo}>
-                    <Text style={styles.appName}>{app.name}</Text>
-                    {app.isCustom && (
+                    <Text style={styles.appIcon}>{app.icon}</Text>
+                    <View style={styles.appInfo}>
+                      <Text style={styles.appName}>{app.name}</Text>
                       <Text style={styles.packageName}>{app.packageName}</Text>
-                    )}
-                  </View>
-                  {app.isCustom && (
+                    </View>
                     <Pressable onPress={() => removeCustomApp(app.id)} style={styles.removeAppButton}>
                       <Ionicons name="close-circle" size={20} color="#ff3b30" />
                     </Pressable>
-                  )}
-                  {selectedApps.includes(app.id) && <Ionicons name="checkmark-circle" size={20} color="#00ff88" />}
-                </Pressable>
-              ))}
+                    {selectedApps.includes(app.id) && <Ionicons name="checkmark-circle" size={20} color="#00ff88" />}
+                  </Pressable>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="apps-outline" size={48} color="#2d2d5f" />
+                  <Text style={styles.emptyText}>Нет добавленных приложений</Text>
+                  <Text style={styles.emptyHint}>Добавьте приложение для автозапуска мониторинга</Text>
+                </View>
+              )}
 
-              {/* Кнопка добавления пользовательского приложения */}
+              {/* Кнопка добавления приложения */}
               <Pressable style={styles.addAppButton} onPress={addCustomApp}>
                 <Ionicons name="add-circle" size={24} color="#00d4ff" />
-                <Text style={styles.addAppText}>Добавить свое приложение</Text>
+                <Text style={styles.addAppText}>Добавить приложение</Text>
               </Pressable>
 
-              {selectedApps.length === 0 && (
+              {customApps.length > 0 && selectedApps.length === 0 && (
                 <Text style={styles.warningText}>⚠️ Выберите хотя бы одно приложение</Text>
               )}
             </View>
