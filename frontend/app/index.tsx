@@ -226,13 +226,7 @@ export default function HomeScreen() {
       showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
     } catch (error) {
       console.error('Error starting tracking:', error);
-      Toast.show({
-        type: 'error',
-        text1: '❌ Ошибка',
-        text2: 'Не удалось запустить мониторинг',
-        visibilityTime: 3000,
-        position: 'bottom',
-      });
+      showToast('error', '❌ Ошибка', 'Не удалось запустить мониторинг', 3000);
     } finally {
       setIsLoading(false);
     }
