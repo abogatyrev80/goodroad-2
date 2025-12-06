@@ -238,9 +238,14 @@ export default function HomeScreen() {
         accelerometerSubscription.current.remove();
         accelerometerSubscription.current = null;
       }
+      if (batterySubscription.current) {
+        batterySubscription.current.remove();
+        batterySubscription.current = null;
+      }
 
       setIsTracking(false);
       setCurrentLocation(null);
+      setWasAutoStarted(false); // Сбрасываем флаг автозапуска
       Alert.alert('Мониторинг остановлен', 'Приложение больше не отслеживает дорогу');
     } catch (error) {
       console.error('Error stopping tracking:', error);
