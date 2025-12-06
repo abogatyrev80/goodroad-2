@@ -230,6 +230,29 @@ export default function AudioSettingsScreen() {
           <Pressable
             style={[
               styles.themeCard,
+              settings.soundTheme === 'radar-detector' && styles.themeCardActive,
+            ]}
+            onPress={() => handleSettingChange('soundTheme', 'radar-detector')}
+          >
+            <View style={styles.themeHeader}>
+              <Ionicons name="speedometer" size={24} color={settings.soundTheme === 'radar-detector' ? '#00d4ff' : '#8b94a8'} />
+              <View style={styles.themeInfo}>
+                <Text style={[styles.themeTitle, settings.soundTheme === 'radar-detector' && styles.themeTitleActive]}>
+                  Радар-Детектор
+                </Text>
+                <Text style={styles.themeDescription}>
+                  Звуки автомобильного радар-детектора 📡
+                </Text>
+              </View>
+              {settings.soundTheme === 'radar-detector' && (
+                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+              )}
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.themeCard,
               settings.soundTheme === 'voice-only' && styles.themeCardActive,
             ]}
             onPress={() => handleSettingChange('soundTheme', 'voice-only')}
