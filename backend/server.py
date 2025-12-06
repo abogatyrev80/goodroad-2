@@ -111,18 +111,9 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
                 logger.info(f"⏳ Retrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
             else:
-                logger.error(f"❌ Failed to connect to MongoDB after {max_retries} attempts")
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Database connection failed: {str(e)}"
-                )
-            
-            if attempt < max_retries:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-            else:
-                logger.critical(f"Failed to connect to MongoDB after {max_retries} attempts")
-                raise Exception(f"MongoDB connection failed: {str(e)}")
+                logger.critical(f"❌ Failed to connect to MongoDB after {max_retries} attempts")
+                # Don't raise HTTPException in startup - just raise regular Exception
+                raise Exception(f"MongoDB connection failed after {max_retries} attempts: {str(e)}")
 
 async def close_mongodb_connection():
     """
