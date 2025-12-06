@@ -548,7 +548,7 @@ class EventClassifier:
             stats['max_magnitude'] >= speed_bump_threshold['magnitude']):
             
             return {
-                'event_type': 'speed_bump',
+                'eventType': 'speed_bump',
                 'severity': self._calculate_severity_from_delta_z(delta_z),
                 'confidence': 0.85,
                 'magnitude': stats['max_magnitude'],
@@ -564,7 +564,7 @@ class EventClassifier:
             stats['max_magnitude'] >= pothole_threshold['magnitude']):
             
             return {
-                'event_type': 'pothole',
+                'eventType': 'pothole',
                 'severity': self._calculate_severity_from_delta_z(delta_z),
                 'confidence': 0.80,
                 'magnitude': stats['max_magnitude'],
@@ -579,7 +579,7 @@ class EventClassifier:
             stats['max_magnitude'] >= bump_threshold['magnitude']):
             
             return {
-                'event_type': 'bump',
+                'eventType': 'bump',
                 'severity': self._calculate_severity_from_delta_z(delta_z),
                 'confidence': 0.70,
                 'magnitude': stats['max_magnitude'],
@@ -594,7 +594,7 @@ class EventClassifier:
             speed >= braking_threshold['min_speed']):
             
             return {
-                'event_type': 'braking',
+                'eventType': 'braking',
                 'severity': self._calculate_severity(stats['range_y'], 0.15, 0.30),
                 'confidence': 0.75,
                 'magnitude': stats['max_magnitude'],
