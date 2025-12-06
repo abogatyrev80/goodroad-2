@@ -190,10 +190,10 @@ export default function ObstacleWarningOverlay({
 
           {/* Расстояние - большое и заметное */}
           <View style={styles.distanceContainer}>
-            <Text style={[styles.distanceNumber, { color: colors.text }]}>
+            <Text style={[styles.distanceNumber, { color: colors.text, fontSize: currentSize.distance }]}>
               {Math.round(obstacle.distance)}
             </Text>
-            <Text style={[styles.distanceUnit, { color: colors.text }]}>м</Text>
+            <Text style={[styles.distanceUnit, { color: colors.text, fontSize: currentSize.distance * 0.5 }]}>м</Text>
           </View>
 
           {/* Подтверждения */}
