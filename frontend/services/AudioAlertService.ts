@@ -270,7 +270,13 @@ class AudioAlertService {
    * Получить URI звука для уровня срочности
    */
   private getSoundUri(urgency: string): any {
+    // Если только голос - не воспроизводим звуки
+    if (this.settings.soundTheme === 'voice-only') {
+      return null;
+    }
+
     // Звуковые файлы для каждого уровня срочности
+    // Тема "motion-tracker" - звук датчика движения из фильма "Чужие"
     const soundMap: Record<string, any> = {
       info: require('../assets/sounds/info.mp3'),
       warning: require('../assets/sounds/warning.mp3'),
