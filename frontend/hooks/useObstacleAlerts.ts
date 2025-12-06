@@ -127,11 +127,18 @@ export function useObstacleAlerts(
     }
   };
 
+  // Отслеживание изменения скорости
+  useEffect(() => {
+    previousSpeed.current = currentSpeed;
+  }, [currentSpeed]);
+
   // Очистка при остановке
   useEffect(() => {
     if (!isTracking) {
       audioAlertService.clearAllAlerts();
+      obstacleService.clearPassedObstacles();
       lastAlertedObstacles.current.clear();
+      alertedObstaclesForReaction.current.clear();
       setObstacles([]);
       setClosestObstacle(null);
     }
