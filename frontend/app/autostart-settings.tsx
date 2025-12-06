@@ -59,6 +59,16 @@ export default function AutostartSettingsScreen() {
       if (saved) {
         setAutostartMode(saved as AutostartMode);
       }
+
+      const savedNavApps = await AsyncStorage.getItem('autostart_nav_apps');
+      if (savedNavApps) {
+        setSelectedNavApps(JSON.parse(savedNavApps));
+      }
+
+      const savedBtDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
+      if (savedBtDevice) {
+        setSelectedBluetoothDevice(JSON.parse(savedBtDevice));
+      }
     } catch (error) {
       console.error('Error loading autostart settings:', error);
     } finally {
