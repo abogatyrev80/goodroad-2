@@ -251,7 +251,11 @@ class EventClassifier:
         # Вычисляем агрегированные показатели
         stats = self._compute_accelerometer_stats(x_values, y_values, z_values)
         
-        # Определяем тип события на основе статистики
+        # 🆕 Анализируем паттерны (форма сигнала)
+        patterns = self._analyze_patterns(x_values, y_values, z_values)
+        stats['patterns'] = patterns  # Добавляем результаты анализа паттернов в stats
+        
+        # Определяем тип события на основе статистики + паттернов
         event = self._classify_from_stats(stats, speed)
         
         if event:
