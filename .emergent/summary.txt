@@ -1,84 +1,85 @@
 <analysis>
-The trajectory details a comprehensive effort to mature the Good Road application from a basic prototype to a robust data collection and analysis platform. The work can be divided into several key phases.
+The trajectory details an iterative and highly user-driven development process for the Good Road application. The work began by completing pending UI tasks and quickly transitioned into a cycle of implementing new features, receiving detailed user feedback, and refining them.
 
-First, the mobile admin panel () was refactored to use the correct V2 APIs, fixing data display issues.
+Key development arcs include:
+1.  **Advanced Auto-Start/Stop:** A simple auto-start feature evolved, based on user requests, into a sophisticated system triggered by custom user-defined applications or Bluetooth devices. This involved multiple rewrites of . The auto-stop logic was also added, with a user-centric refinement to warn about charger disconnection rather than stopping monitoring.
+2.  **UI/UX Refinements:** Persistent  popups were replaced with a custom-built, non-blocking toast notification system () after a third-party library caused a crash.
+3.  **Audio System Enhancement:** The audio feedback system was made more transparent and customizable. The  screen was updated to show example voice phrases and allow users to select from multiple sound themes using custom audio files they provided.
+4.  **Backend & Deployment Hardening:** A significant portion of the work involved debugging critical backend issues. This included fixing a bug that prevented obstacle clustering, and a major refactoring of  to ensure it could robustly connect to MongoDB Atlas in a production Kubernetes environment, resolving deployment failures.
+5.  **Environment Management:** A recurring issue of incorrect backend URLs in the frontend's  file was identified and fixed. The conversation concluded while debugging a new production environment issue where two separate deployments and databases were created, causing confusion.
 
-The most critical task was resolving a major flaw where the app failed to collect data in the background. This was addressed by re-architecting the data collection in  to use  for true background location and sensor processing. A subsequent bug, where background data was collected but not sent, was also fixed by adding a direct API call from the background task itself.
-
-Following this, the AI engineer diagnosed and fixed the absence of accelerometer data in the collected packets. Based on the newly acquired raw data, the ML classification model in  was tuned with data-driven thresholds to reliably distinguish between potholes and speed bumps.
-
-Finally, based on user feedback, a sophisticated event clustering system was designed and partially implemented. This involved creating a new  module and integrating it into  to group multiple reports of the same road hazard into a single, confirmed obstacle. The web admin dashboard () was also enhanced with better filtering and prepared for cluster visualization.
-
-**The user's primary language is Russian. The next agent MUST respond in Russian.**
+The user's primary language is **Russian**. The next agent **MUST** respond in Russian.
 </analysis>
 
 <product_requirements>
-The Good Road application is a mobile tool for monitoring road quality and driver safety. Its primary function is to collect sensor data to detect and report road hazards like potholes and speed bumps.
+The Good Road application is a driver safety tool designed to monitor road quality and provide real-time warnings.
 
-The architecture has evolved into a server-centric model where the mobile app acts as a high-fidelity raw data collector. The core requirements are:
-
-1.  **Synchronized Data Collection:** The app must collect synchronized packets of data, each containing a GPS coordinate and a burst of corresponding accelerometer readings for a one-second interval.
-2.  **Reliable Background Operation:** Data collection must continue reliably even when the app is in the background or the phone screen is off.
-3.  **Server-Side Intelligence:** All raw data is sent to a backend server where it is processed. An ML model analyzes the data to detect and classify road events.
-4.  **Event Clustering:** The system must aggregate multiple reports of the same physical obstacle from different users/trips into a single, more reliable cluster with a confirmation count and average severity.
-5.  **Advanced Admin Dashboard:** A web-based admin panel is required for data management, including visualizing raw data trajectories, filtering data (by date, device), and viewing the processed obstacle clusters.
+**Core Functionality:**
+1.  **Data Collection:** The mobile app collects GPS and accelerometer data from the user's phone, even in the background, to detect road hazards like potholes and speed bumps.
+2.  **Backend Processing:** Data is sent to a FastAPI backend where an ML model classifies it into discrete events. These events are then spatially clustered to create single, confirmed obstacle reports.
+3.  **Driver Warnings:** The primary user-facing feature is a sophisticated warning system in the mobile app, which includes:
+    *   A minimalist UI with large Start/Stop controls.
+    *   A floating, resizable, and movable overlay showing the distance to the next hazard.
+    *   An intelligent audio system with customizable sound themes and voice alerts that adapt to proximity and danger.
+4.  **Advanced Automation:** Monitoring can be automatically started/stopped based on triggers like connecting to a specific Bluetooth device or launching a user-specified application.
+5.  **Admin Dashboard:** A web interface allows administrators to view and filter raw sensor data, classified events, and obstacle clusters on a map.
 </product_requirements>
 
 <key_technical_concepts>
-- **Frontend:** React Native, Expo, TypeScript, , .
-- **Background Processing:**  for persistent background location updates and data sending.
-- **Backend:** Python, FastAPI, Motor (async MongoDB driver).
-- **Database:** MongoDB with 2dsphere geo-indexing.
-- **Data Analysis:** A custom ML processor () using statistical thresholds on accelerometer magnitude () to classify events.
-- **Event Aggregation:** A new spatial clustering module () to group nearby events into consolidated obstacles.
-- **Visualization:** Leaflet.js for map rendering in the web admin dashboard.
+- **Frontend:** React Native, Expo, TypeScript,  (file-based routing), , , , AsyncStorage.
+- **Backend:** Python, FastAPI, Motor (async MongoDB driver), Pydantic.
+- **Database:** MongoDB with  geospatial indexing.
+- **Deployment & Ops:** Kubernetes, Docker, Supervisor for process management.
+- **Core Concepts:** Sensor data processing, background tasks, spatial clustering, dynamic UI customization, robust environment variable management, production-readiness for database connections.
 </key_technical_concepts>
 
 <code_architecture>
-The application uses a monorepo structure with a React Native/Expo frontend and a FastAPI backend.
-
-**Directory Structure:**
+The application uses a monorepo structure with a  (Expo) and  (FastAPI).
 
 
-- ****
-    - **Importance:** The main application screen, responsible for UI, state, and orchestrating all data collection.
-    - **Summary of Changes:** This file was heavily modified to implement reliable background data collection. The logic was refactored to use  and . A critical fix was added to ensure the background task not only collects data but also directly sends it to the backend API, resolving data loss when the app was not in the foreground. Logic was also added to ensure the accelerometer starts correctly.
 
 - ****
-    - **Importance:** The core FastAPI application that defines all API endpoints, handles database interactions, and orchestrates data processing.
-    - **Summary of Changes:** This file was updated to integrate the new clustering logic. It now imports and initializes the . The  endpoint was modified to pass detected events to the clusterer after classification. A new API endpoint, , was added to serve the aggregated cluster data to the frontend.
+  - **Importance:** The heart of the backend. It defines all API endpoints, handles data ingestion, runs clustering logic, and serves the admin dashboard.
+  - **Summary of Changes:** Was significantly refactored. A critical bug in the  endpoint that prevented obstacle clustering was fixed. The database connection logic was rewritten to be resilient, handle failures gracefully, and correctly parse MongoDB Atlas connection strings, which resolved deployment failures. Health () and readiness () endpoints were improved for Kubernetes.
 
 - ****
-    - **Importance:** Contains the logic for classifying road events from raw sensor data.
-    - **Summary of Changes:** The classification thresholds (, ) were recalibrated based on analysis of real-world trip data. This significantly improved the model's ability to distinguish between speed bumps and potholes and to detect events with higher accuracy.
+  - **Importance:** The main screen of the mobile app and the central point for state management and service integration.
+  - **Summary of Changes:** Logic was added to handle advanced auto-start/stop triggers (e.g., battery state).  calls were replaced with a custom  component to fix a rendering crash and improve UX. It loads all user settings from AsyncStorage on startup.
 
 - ****
-    - **Importance:** A new module created to solve the problem of duplicate event reporting.
-    - **Summary of Changes:** This file contains the  class. Its  method finds nearby clusters within a 10-meter radius using MongoDB's geospatial queries. If a cluster is found, it's updated (incrementing ); otherwise, a new cluster is created. This prevents multiple markers for the same pothole.
+  - **Importance:** A settings screen for configuring automated monitoring.
+  - **Summary of Changes:** This file was rewritten several times based on iterative user feedback. It evolved from a simple toggle to a UI that allows users to manually add custom application package names as triggers for auto-start.
 
 - ****
-    - **Importance:** The primary web interface for data visualization and administration.
-    - **Summary of Changes:** The UI was significantly enhanced. A bug that caused filters to reset on auto-refresh was fixed. The simple data limit dropdown was replaced with advanced filters for date range, time range, and device ID. A new Кластеры (Clusters) view mode was added to the UI, and work began on the JavaScript functions to fetch and display this new data type.
+  - **Importance:** The screen for configuring all audio-related warnings.
+  - **Summary of Changes:** Was heavily enhanced to improve user trust and customizability. It now displays example voice phrases, includes buttons to test-play them, and features a UI for selecting between different sound themes (e.g., 'Sci-Fi', 'Radar Detector') which use different sets of  files.
+
+- ****
+  - **Importance:** Manages all text-to-speech and sound effect playback.
+  - **Summary of Changes:** Modified to support selectable sound themes. The  method now returns different sound files based on the  setting loaded from AsyncStorage. A  method was added to allow users to preview voice alerts from the settings screen.
+
+- ****
+  - **Importance:** A new, custom-built component for showing non-blocking notifications.
+  - **Summary of Changes:** Created from scratch to replace the  library, which was causing the app to crash due to a style prop on React.Fragment error.
+
+- ****
+  - **Importance:** Stores critical environment variables for the frontend, especially the backend URL.
+  - **Summary of Changes:** This file was a recurring source of issues. It was corrected multiple times to ensure  and  pointed to the single, correct production URL () instead of temporary preview URLs.
 
 </code_architecture>
 
 <pending_tasks>
-- **Complete Web Admin Cluster View:** Finish the JavaScript implementation in  to fetch data from  and display the clusters on the map.
-- **Mobile Client Access to Obstacles:** Implement an API endpoint and corresponding frontend logic for the mobile app to fetch and display the classified, clustered obstacles to users as warnings.
-- **Incorporate Cluster Significance:** Update the warning logic to prioritize obstacles with a higher .
+- **Resolve Deployment Confusion:** Analyze the contents of the two separate MongoDB databases to help the user decide which deployment ( or ) to keep and which to delete.
+- **Data Migration:** Based on the database analysis, potentially migrate data if the old database contains valuable history that needs to be preserved in the new one.
+- **Implement Native Triggers:** The UI for auto-start/stop based on App Launch and Bluetooth is complete, but the underlying native event listeners to detect these events are not yet implemented.
 </pending_tasks>
 
 <current_work>
-The AI engineer was in the final stages of implementing the event clustering feature, a key architectural improvement requested by the user to prevent duplicate reports of the same road hazard.
+The AI engineer was in the middle of diagnosing a critical production environment issue. The user discovered that two separate deployments (road-monitor-4 and pothole-alert-6) had been created, each linked to its own independent MongoDB Atlas database. This created significant confusion about which deployment was correct and raised concerns about data loss if one were to be deleted.
 
-The backend work is largely complete:
-1.  A new  module was created to handle the logic of grouping events by proximity.
-2.  The main  was updated to use this module within the  endpoint, ensuring that newly detected events are automatically clustered.
-3.  A new API endpoint, , was created to expose this clustered data.
-
-The current focus is on the frontend part of this feature: updating the web admin dashboard () to visualize these clusters. The engineer has already added a new Кластеры (Clusters) option to the view switcher on the dashboard. The immediate next step was to write the JavaScript functions (, ) to fetch data from the new API endpoint and render the clusters as markers on the Leaflet map, making the feature fully usable for administrators.
+The user provided the connection strings for both databases. The immediate task, prompted by the user's direct request проверь данные (check the data), was to connect to each database to inspect its contents. The goal is to determine which database contains the valuable historical monitoring data versus which one might be new or empty. This analysis is the essential first step to help the user make an informed decision about which deployment and database to preserve. The agent was just about to begin this database inspection.
 </current_work>
 
 <optional_next_step>
-Finish implementing the Clusters view in  by adding the JavaScript functions to fetch from the  endpoint and display the results on the map.
+Connect to the first MongoDB Atlas database for  and report on its collections and document counts to begin the data comparison.
 </optional_next_step>
