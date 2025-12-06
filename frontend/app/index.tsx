@@ -70,42 +70,49 @@ export default function HomeScreen() {
     checkAutostart();
   }, []);
 
-  // Отслеживание изменений состояния для автоотключения
+  // Предупреждение о разрядке батареи (параллельная функция)
   useEffect(() => {
-    if (!isTracking || !wasAutoStarted) return;
+    if (!isTracking) return;
     
-    // Автоотключение для режима "При зарядке"
-    if (autostartMode === 'onCharge') {
-      const subscription = Battery.addBatteryStateListener(({ batteryState }) => {
-        console.log('🔋 Battery state changed:', batteryState);
-        
-        // Если отключили от зарядки - останавливаем мониторинг
-        if (batteryState !== Battery.BatteryState.CHARGING) {
-          console.log('⛔ Auto-stopping monitoring - device unplugged');
-          stopTracking();
-          setWasAutoStarted(false);
-          Alert.alert(
-            'Мониторинг остановлен',
-            'Устройство отключено от зарядки. Мониторинг автоматически остановлен.'
-          );
-        }
-      });
+    // Отслеживание состояния зарядки во время активного мониторинга
+    const subscription = Battery.addBatteryStateListener(({ batteryState }) => {
+      console.log('🔋 Battery state changed:', batteryState);
       
-      batterySubscription.current = subscription;
-      
-      return () => {
-        if (batterySubscription.current) {
-          batterySubscription.current.remove();
-        }
-      };
-    }
+      // Если отключили от зарядки во время мониторинга - предупреждаем
+      if (batteryState !== Battery.BatteryState.CHARGING) {
+        console.log('⚠️ Warning - device unplugged during monitoring');
+        Alert.alert(
+          '⚠️ Зарядка отключена',
+          'Мониторинг дороги активен и расходует больше энергии. Телефон может быстро разрядиться.\n\nВы можете остановить мониторинг вручную, если это необходимо.',
+          [
+            {
+              text: 'Продолжить мониторинг',
+              style: 'cancel',
+            },
+            {
+              text: 'Остановить',
+              style: 'destructive',
+              onPress: () => {
+                stopTracking();
+              },
+            },
+          ]
+        );
+      } else {
+        // Подключили зарядку - можно показать позитивное уведомление
+        console.log('✅ Device plugged in - battery charging');
+      }
+    });
     
-    // TODO: Автоотключение для режима "С приложениями"
-    // Потребуется отслеживание закрытия приложений через нативные API
+    batterySubscription.current = subscription;
     
-    // TODO: Автоотключение для режима "Bluetooth"
-    // Потребуется отслеживание отключения Bluetooth устройств
-  }, [isTracking, wasAutoStarted, autostartMode]);
+    return () => {
+      if (batterySubscription.current) {
+        batterySubscription.current.remove();
+        batterySubscription.current = null;
+      }
+    };
+  }, [isTracking]);
 
   const checkAutostart = async () => {
     try {
