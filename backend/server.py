@@ -372,25 +372,15 @@ async def readiness_check():
         raise HTTPException(status_code=503, detail="MongoDB not connected")
     
     try:
-        # Quick ping to verify connection is still alive
-        await db.command("ping")
+        # Quick ping to verify MongoDB is still responsive
+        if client:
+            await client.admin.command('ping')
         return {
             "status": "ready",
             "service": "Good Road API",
-            "database": "connected",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Readiness check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Database check failed: {str(e)}")
-    
-    try:
-        # Quick ping to verify MongoDB is still responsive
-        await client.admin.command('ping')
-        return {
-            "status": "ready",
             "mongodb": "connected",
-            "database": db_name
+            "database": db_name,
+            "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
