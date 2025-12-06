@@ -154,16 +154,32 @@ export default function ObstacleWarningOverlay({
     <Animated.View
       style={[
         styles.overlay,
+        currentPosition,
         {
           opacity: fadeAnim,
           transform: [{ scale: pulseAnim }],
         },
       ]}
     >
-      <View style={[styles.container, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+      <View style={[
+        styles.container, 
+        { 
+          backgroundColor: colors.bg, 
+          borderColor: colors.border,
+          padding: currentSize.padding,
+        }
+      ]}>
         {/* Иконка */}
-        <View style={[styles.iconContainer, { backgroundColor: colors.icon }]}>
-          <Ionicons name={getObstacleIcon() as any} size={40} color={colors.bg} />
+        <View style={[
+          styles.iconContainer, 
+          { 
+            backgroundColor: colors.icon,
+            width: currentSize.iconBg,
+            height: currentSize.iconBg,
+            borderRadius: currentSize.iconBg / 2,
+          }
+        ]}>
+          <Ionicons name={getObstacleIcon() as any} size={currentSize.icon} color={colors.bg} />
         </View>
 
         {/* Информация */}
