@@ -586,30 +586,6 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     fontWeight: '600',
   },
-  categories: {
-    marginBottom: 16,
-  },
-  categoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    backgroundColor: '#1a1a3e',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2d2d5f',
-  },
-  categoryTabActive: {
-    backgroundColor: '#00d4ff',
-    borderColor: '#00d4ff',
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#8b94a8',
-    fontWeight: '600',
-  },
-  categoryTextActive: {
-    color: '#0f0f23',
-  },
   appOption: {
     flexDirection: 'row',
     alignItems: 'center',
