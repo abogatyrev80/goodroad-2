@@ -37,34 +37,7 @@ interface BluetoothDevice {
   address?: string;
 }
 
-// Популярные приложения по категориям
-const POPULAR_APPS: TriggerApp[] = [
-  // Навигация
-  { id: 'google-maps', name: 'Google Maps', packageName: 'com.google.android.apps.maps', icon: '🗺️', category: 'Навигация' },
-  { id: 'yandex-maps', name: 'Яндекс.Карты', packageName: 'ru.yandex.yandexmaps', icon: '🗺️', category: 'Навигация' },
-  { id: 'yandex-navi', name: 'Яндекс.Навигатор', packageName: 'ru.yandex.yandexnavi', icon: '🧭', category: 'Навигация' },
-  { id: 'waze', name: 'Waze', packageName: 'com.waze', icon: '🚗', category: 'Навигация' },
-  { id: '2gis', name: '2GIS', packageName: 'ru.dublgis.dgismobile', icon: '🗺️', category: 'Навигация' },
-  { id: 'apple-maps', name: 'Apple Maps', packageName: 'com.apple.Maps', icon: '🗺️', category: 'Навигация' },
-  { id: 'here-maps', name: 'HERE WeGo', packageName: 'com.here.app.maps', icon: '🗺️', category: 'Навигация' },
-  { id: 'sygic', name: 'Sygic GPS Navigation', packageName: 'com.sygic.aura', icon: '🧭', category: 'Навигация' },
-  
-  // Такси и каршеринг
-  { id: 'yandex-taxi', name: 'Яндекс Go', packageName: 'ru.yandex.taxi', icon: '🚕', category: 'Такси' },
-  { id: 'uber', name: 'Uber', packageName: 'com.ubercab', icon: '🚕', category: 'Такси' },
-  { id: 'bolt', name: 'Bolt', packageName: 'ee.mtakso.client', icon: '🚕', category: 'Такси' },
-  { id: 'citymobil', name: 'Ситимобил', packageName: 'com.citymobil', icon: '🚕', category: 'Такси' },
-  { id: 'yandex-drive', name: 'Яндекс Драйв', packageName: 'ru.yandex.drive', icon: '🚗', category: 'Каршеринг' },
-  { id: 'delimobil', name: 'Делимобиль', packageName: 'com.carsharing.delimobil', icon: '🚗', category: 'Каршеринг' },
-  
-  // Музыка (часто используется в машине)
-  { id: 'spotify', name: 'Spotify', packageName: 'com.spotify.music', icon: '🎵', category: 'Музыка' },
-  { id: 'yandex-music', name: 'Яндекс Музыка', packageName: 'ru.yandex.music', icon: '🎵', category: 'Музыка' },
-  { id: 'apple-music', name: 'Apple Music', packageName: 'com.apple.android.music', icon: '🎵', category: 'Музыка' },
-  { id: 'youtube-music', name: 'YouTube Music', packageName: 'com.google.android.apps.youtube.music', icon: '🎵', category: 'Музыка' },
-];
-
-const CATEGORIES = ['Навигация', 'Такси', 'Каршеринг', 'Музыка'];
+// Предустановленных приложений больше нет - пользователь добавляет сам
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
