@@ -377,6 +377,15 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
         </Pressable>
 
+        {/* 🆕 Динамические предупреждения */}
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push('/dynamic-audio-settings')}
+        >
+          <Ionicons name="pulse" size={34} color="#ff3b30" />
+          <Text style={styles.buttonText}>ДИНАМИЧЕСКИЕ СИГНАЛЫ</Text>
+        </Pressable>
+
         {/* Настройки предупреждений */}
         <Pressable
           style={styles.button}
