@@ -853,7 +853,13 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#c7cad9',
+    marginBottom: 12,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#5a5f73',
     marginBottom: 20,
+    lineHeight: 18,
   },
   modalButtons: {
     flexDirection: 'row',
