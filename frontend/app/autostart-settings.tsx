@@ -450,6 +450,49 @@ export default function AutostartSettingsScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Modal для добавления Bluetooth устройства */}
+      <Modal
+        visible={showDeviceModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDeviceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Добавить Bluetooth устройство</Text>
+            <Text style={styles.modalSubtitle}>
+              Введите имя вашего Bluetooth устройства{'\n'}
+              (например: "Car Audio", "Toyota Camry")
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Имя устройства"
+              placeholderTextColor="#8b94a8"
+              value={deviceName}
+              onChangeText={setDeviceName}
+              autoFocus={true}
+            />
+            
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowDeviceModal(false)}
+              >
+                <Text style={styles.modalButtonTextCancel}>Отмена</Text>
+              </Pressable>
+              
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonSave]}
+                onPress={saveBluetoothDevice}
+              >
+                <Text style={styles.modalButtonTextSave}>Добавить</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
