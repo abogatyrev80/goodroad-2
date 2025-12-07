@@ -53,6 +53,7 @@ class DynamicAudioAlertService {
     maxDistance: 600,  // Не предупреждать дальше 600м (слишком рано)
     language: 'ru',
     speedWarningEnabled: true,
+    recommendedSpeeds: { ...DEFAULT_RECOMMENDED_SPEEDS }, // 🆕 Копируем значения по умолчанию
   };
 
   private beepSound: Audio.Sound | null = null;
