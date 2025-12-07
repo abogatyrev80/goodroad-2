@@ -474,16 +474,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
+  editableSpeedRow: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  speedRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   speedType: {
     flex: 1,
     fontSize: 15,
     color: '#fff',
     marginLeft: 12,
   },
+  speedSlider: {
+    width: '100%',
+    height: 40,
+    marginVertical: 4,
+  },
   speedValue: {
     fontSize: 16,
     fontWeight: '700',
     color: '#00d4ff',
+    textAlign: 'right',
   },
   howItWorksItem: {
     backgroundColor: '#111',
