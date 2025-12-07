@@ -269,7 +269,7 @@ class DynamicAudioAlertService {
 
     const obstacleType = obstacle.type;
     const distance = obstacle.distance;
-    const recommendedSpeed = RECOMMENDED_SPEEDS[obstacleType] || 50;
+    const recommendedSpeed = this.settings.recommendedSpeeds[obstacleType] || 50;
 
     let text = '';
     
