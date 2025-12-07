@@ -1,12 +1,12 @@
 /**
  * useObstacleAlerts - Хук для управления оповещениями о препятствиях
  * 
- * Интегрирует ObstacleService и AudioAlertService
+ * Интегрирует ObstacleService и DynamicAudioAlertService
  */
 
 import { useState, useEffect, useRef } from 'react';
 import obstacleService, { Obstacle } from '../services/ObstacleService';
-import audioAlertService from '../services/AudioAlertService';
+import dynamicAudioService from '../services/DynamicAudioAlertService';
 
 export function useObstacleAlerts(
   isTracking: boolean,
