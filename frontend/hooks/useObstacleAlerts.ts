@@ -64,25 +64,23 @@ export function useObstacleAlerts(
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
 
-  // Проверка и выдача аудио-оповещений
+  // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
-    // Обновляем скорость в аудио-сервисе
-    audioAlertService.updateSpeed(currentSpeed);
+    // Получаем настройки динамической системы
+    const settings = dynamicAudioService.getSettings();
 
     for (const obstacle of obstacleList) {
-      // Пропускаем если уже оповещали
-      if (lastAlertedObstacles.current.has(obstacle.id)) {
-        // Проверяем реакцию водителя
-        checkDriverReaction(obstacle);
+      const distance = obstacle.distance;
+
+      // Проверяем пределы дистанции
+      if (distance < settings.minDistance || distance > settings.maxDistance) {
         continue;
       }
 
-      // Проверяем нужно ли оповещение
-      if (audioAlertService.shouldAlert(obstacle, currentSpeed)) {
-        // Выдаем оповещение
-        await audioAlertService.alert(obstacle, currentSpeed);
-        
-        // Помечаем как оповещенное
+      // Проверяем, это новое препятствие?
+      if (!lastAlertedObstacles.current.has(obstacle.id)) {
+        // Первый раз видим это препятствие - объявляем голосом
+        await dynamicAudioService.announceObstacle(obstacle);
         lastAlertedObstacles.current.add(obstacle.id);
         
         // Сохраняем для отслеживания реакции
@@ -91,13 +89,19 @@ export function useObstacleAlerts(
           alerted: true,
         });
 
-        // Очищаем через 60 секунд (чтобы не повторять слишком часто)
+        // Очищаем через 60 секунд
         setTimeout(() => {
           lastAlertedObstacles.current.delete(obstacle.id);
-          audioAlertService.clearAlert(obstacle.id);
+          dynamicAudioService.clearActiveObstacle();
           alertedObstaclesForReaction.current.delete(obstacle.id);
         }, 60000);
       }
+
+      // Непрерывные динамические сигналы (beep) пока препятствие рядом
+      await dynamicAudioService.alertDynamic(obstacle, currentSpeed);
+
+      // Проверяем реакцию водителя
+      checkDriverReaction(obstacle);
     }
   };
 
