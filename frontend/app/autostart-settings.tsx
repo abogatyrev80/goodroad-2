@@ -451,6 +451,62 @@ export default function AutostartSettingsScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
+      {/* Modal для добавления приложения */}
+      <Modal
+        visible={showAppModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAppModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Добавить приложение</Text>
+            <Text style={styles.modalSubtitle}>
+              Введите название приложения и имя пакета
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Название приложения"
+              placeholderTextColor="#8b94a8"
+              value={appName}
+              onChangeText={setAppName}
+              autoFocus={true}
+            />
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Имя пакета (Package Name)"
+              placeholderTextColor="#8b94a8"
+              value={packageName}
+              onChangeText={setPackageName}
+            />
+            
+            <Text style={styles.modalHint}>
+              Например:{'\n'}
+              com.google.android.apps.maps{'\n'}
+              ru.yandex.yandexnavi
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowAppModal(false)}
+              >
+                <Text style={styles.modalButtonTextCancel}>Отмена</Text>
+              </Pressable>
+              
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonSave]}
+                onPress={saveCustomApp}
+              >
+                <Text style={styles.modalButtonTextSave}>Добавить</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal для добавления Bluetooth устройства */}
       <Modal
         visible={showDeviceModal}
