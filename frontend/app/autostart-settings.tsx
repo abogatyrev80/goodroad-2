@@ -166,27 +166,25 @@ export default function AutostartSettingsScreen() {
   };
 
   const scanBluetoothDevices = () => {
-    Alert.prompt(
-      'Добавить Bluetooth устройство',
-      'Введите имя вашего Bluetooth устройства\n(например: "Car Audio", "Toyota Camry")',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Добавить',
-          onPress: async (deviceName) => {
-            if (deviceName && deviceName.trim()) {
-              const device: BluetoothDevice = {
-                id: Date.now().toString(),
-                name: deviceName.trim(),
-              };
-              setSelectedBluetoothDevice(device);
-              await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
-              Alert.alert('Успех ✅', `Устройство "${deviceName}" добавлено`);
-            }
-          },
-        },
-      ]
-    );
+    setDeviceName('');
+    setShowDeviceModal(true);
+  };
+  
+  const saveBluetoothDevice = async () => {
+    if (!deviceName.trim()) {
+      Alert.alert('Ошибка', 'Введите имя устройства');
+      return;
+    }
+    
+    const device: BluetoothDevice = {
+      id: `bt-${Date.now()}`,
+      name: deviceName.trim(),
+    };
+    
+    setSelectedBluetoothDevice(device);
+    await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
+    setShowDeviceModal(false);
+    Alert.alert('Успех ✅', `Устройство "${deviceName}" добавлено`);
   };
 
   const clearBluetoothDevice = async () => {
