@@ -107,51 +107,35 @@ export default function AutostartSettingsScreen() {
   };
 
   const addCustomApp = () => {
-    Alert.prompt(
-      'Добавить приложение',
-      'Введите название приложения:',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Далее',
-          onPress: (appName) => {
-            if (!appName || !appName.trim()) return;
-            
-            Alert.prompt(
-              'Имя пакета',
-              'Введите имя пакета (Package Name):\n\nНапример:\ncom.google.android.apps.maps\nru.yandex.yandexnavi',
-              [
-                { text: 'Отмена', style: 'cancel' },
-                {
-                  text: 'Добавить',
-                  onPress: async (packageName) => {
-                    if (!packageName || !packageName.trim()) return;
-                    
-                    const customApp: TriggerApp = {
-                      id: `custom-${Date.now()}`,
-                      name: appName.trim(),
-                      packageName: packageName.trim(),
-                      icon: '📱',
-                      category: 'Пользовательские',
-                      isCustom: true,
-                    };
-                    
-                    const newCustomApps = [...customApps, customApp];
-                    setCustomApps(newCustomApps);
-                    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
-                    
-                    // Автоматически выбираем добавленное приложение
-                    await toggleApp(customApp.id);
-                    
-                    Alert.alert('Успех ✅', `Приложение "${appName}" добавлено`);
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setAppName('');
+    setPackageName('');
+    setShowAppModal(true);
+  };
+  
+  const saveCustomApp = async () => {
+    if (!appName.trim() || !packageName.trim()) {
+      Alert.alert('Ошибка', 'Заполните все поля');
+      return;
+    }
+    
+    const customApp: TriggerApp = {
+      id: `custom-${Date.now()}`,
+      name: appName.trim(),
+      packageName: packageName.trim(),
+      icon: '📱',
+      category: 'Пользовательские',
+      isCustom: true,
+    };
+    
+    const newCustomApps = [...customApps, customApp];
+    setCustomApps(newCustomApps);
+    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
+    
+    // Автоматически выбираем добавленное приложение
+    await toggleApp(customApp.id);
+    
+    setShowAppModal(false);
+    Alert.alert('Успех ✅', `Приложение "${appName}" добавлено`);
   };
 
   const removeCustomApp = async (appId: string) => {
