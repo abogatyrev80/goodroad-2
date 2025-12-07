@@ -139,7 +139,7 @@ export function useObstacleAlerts(
   // Очистка при остановке
   useEffect(() => {
     if (!isTracking) {
-      audioAlertService.clearAllAlerts();
+      dynamicAudioService.clearActiveObstacle();
       obstacleService.clearPassedObstacles();
       lastAlertedObstacles.current.clear();
       alertedObstaclesForReaction.current.clear();
