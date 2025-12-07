@@ -220,8 +220,8 @@ class DynamicAudioAlertService {
       return;
     }
 
-    // Получаем рекомендуемую скорость
-    const recommendedSpeed = RECOMMENDED_SPEEDS[obstacleType] || 50;
+    // Получаем рекомендуемую скорость из настроек
+    const recommendedSpeed = this.settings.recommendedSpeeds[obstacleType] || 50;
     const speedDiff = currentSpeed - recommendedSpeed; // Положительно если превышаем
 
     // Предупреждение о скорости (только один раз при входе в зону)
