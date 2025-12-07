@@ -2762,6 +2762,11 @@ async def expo_qr_page_api(request: Request):
 # Include the router in the main app
 app.include_router(api_router)
 
+# Include admin editor router
+from admin_api import get_admin_editor_router
+admin_editor_router = get_admin_editor_router(db)
+app.include_router(admin_editor_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
