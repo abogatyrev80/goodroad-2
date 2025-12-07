@@ -2759,6 +2759,24 @@ async def expo_qr_page_api(request: Request):
     """Serve QR codes page via API route (for deployment)"""
     return templates.TemplateResponse("expo_qr_page.html", {"request": request})
 
+# Download endpoint for frontend archive
+@app.get("/download/good-road-frontend.tar.gz")
+async def download_frontend_archive():
+    """Download the frontend archive for local APK building"""
+    import os
+    from fastapi.responses import FileResponse
+    
+    archive_path = "/app/good-road-frontend.tar.gz"
+    
+    if not os.path.exists(archive_path):
+        raise HTTPException(status_code=404, detail="Archive not found")
+    
+    return FileResponse(
+        path=archive_path,
+        media_type="application/gzip",
+        filename="good-road-frontend.tar.gz"
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
