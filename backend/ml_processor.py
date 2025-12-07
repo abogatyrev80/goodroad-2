@@ -366,7 +366,7 @@ class EventClassifier:
         """
         🆕 ДЕТЕКТОР ПАТТЕРНА "ВОЛНА"
         Ищет плавную волну в последовательности (характерно для лежачего полицейского)
-        Паттерн: ↗ плавно вверх → ↘ плавно вниз
+        Паттерн: ↗ плавно вверх → ↘ плавно вниз ИЛИ наоборот
         
         Args:
             z_values: массив значений по оси Z
@@ -389,9 +389,14 @@ class EventClassifier:
         rising_trend = middle_avg - start_avg
         falling_trend = end_avg - middle_avg
         
-        # Волна: плавный подъем + плавный спуск
-        wave_detected = (rising_trend > threshold and falling_trend < -threshold)
-        wave_amplitude = rising_trend + abs(falling_trend)
+        # Волна в обоих направлениях:
+        # Вариант 1: вверх-вниз (↗↘)
+        # Вариант 2: вниз-вверх (↘↗)
+        wave_up_down = (rising_trend > threshold and falling_trend < -threshold)
+        wave_down_up = (rising_trend < -threshold and falling_trend > threshold)
+        
+        wave_detected = wave_up_down or wave_down_up
+        wave_amplitude = abs(rising_trend) + abs(falling_trend)
         
         return wave_detected, wave_amplitude
     
