@@ -46,6 +46,13 @@ export default function AutostartSettingsScreen() {
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Модальные окна для добавления
+  const [showAppModal, setShowAppModal] = useState(false);
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [appName, setAppName] = useState('');
+  const [packageName, setPackageName] = useState('');
+  const [deviceName, setDeviceName] = useState('');
 
   useEffect(() => {
     loadSettings();
