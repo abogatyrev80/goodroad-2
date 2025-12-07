@@ -16,8 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import DynamicAudioAlertService, { 
-  DynamicAudioSettings, 
-  RECOMMENDED_SPEEDS 
+  DynamicAudioSettings
 } from '../services/DynamicAudioAlertService';
 
 export default function DynamicAudioSettingsScreen() {
