@@ -186,44 +186,140 @@ export default function DynamicAudioSettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🚗 Рекомендуемые скорости</Text>
           <Text style={styles.sectionDescription}>
-            Система будет предупреждать если вы едете быстрее
+            Настройте безопасную скорость для каждого типа препятствия
           </Text>
 
           <View style={styles.speedTable}>
-            <View style={styles.speedRow}>
-              <Ionicons name="warning" size={20} color="#ff3b30" />
-              <Text style={styles.speedType}>Лежачий полицейский</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.speed_bump} км/ч</Text>
+            {/* Лежачий полицейский */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="warning" size={20} color="#ff3b30" />
+                <Text style={styles.speedType}>Лежачий полицейский</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={10}
+                maximumValue={60}
+                step={5}
+                value={settings.recommendedSpeeds.speed_bump}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, speed_bump: value }
+                })}
+                minimumTrackTintColor="#ff3b30"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#ff3b30"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.speed_bump} км/ч</Text>
             </View>
 
-            <View style={styles.speedRow}>
-              <Ionicons name="alert-circle" size={20} color="#ff9500" />
-              <Text style={styles.speedType}>Яма</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.pothole} км/ч</Text>
+            {/* Яма */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="alert-circle" size={20} color="#ff9500" />
+                <Text style={styles.speedType}>Яма</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={20}
+                maximumValue={80}
+                step={5}
+                value={settings.recommendedSpeeds.pothole}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, pothole: value }
+                })}
+                minimumTrackTintColor="#ff9500"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#ff9500"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.pothole} км/ч</Text>
             </View>
 
-            <View style={styles.speedRow}>
-              <Ionicons name="ellipse" size={20} color="#ffcc00" />
-              <Text style={styles.speedType}>Неровность</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.bump} км/ч</Text>
+            {/* Неровность */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="ellipse" size={20} color="#ffcc00" />
+                <Text style={styles.speedType}>Неровность</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={30}
+                maximumValue={90}
+                step={5}
+                value={settings.recommendedSpeeds.bump}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, bump: value }
+                })}
+                minimumTrackTintColor="#ffcc00"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#ffcc00"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.bump} км/ч</Text>
             </View>
 
-            <View style={styles.speedRow}>
-              <Ionicons name="hand-left" size={20} color="#34c759" />
-              <Text style={styles.speedType}>Зона торможения</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.braking} км/ч</Text>
+            {/* Зона торможения */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="hand-left" size={20} color="#34c759" />
+                <Text style={styles.speedType}>Зона торможения</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={40}
+                maximumValue={100}
+                step={5}
+                value={settings.recommendedSpeeds.braking}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, braking: value }
+                })}
+                minimumTrackTintColor="#34c759"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#34c759"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.braking} км/ч</Text>
             </View>
 
-            <View style={styles.speedRow}>
-              <Ionicons name="pulse" size={20} color="#5ac8fa" />
-              <Text style={styles.speedType}>Вибрация</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.vibration} км/ч</Text>
+            {/* Вибрация */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="pulse" size={20} color="#5ac8fa" />
+                <Text style={styles.speedType}>Вибрация</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={50}
+                maximumValue={110}
+                step={5}
+                value={settings.recommendedSpeeds.vibration}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, vibration: value }
+                })}
+                minimumTrackTintColor="#5ac8fa"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#5ac8fa"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.vibration} км/ч</Text>
             </View>
 
-            <View style={styles.speedRow}>
-              <Ionicons name="warning-outline" size={20} color="#af52de" />
-              <Text style={styles.speedType}>Авария</Text>
-              <Text style={styles.speedValue}>{RECOMMENDED_SPEEDS.accident} км/ч</Text>
+            {/* Авария */}
+            <View style={styles.editableSpeedRow}>
+              <View style={styles.speedRowHeader}>
+                <Ionicons name="warning-outline" size={20} color="#af52de" />
+                <Text style={styles.speedType}>Авария</Text>
+              </View>
+              <Slider
+                style={styles.speedSlider}
+                minimumValue={10}
+                maximumValue={60}
+                step={5}
+                value={settings.recommendedSpeeds.accident}
+                onSlidingComplete={(value) => saveSettings({
+                  recommendedSpeeds: { ...settings.recommendedSpeeds, accident: value }
+                })}
+                minimumTrackTintColor="#af52de"
+                maximumTrackTintColor="#333"
+                thumbTintColor="#af52de"
+              />
+              <Text style={styles.speedValue}>{settings.recommendedSpeeds.accident} км/ч</Text>
             </View>
           </View>
         </View>
