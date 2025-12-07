@@ -897,6 +897,19 @@ async def process_raw_data(batch: RawDataBatch):
                     "clusterId": cluster_id,  # 🆕 Добавляем ID кластера
                     "created_at": datetime.utcnow()
                 }
+                
+                # 🆕 Копируем дополнительные поля из анализа паттернов
+                if 'impact_intensity' in event:
+                    processed_event['impact_intensity'] = event['impact_intensity']
+                if 'wave_amplitude' in event:
+                    processed_event['wave_amplitude'] = event['wave_amplitude']
+                if 'vibration_frequency' in event:
+                    processed_event['vibration_frequency'] = event['vibration_frequency']
+                if 'detection_method' in event:
+                    processed_event['detection_method'] = event['detection_method']
+                if 'note' in event:
+                    processed_event['note'] = event['note']
+                
                 processed_events.append(processed_event)
                 
                 # Проверяем нужно ли предупредить пользователя
