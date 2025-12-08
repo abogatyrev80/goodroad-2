@@ -482,6 +482,10 @@
             <div class="subtitle">Новая архитектура - ML классификация</div>
         </div>
         <div class="stats">
+            <div class="view-toggle">
+                <button class="active" id="map-view-btn" onclick="toggleView('map')">🗺️ Карта</button>
+                <button id="table-view-btn" onclick="toggleView('table')">📋 Таблица</button>
+            </div>
             <div class="stat">
                 <div class="stat-value" id="raw-count">0</div>
                 <div class="stat-label">Сырых данных</div>
@@ -498,7 +502,7 @@
         </div>
     </div>
 
-    <div class="container">
+    <div class="container" id="map-container">
         <div id="map"></div>
         
         <div class="sidebar">
