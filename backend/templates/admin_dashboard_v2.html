@@ -1106,5 +1106,226 @@
             loadData();
         }, 30000);
     </script>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Редактировать</h2>
+                <button class="close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="edit-form"></form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚠️ Подтверждение удаления</h2>
+                <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p style="margin-bottom: 1.5rem; color: #94a3b8;">
+                Вы уверены, что хотите удалить этот элемент? Это действие нельзя отменить.
+            </p>
+            <div class="form-group">
+                <label>Причина удаления (необязательно)</label>
+                <textarea id="delete-reason" placeholder="Укажите причину удаления..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts Container -->
+    <div id="alerts-container"></div>
+
+    <script>
+        let deleteTargetId = null;
+        let deleteTargetType = null; // 'event' or 'cluster'
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alerts-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateX(100%)';
+                setTimeout(() => alert.remove(), 300);
+            }, 5000);
+        }
+
+        function editItem(id, type) {
+            deleteTargetType = type;
+            const item = type === 'event' 
+                ? allEvents.find(e => e.id === id)
+                : allClusters.find(c => c.clusterId === id);
+            
+            if (!item) return;
+            
+            const modal = document.getElementById('edit-modal');
+            const form = document.getElementById('edit-form');
+            const title = document.getElementById('modal-title');
+            
+            title.textContent = type === 'event' ? 'Редактировать событие' : 'Редактировать кластер';
+            
+            if (type === 'event') {
+                form.innerHTML = `
+                    <div class="form-group">
+                        <label>Тип препятствия</label>
+                        <select id="edit-type">
+                            <option value="pothole" ${item.eventType === 'pothole' ? 'selected' : ''}>Яма</option>
+                            <option value="bump" ${item.eventType === 'bump' ? 'selected' : ''}>Неровность</option>
+                            <option value="wave" ${item.eventType === 'wave' ? 'selected' : ''}>Волна</option>
+                            <option value="braking" ${item.eventType === 'braking' ? 'selected' : ''}>Торможение</option>
+                            <option value="accident" ${item.eventType === 'accident' ? 'selected' : ''}>Авария</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Серьезность (1-5)</label>
+                        <input type="number" id="edit-severity" min="1" max="5" value="${item.severity}">
+                    </div>
+                    <div class="form-group">
+                        <label>Уверенность (0-1)</label>
+                        <input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}">
+                    </div>
+                    <div class="form-group">
+                        <label>Заметки</label>
+                        <textarea id="edit-notes">${item.notes || ''}</textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEdit('${id}')">💾 Сохранить</button>
+                    </div>
+                `;
+            } else {
+                form.innerHTML = `
+                    <div class="form-group">
+                        <label>Тип препятствия</label>
+                        <select id="edit-type">
+                            <option value="pothole" ${item.obstacleType === 'pothole' ? 'selected' : ''}>Яма</option>
+                            <option value="bump" ${item.obstacleType === 'bump' ? 'selected' : ''}>Неровность</option>
+                            <option value="wave" ${item.obstacleType === 'wave' ? 'selected' : ''}>Волна</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Максимальная серьезность (1-5)</label>
+                        <input type="number" id="edit-severity-max" min="1" max="5" value="${item.severity?.max || 5}">
+                    </div>
+                    <div class="form-group">
+                        <label>Уверенность (0-1)</label>
+                        <input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}">
+                    </div>
+                    <div class="form-group">
+                        <label>Статус</label>
+                        <select id="edit-status">
+                            <option value="active" ${item.status === 'active' ? 'selected' : ''}>Активный</option>
+                            <option value="expired" ${item.status === 'expired' ? 'selected' : ''}>Истёкший</option>
+                            <option value="verified" ${item.status === 'verified' ? 'selected' : ''}>Проверенный</option>
+                            <option value="rejected" ${item.status === 'rejected' ? 'selected' : ''}>Отклонённый</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Заметки</label>
+                        <textarea id="edit-notes">${item.notes || ''}</textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEdit('${id}')">💾 Сохранить</button>
+                    </div>
+                `;
+            }
+            
+            modal.classList.add('active');
+        }
+
+        async function saveEdit(id) {
+            try {
+                const endpoint = deleteTargetType === 'event'
+                    ? `/api/admin/editor/events/${id}`
+                    : `/api/admin/editor/clusters/${id}`;
+                
+                let body;
+                if (deleteTargetType === 'event') {
+                    body = {
+                        eventType: document.getElementById('edit-type').value,
+                        severity: parseInt(document.getElementById('edit-severity').value),
+                        confidence: parseFloat(document.getElementById('edit-confidence').value),
+                        notes: document.getElementById('edit-notes').value
+                    };
+                } else {
+                    body = {
+                        obstacleType: document.getElementById('edit-type').value,
+                        severity_max: parseInt(document.getElementById('edit-severity-max').value),
+                        confidence: parseFloat(document.getElementById('edit-confidence').value),
+                        status: document.getElementById('edit-status').value,
+                        notes: document.getElementById('edit-notes').value
+                    };
+                }
+                
+                const response = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (response.ok) {
+                    showAlert('success', '✅ Изменения сохранены успешно');
+                    closeEditModal();
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    showAlert('error', 'Ошибка сохранения: ' + error.detail);
+                }
+            } catch (error) {
+                showAlert('error', 'Ошибка сохранения: ' + error.message);
+            }
+        }
+
+        function deleteItem(id, type) {
+            deleteTargetId = id;
+            deleteTargetType = type;
+            document.getElementById('delete-modal').classList.add('active');
+        }
+
+        async function confirmDelete() {
+            if (!deleteTargetId) return;
+            
+            try {
+                const reason = document.getElementById('delete-reason').value;
+                const endpoint = deleteTargetType === 'event'
+                    ? `/api/admin/editor/events/${deleteTargetId}${reason ? '?reason=' + encodeURIComponent(reason) : ''}`
+                    : `/api/admin/editor/clusters/${deleteTargetId}${reason ? '?reason=' + encodeURIComponent(reason) : ''}`;
+                
+                const response = await fetch(endpoint, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    showAlert('success', '✅ Элемент удалён успешно');
+                    closeDeleteModal();
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    showAlert('error', 'Ошибка удаления: ' + error.detail);
+                }
+            } catch (error) {
+                showAlert('error', 'Ошибка удаления: ' + error.message);
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.remove('active');
+            deleteTargetId = null;
+            document.getElementById('delete-reason').value = '';
+        }
+    </script>
 </body>
 </html>
