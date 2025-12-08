@@ -4,7 +4,7 @@
 
 1. HTTPS вариант (РЕКОМЕНДУЕТСЯ):
    Файл: /app/expo_qr_for_expo_go.png
-   URL: https://roadalert-2.preview.emergentagent.com/
+   URL: https://obstacle-tracker-1.preview.emergentagent.com/
    Использование: Работает в современных версиях Expo Go
 
 2. exp:// вариант (АЛЬТЕРНАТИВА):
@@ -23,7 +23,7 @@
 
 1. Откройте Expo Go на телефоне
 2. Нажмите 'Enter URL manually'
-3. Введите: https://roadalert-2.preview.emergentagent.com/
+3. Введите: https://obstacle-tracker-1.preview.emergentagent.com/
 
 === ПРИМЕЧАНИЕ ===
 Если QR код не работает, используйте ручной ввод URL.
