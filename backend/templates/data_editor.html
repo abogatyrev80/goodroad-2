@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор данных - Good Road Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .tab {
+            background: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 3rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 0.875rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            background: white;
+            transition: all 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 2px solid #e5e7eb;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        thead {
+            background: #f9fafb;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            font-size: 0.875rem;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            color: #6b7280;
+        }
+
+        tbody tr {
+            transition: all 0.2s;
+        }
+
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-pothole {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-bump {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-wave {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-expired {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 0.875rem;
+        }
+
+        .severity-1 { background: #fee2e2; color: #991b1b; }
+        .severity-2 { background: #fed7aa; color: #9a3412; }
+        .severity-3 { background: #fef3c7; color: #92400e; }
+        .severity-4 { background: #d1fae5; color: #065f46; }
+        .severity-5 { background: #dbeafe; color: #1e40af; }
+
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .icon-btn {
+            padding: 0.5rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-size: 1.25rem;
+        }
+
+        .icon-btn:hover {
+            background: #f3f4f6;
+        }
+
+        .icon-btn.edit:hover {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .icon-btn.delete:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+            color: #111827;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: #f3f4f6;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .loading::after {
+            content: "⏳";
+            display: block;
+            font-size: 3rem;
+            margin-top: 1rem;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            color: #6b7280;
+            font-size: 1.125rem;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 2rem;
+        }
+
+        .page-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .page-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #6ee7b7;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #fca5a5;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #93c5fd;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.875rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>📝 Редактор данных</h1>
+                <p class="subtitle">Управление событиями и кластерами препятствий</p>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div id="alerts"></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('events')">
+                🚧 События
+            </button>
+            <button class="tab" onclick="switchTab('clusters')">
+                🗺️ Кластеры
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Stats Row -->
+            <div class="stats-row" id="stats-row"></div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" placeholder="Поиск по ID, типу, устройству...">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="type-filter">
+                        <option value="">Все типы</option>
+                        <option value="pothole">Ямы</option>
+                        <option value="bump">Неровности</option>
+                        <option value="wave">Волны</option>
+                    </select>
+                    
+                    <select id="severity-filter">
+                        <option value="">Все уровни</option>
+                        <option value="1">Критический (1)</option>
+                        <option value="2">Высокий (2)</option>
+                        <option value="3">Средний (3)</option>
+                        <option value="4">Низкий (4)</option>
+                        <option value="5">Минимальный (5)</option>
+                    </select>
+                    
+                    <select id="status-filter" style="display: none;">
+                        <option value="">Все статусы</option>
+                        <option value="active">Активные</option>
+                        <option value="expired">Истёкшие</option>
+                        <option value="verified">Проверенные</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-danger" id="bulk-delete-btn" style="display: none;" onclick="bulkDelete()">
+                    🗑️ Удалить выбранные (<span id="selected-count">0</span>)
+                </button>
+                
+                <button class="btn btn-primary" onclick="loadData()">
+                    🔄 Обновить
+                </button>
+            </div>
+
+            <!-- Table -->
+            <div id="table-container"></div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Редактировать</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="edit-form"></form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚠️ Подтверждение удаления</h2>
+                <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p style="margin-bottom: 1.5rem; color: #6b7280;">
+                Вы уверены, что хотите удалить этот элемент? Это действие нельзя отменить.
+            </p>
+            <div class="form-group">
+                <label>Причина удаления (необязательно)</label>
+                <textarea id="delete-reason" placeholder="Укажите причину удаления..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'events';
+        let currentData = [];
+        let selectedIds = new Set();
+        let deleteTargetId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('search-input').addEventListener('input', filterTable);
+            document.getElementById('type-filter').addEventListener('change', filterTable);
+            document.getElementById('severity-filter').addEventListener('change', filterTable);
+            document.getElementById('status-filter').addEventListener('change', filterTable);
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            selectedIds.clear();
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show/hide status filter
+            document.getElementById('status-filter').style.display = tab === 'clusters' ? 'block' : 'none';
+            
+            loadData();
+        }
+
+        async function loadData() {
+            showLoading();
+            
+            try {
+                const endpoint = currentTab === 'events' 
+                    ? '/api/admin/v2/events?limit=1000'
+                    : '/api/admin/v2/clusters?limit=1000';
+                
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                
+                currentData = currentTab === 'events' ? data.events : data.clusters;
+                
+                renderStats(data);
+                renderTable(currentData);
+            } catch (error) {
+                showAlert('error', 'Ошибка загрузки данных: ' + error.message);
+            }
+        }
+
+        function renderStats(data) {
+            const container = document.getElementById('stats-row');
+            
+            if (currentTab === 'events') {
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${data.total || 0}</div>
+                        <div class="stat-label">Всего событий</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(e => e.eventType === 'pothole').length}</div>
+                        <div class="stat-label">Ямы</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(e => e.eventType === 'bump').length}</div>
+                        <div class="stat-label">Неровности</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(e => e.severity <= 2).length}</div>
+                        <div class="stat-label">Критические</div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${data.total || 0}</div>
+                        <div class="stat-label">Всего кластеров</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(c => c.status === 'active').length}</div>
+                        <div class="stat-label">Активные</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(c => c.reportCount >= 5).length}</div>
+                        <div class="stat-label">Подтверждённые (5+)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${currentData.filter(c => c.confidence >= 0.8).length}</div>
+                        <div class="stat-label">Высокая точность</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderTable(data) {
+            const container = document.getElementById('table-container');
+            
+            if (data.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-text">Нет данных для отображения</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (currentTab === 'events') {
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="checkbox" onchange="toggleSelectAll(this)"></th>
+                                <th>Тип</th>
+                                <th>Серьезность</th>
+                                <th>Уверенность</th>
+                                <th>Время</th>
+                                <th>Координаты</th>
+                                <th>Устройство</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(event => `
+                                <tr>
+                                    <td><input type="checkbox" class="checkbox" value="${event.id}" onchange="toggleSelect(this)"></td>
+                                    <td><span class="badge badge-${event.eventType}">${formatType(event.eventType)}</span></td>
+                                    <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
+                                    <td>${(event.confidence * 100).toFixed(0)}%</td>
+                                    <td>${formatDate(event.timestamp)}</td>
+                                    <td>${event.latitude?.toFixed(6)}, ${event.longitude?.toFixed(6)}</td>
+                                    <td><small>${event.deviceId?.substring(0, 20)}...</small></td>
+                                    <td>
+                                        <div class="action-btns">
+                                            <button class="icon-btn edit" onclick="editItem('${event.id}')" title="Редактировать">✏️</button>
+                                            <button class="icon-btn delete" onclick="deleteItem('${event.id}')" title="Удалить">🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" class="checkbox" onchange="toggleSelectAll(this)"></th>
+                                <th>Тип</th>
+                                <th>Серьезность</th>
+                                <th>Отчётов</th>
+                                <th>Точность</th>
+                                <th>Статус</th>
+                                <th>Координаты</th>
+                                <th>Обновлено</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(cluster => `
+                                <tr>
+                                    <td><input type="checkbox" class="checkbox" value="${cluster.clusterId}" onchange="toggleSelect(this)"></td>
+                                    <td><span class="badge badge-${cluster.obstacleType}">${formatType(cluster.obstacleType)}</span></td>
+                                    <td><span class="severity-badge severity-${cluster.severity?.max || 5}">${cluster.severity?.max || '?'}</span></td>
+                                    <td>${cluster.reportCount}</td>
+                                    <td>${(cluster.confidence * 100).toFixed(0)}%</td>
+                                    <td><span class="badge badge-${cluster.status}">${formatStatus(cluster.status)}</span></td>
+                                    <td>${cluster.location?.latitude?.toFixed(6)}, ${cluster.location?.longitude?.toFixed(6)}</td>
+                                    <td>${formatDate(cluster.lastReported)}</td>
+                                    <td>
+                                        <div class="action-btns">
+                                            <button class="icon-btn edit" onclick="editItem('${cluster.clusterId}')" title="Редактировать">✏️</button>
+                                            <button class="icon-btn delete" onclick="deleteItem('${cluster.clusterId}')" title="Удалить">🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
+        function filterTable() {
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            const typeFilter = document.getElementById('type-filter').value;
+            const severityFilter = document.getElementById('severity-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+            
+            let filtered = currentData.filter(item => {
+                // Search filter
+                const searchMatch = !searchText || 
+                    JSON.stringify(item).toLowerCase().includes(searchText);
+                
+                // Type filter
+                const typeMatch = !typeFilter || 
+                    (currentTab === 'events' ? item.eventType === typeFilter : item.obstacleType === typeFilter);
+                
+                // Severity filter
+                const severityMatch = !severityFilter || 
+                    (currentTab === 'events' 
+                        ? item.severity === parseInt(severityFilter)
+                        : item.severity?.max === parseInt(severityFilter));
+                
+                // Status filter (clusters only)
+                const statusMatch = !statusFilter || 
+                    (currentTab === 'clusters' && item.status === statusFilter);
+                
+                return searchMatch && typeMatch && severityMatch && statusMatch;
+            });
+            
+            renderTable(filtered);
+        }
+
+        function toggleSelect(checkbox) {
+            if (checkbox.checked) {
+                selectedIds.add(checkbox.value);
+            } else {
+                selectedIds.delete(checkbox.value);
+            }
+            updateBulkDeleteButton();
+        }
+
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+                if (checkbox.checked) {
+                    selectedIds.add(cb.value);
+                } else {
+                    selectedIds.delete(cb.value);
+                }
+            });
+            updateBulkDeleteButton();
+        }
+
+        function updateBulkDeleteButton() {
+            const btn = document.getElementById('bulk-delete-btn');
+            const count = document.getElementById('selected-count');
+            
+            if (selectedIds.size > 0) {
+                btn.style.display = 'inline-flex';
+                count.textContent = selectedIds.size;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        async function editItem(id) {
+            const item = currentData.find(i => 
+                currentTab === 'events' ? i.id === id : i.clusterId === id
+            );
+            
+            if (!item) return;
+            
+            const modal = document.getElementById('edit-modal');
+            const form = document.getElementById('edit-form');
+            const title = document.getElementById('modal-title');
+            
+            title.textContent = currentTab === 'events' ? 'Редактировать событие' : 'Редактировать кластер';
+            
+            if (currentTab === 'events') {
+                form.innerHTML = `
+                    <div class="form-group">
+                        <label>Тип препятствия</label>
+                        <select id="edit-type">
+                            <option value="pothole" ${item.eventType === 'pothole' ? 'selected' : ''}>Яма</option>
+                            <option value="bump" ${item.eventType === 'bump' ? 'selected' : ''}>Неровность</option>
+                            <option value="wave" ${item.eventType === 'wave' ? 'selected' : ''}>Волна</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Серьезность (1-5)</label>
+                        <input type="number" id="edit-severity" min="1" max="5" value="${item.severity}">
+                    </div>
+                    <div class="form-group">
+                        <label>Уверенность (0-1)</label>
+                        <input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}">
+                    </div>
+                    <div class="form-group">
+                        <label>Проверено</label>
+                        <select id="edit-verified">
+                            <option value="true" ${item.verified ? 'selected' : ''}>Да</option>
+                            <option value="false" ${!item.verified ? 'selected' : ''}>Нет</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Заметки</label>
+                        <textarea id="edit-notes">${item.notes || ''}</textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEdit('${id}')">💾 Сохранить</button>
+                    </div>
+                `;
+            } else {
+                form.innerHTML = `
+                    <div class="form-group">
+                        <label>Тип препятствия</label>
+                        <select id="edit-type">
+                            <option value="pothole" ${item.obstacleType === 'pothole' ? 'selected' : ''}>Яма</option>
+                            <option value="bump" ${item.obstacleType === 'bump' ? 'selected' : ''}>Неровность</option>
+                            <option value="wave" ${item.obstacleType === 'wave' ? 'selected' : ''}>Волна</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Максимальная серьезность (1-5)</label>
+                        <input type="number" id="edit-severity-max" min="1" max="5" value="${item.severity?.max || 5}">
+                    </div>
+                    <div class="form-group">
+                        <label>Уверенность (0-1)</label>
+                        <input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}">
+                    </div>
+                    <div class="form-group">
+                        <label>Статус</label>
+                        <select id="edit-status">
+                            <option value="active" ${item.status === 'active' ? 'selected' : ''}>Активный</option>
+                            <option value="expired" ${item.status === 'expired' ? 'selected' : ''}>Истёкший</option>
+                            <option value="verified" ${item.status === 'verified' ? 'selected' : ''}>Проверенный</option>
+                            <option value="rejected" ${item.status === 'rejected' ? 'selected' : ''}>Отклонённый</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Заметки</label>
+                        <textarea id="edit-notes">${item.notes || ''}</textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEdit('${id}')">💾 Сохранить</button>
+                    </div>
+                `;
+            }
+            
+            modal.classList.add('active');
+        }
+
+        async function saveEdit(id) {
+            try {
+                const endpoint = currentTab === 'events'
+                    ? `/api/admin/editor/events/${id}`
+                    : `/api/admin/editor/clusters/${id}`;
+                
+                let body;
+                if (currentTab === 'events') {
+                    body = {
+                        eventType: document.getElementById('edit-type').value,
+                        severity: parseInt(document.getElementById('edit-severity').value),
+                        confidence: parseFloat(document.getElementById('edit-confidence').value),
+                        verified: document.getElementById('edit-verified').value === 'true',
+                        notes: document.getElementById('edit-notes').value
+                    };
+                } else {
+                    body = {
+                        obstacleType: document.getElementById('edit-type').value,
+                        severity_max: parseInt(document.getElementById('edit-severity-max').value),
+                        confidence: parseFloat(document.getElementById('edit-confidence').value),
+                        status: document.getElementById('edit-status').value,
+                        notes: document.getElementById('edit-notes').value
+                    };
+                }
+                
+                const response = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (response.ok) {
+                    showAlert('success', '✅ Изменения сохранены успешно');
+                    closeModal();
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    showAlert('error', 'Ошибка сохранения: ' + error.detail);
+                }
+            } catch (error) {
+                showAlert('error', 'Ошибка сохранения: ' + error.message);
+            }
+        }
+
+        function deleteItem(id) {
+            deleteTargetId = id;
+            document.getElementById('delete-modal').classList.add('active');
+        }
+
+        async function confirmDelete() {
+            if (!deleteTargetId) return;
+            
+            try {
+                const reason = document.getElementById('delete-reason').value;
+                const endpoint = currentTab === 'events'
+                    ? `/api/admin/editor/events/${deleteTargetId}${reason ? '?reason=' + encodeURIComponent(reason) : ''}`
+                    : `/api/admin/editor/clusters/${deleteTargetId}${reason ? '?reason=' + encodeURIComponent(reason) : ''}`;
+                
+                const response = await fetch(endpoint, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    showAlert('success', '✅ Элемент удалён успешно');
+                    closeDeleteModal();
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    showAlert('error', 'Ошибка удаления: ' + error.detail);
+                }
+            } catch (error) {
+                showAlert('error', 'Ошибка удаления: ' + error.message);
+            }
+        }
+
+        async function bulkDelete() {
+            if (selectedIds.size === 0) return;
+            
+            if (!confirm(`Вы уверены, что хотите удалить ${selectedIds.size} элементов?`)) {
+                return;
+            }
+            
+            try {
+                const endpoint = currentTab === 'events'
+                    ? '/api/admin/editor/events/bulk-delete'
+                    : '/api/admin/editor/clusters/bulk-delete';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ids: Array.from(selectedIds),
+                        reason: 'Массовое удаление через редактор'
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert('success', `✅ Удалено элементов: ${result.deleted_count}`);
+                    selectedIds.clear();
+                    updateBulkDeleteButton();
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    showAlert('error', 'Ошибка массового удаления: ' + error.detail);
+                }
+            } catch (error) {
+                showAlert('error', 'Ошибка массового удаления: ' + error.message);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.remove('active');
+            deleteTargetId = null;
+            document.getElementById('delete-reason').value = '';
+        }
+
+        function showLoading() {
+            document.getElementById('table-container').innerHTML = '<div class="loading">Загрузка данных...</div>';
+        }
+
+        function showAlert(type, message) {
+            const alerts = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                <span>${message}</span>
+            `;
+            alerts.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                setTimeout(() => alert.remove(), 300);
+            }, 5000);
+        }
+
+        function formatType(type) {
+            const types = {
+                'pothole': 'Яма',
+                'bump': 'Неровность',
+                'wave': 'Волна'
+            };
+            return types[type] || type;
+        }
+
+        function formatStatus(status) {
+            const statuses = {
+                'active': 'Активный',
+                'expired': 'Истёкший',
+                'verified': 'Проверен',
+                'rejected': 'Отклонён'
+            };
+            return statuses[status] || status;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    </script>
+</body>
+</html>
