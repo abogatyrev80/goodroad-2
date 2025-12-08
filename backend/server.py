@@ -2743,6 +2743,16 @@ async def data_editor_api(request: Request):
     """Serve the data editor page through /api route"""
     return templates.TemplateResponse("data_editor.html", {"request": request})
 
+@app.get("/admin/apk-guide", response_class=HTMLResponse)
+async def apk_guide(request: Request):
+    """Serve the APK build guide page"""
+    return templates.TemplateResponse("apk_guide.html", {"request": request})
+
+@api_router.get("/admin/apk-guide", response_class=HTMLResponse)
+async def apk_guide_api(request: Request):
+    """Serve the APK build guide page through /api route"""
+    return templates.TemplateResponse("apk_guide.html", {"request": request})
+
 
 # Admin Index - Main navigation page
 @app.get("/admin", response_class=HTMLResponse)
