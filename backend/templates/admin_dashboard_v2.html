@@ -619,6 +619,10 @@
                             <div>Скорость: ${event.speed?.toFixed(1) || 0} км/ч</div>
                             <div>${timestamp}</div>
                         </div>
+                        <div class="action-btns">
+                            <button class="icon-btn edit" onclick="editItem('${event.id}', 'event')" title="Редактировать">✏️</button>
+                            <button class="icon-btn delete" onclick="deleteItem('${event.id}', 'event')" title="Удалить">🗑️</button>
+                        </div>
                     </div>
                 `;
             }).join('');
