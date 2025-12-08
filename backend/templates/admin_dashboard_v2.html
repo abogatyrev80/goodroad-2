@@ -561,6 +561,15 @@
         </div>
     </div>
 
+    <!-- Table View Container -->
+    <div class="table-container" id="table-container">
+        <div class="bulk-actions" id="bulk-actions">
+            <span style="color: #cbd5e1; font-weight: 600;">Выбрано: <span id="selected-count">0</span></span>
+            <button class="btn btn-danger" onclick="bulkDelete()">🗑️ Удалить выбранные</button>
+        </div>
+        <div id="table-content"></div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         let map;
