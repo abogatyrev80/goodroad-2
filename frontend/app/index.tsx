@@ -327,11 +327,21 @@ export default function HomeScreen() {
         batterySubscription.current.remove();
         batterySubscription.current = null;
       }
+      if (dataCollectionInterval.current) {
+        clearTimeout(dataCollectionInterval.current);
+        dataCollectionInterval.current = null;
+      }
+
+      // Очищаем буферы
+      accelerometerBuffer.current = [];
+      syncedDataBuffer.current = [];
+      currentLocationRef.current = null;
 
       setIsTracking(false);
       setCurrentLocation(null);
       setWasAutoStarted(false); // Сбрасываем флаг автозапуска
       showToast('info', '⏹️ Мониторинг остановлен', 'Приложение больше не отслеживает дорогу', 3000);
+      console.log('✅ Tracking stopped and buffers cleared');
     } catch (error) {
       console.error('Error stopping tracking:', error);
     } finally {
