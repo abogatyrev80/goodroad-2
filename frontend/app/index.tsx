@@ -226,17 +226,81 @@ export default function HomeScreen() {
         },
         (location) => {
           setCurrentLocation(location);
+          currentLocationRef.current = location; // Сохраняем в ref для использования в интервале
           setCurrentSpeed((location.coords.speed || 0) * 3.6); // м/с -> км/ч
         }
       );
       locationSubscription.current = subscription;
+      console.log('✅ GPS tracking started');
 
-      // Запускаем акселерометр
+      // Запускаем акселерометр (10 Hz)
       Accelerometer.setUpdateInterval(100);
       const accelSubscription = Accelerometer.addListener((data) => {
-        // Данные акселерометра обрабатываются в коллекторе
+        // Накапливаем данные в буфер с временной меткой
+        accelerometerBuffer.current.push({
+          x: data.x,
+          y: data.y,
+          z: data.z,
+          timestamp: Date.now()
+        });
+        
+        // Ограничиваем размер буфера (максимум 100 значений = 10 секунд при 10Hz)
+        if (accelerometerBuffer.current.length > 100) {
+          accelerometerBuffer.current.shift();
+        }
       });
       accelerometerSubscription.current = accelSubscription;
+      console.log('✅ Accelerometer started (10 Hz)');
+
+      // 🆕 Интервал для сбора и отправки синхронизированных пакетов данных
+      const collectSyncedPacket = () => {
+        if (currentLocationRef.current && rawDataCollector.current) {
+          // Берем snapshot акселерометра за последнюю секунду
+          const accelerometerSnapshot = [...accelerometerBuffer.current];
+          
+          // Очищаем буфер для следующей секунды
+          accelerometerBuffer.current = [];
+          
+          // Создаем синхронизированный пакет
+          const syncedPacket = {
+            timestamp: Date.now(),
+            gps: currentLocationRef.current,
+            accelerometerData: accelerometerSnapshot
+          };
+          
+          // Добавляем в буфер пакетов
+          syncedDataBuffer.current.push(syncedPacket);
+          
+          console.log(`📦 Пакет собран: ${accelerometerSnapshot.length} точек акселерометра, буфер: ${syncedDataBuffer.current.length}/5`);
+          
+          // Отправляем батч когда накопится 5 пакетов (= 5 секунд данных)
+          if (syncedDataBuffer.current.length >= 5) {
+            console.log(`📤 Отправка батча из ${syncedDataBuffer.current.length} пакетов`);
+            
+            // Отправляем все пакеты
+            syncedDataBuffer.current.forEach(packet => {
+              rawDataCollector.current?.addDataPoint(
+                packet.gps,
+                packet.accelerometerData,
+                packet.timestamp
+              );
+            });
+            
+            // Очищаем буфер после отправки
+            syncedDataBuffer.current = [];
+          }
+          
+          // Повторяем каждую секунду
+          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
+        } else {
+          // Если GPS еще не готов, повторяем попытку
+          console.log('⏳ Ожидание GPS сигнала...');
+          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
+        }
+      };
+      
+      // Запускаем первый цикл с задержкой
+      dataCollectionInterval.current = setTimeout(collectSyncedPacket, 2000);
 
       setIsTracking(true);
       showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
