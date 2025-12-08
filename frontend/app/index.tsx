@@ -203,6 +203,12 @@ export default function HomeScreen() {
     if (accelerometerSubscription.current) {
       accelerometerSubscription.current.remove();
     }
+    if (dataCollectionInterval.current) {
+      clearTimeout(dataCollectionInterval.current);
+    }
+    if (batterySubscription.current) {
+      batterySubscription.current.remove();
+    }
   };
 
   // Начать/остановить мониторинг
