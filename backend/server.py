@@ -2718,6 +2718,16 @@ async def admin_dashboard_v2_api(request: Request):
     """Serve the NEW admin dashboard v2 through /api route (for deployment)"""
     return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
 
+@app.get("/admin/dashboard/v3", response_class=HTMLResponse)
+async def admin_dashboard_v3(request: Request):
+    """Serve the admin dashboard v3 page with integrated editor"""
+    return templates.TemplateResponse("admin_dashboard_v3.html", {"request": request})
+
+@api_router.get("/admin/dashboard/v3", response_class=HTMLResponse)
+async def admin_dashboard_v3_api(request: Request):
+    """Serve the admin dashboard v3 page through /api route"""
+    return templates.TemplateResponse("admin_dashboard_v3.html", {"request": request})
+
 @api_router.get("/admin/settings/v2", response_class=HTMLResponse)
 async def admin_settings_v2_api(request: Request):
     """Serve the ML settings page through /api route"""
