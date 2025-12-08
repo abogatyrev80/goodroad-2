@@ -50,6 +50,16 @@ export default function HomeScreen() {
   const accelerometerSubscription = useRef<any>(null);
   const rawDataCollector = useRef<RawDataCollector | null>(null);
   const batterySubscription = useRef<any>(null);
+  const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
+  
+  // Буферы для сбора данных
+  const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
+  const syncedDataBuffer = useRef<Array<{
+    timestamp: number;
+    gps: any;
+    accelerometerData: Array<{ x: number; y: number; z: number; timestamp: number }>;
+  }>>([]);
+  const currentLocationRef = useRef<any>(null);
 
   // Хук для препятствий
   const { obstacles, closestObstacle, obstaclesCount } = useObstacleAlerts(
