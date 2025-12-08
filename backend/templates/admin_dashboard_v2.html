@@ -1002,21 +1002,26 @@
                                          cluster.reportCount === 2 ? 'severity-3' : 'severity-5';
                 
                 return `
-                    <div class="event-item" style="cursor: pointer;" 
-                         onclick="map.setView([${cluster.location.latitude}, ${cluster.location.longitude}], 16);">
-                        <div class="event-type" style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>${icon} ${cluster.obstacleType}</span>
-                            <span class="severity-badge ${confirmationClass}">
-                                ${cluster.reportCount} ${cluster.reportCount === 1 ? 'отчет' : 'отчета'}
-                            </span>
-                        </div>
-                        <div class="event-details">
-                            <div>Уверенность: ${(cluster.confidence * 100).toFixed(0)}%</div>
-                            <div>Средняя серьезность: ${cluster.severity.average.toFixed(1)}</div>
-                            <div>Устройств: ${cluster.devices.length}</div>
-                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">
-                                Последний: ${lastReportedDate}
+                    <div class="event-item">
+                        <div style="cursor: pointer;" onclick="map.setView([${cluster.location.latitude}, ${cluster.location.longitude}], 16);">
+                            <div class="event-type" style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>${icon} ${cluster.obstacleType}</span>
+                                <span class="severity-badge ${confirmationClass}">
+                                    ${cluster.reportCount} ${cluster.reportCount === 1 ? 'отчет' : 'отчета'}
+                                </span>
                             </div>
+                            <div class="event-details">
+                                <div>Уверенность: ${(cluster.confidence * 100).toFixed(0)}%</div>
+                                <div>Средняя серьезность: ${cluster.severity.average.toFixed(1)}</div>
+                                <div>Устройств: ${cluster.devices.length}</div>
+                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">
+                                    Последний: ${lastReportedDate}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="action-btns">
+                            <button class="icon-btn edit" onclick="event.stopPropagation(); editItem('${cluster.clusterId}', 'cluster')" title="Редактировать">✏️</button>
+                            <button class="icon-btn delete" onclick="event.stopPropagation(); deleteItem('${cluster.clusterId}', 'cluster')" title="Удалить">🗑️</button>
                         </div>
                     </div>
                 `;
