@@ -153,10 +153,16 @@ export default function HomeScreen() {
 
       // Инициализируем коллектор данных
       if (!rawDataCollector.current) {
+        const deviceId = 'mobile-app-' + Date.now();
+        const backendUrl = 'https://road-monitor-4.emergent.host';
         rawDataCollector.current = new RawDataCollector(
-          process.env.EXPO_PUBLIC_BACKEND_URL || 'https://road-monitor-4.emergent.host',
-          'mobile-device-' + Math.random().toString(36).substr(2, 9)
+          deviceId,
+          backendUrl,
+          (warnings) => {
+            console.log('⚠️ Received warnings from backend:', warnings);
+          }
         );
+        console.log('🔧 RawDataCollector initialized with:', { deviceId, backendUrl });
       }
 
       // Загружаем настройки предупреждений
