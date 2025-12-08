@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создание APK - Good Road Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle { color: #6b7280; font-size: 1rem; margin-top: 0.5rem; }
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .section:last-child { border-bottom: none; }
+        .section h2 {
+            color: #111827;
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .section h3 {
+            color: #374151;
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+        .section p { color: #6b7280; line-height: 1.6; margin-bottom: 1rem; }
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            position: relative;
+        }
+        .code-block code { display: block; }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .copy-btn:hover { background: #2563eb; }
+        .steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+        .steps li {
+            counter-increment: step-counter;
+            margin-bottom: 1.5rem;
+            padding-left: 3rem;
+            position: relative;
+        }
+        .steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 2rem;
+            height: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #93c5fd;
+        }
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #fcd34d;
+        }
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #6ee7b7;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .feature-card {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 2px solid #e5e7eb;
+        }
+        .feature-card h4 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        .feature-card p {
+            color: #6b7280;
+            font-size: 0.875rem;
+            margin: 0;
+        }
+        a { color: #667eea; text-decoration: none; font-weight: 600; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/api/admin" class="back-btn">← Назад к админ-панели</a>
+
+        <div class="header">
+            <h1>📦 Создание APK файлов через Expo</h1>
+            <div class="subtitle">Полное руководство по настройке и сборке APK для приложения Good Road</div>
+        </div>
+
+        <!-- Быстрый старт -->
+        <div class="content">
+            <div class="section">
+                <h2>🚀 Быстрый старт</h2>
+                <p>Для создания APK файла приложения Good Road вам понадобится:</p>
+                <ul style="margin-left: 2rem; color: #6b7280; line-height: 1.8;">
+                    <li>Аккаунт на <a href="https://expo.dev" target="_blank">expo.dev</a></li>
+                    <li>Node.js и npm установленные локально</li>
+                    <li>Исходный код приложения Good Road</li>
+                </ul>
+
+                <div class="alert alert-info">
+                    <strong>💡 Совет:</strong> Expo Build Service (EAS) предоставляет бесплатный tier для персональных проектов с ограниченным количеством сборок в месяц.
+                </div>
+            </div>
+
+            <!-- Метод 1: Облачная сборка -->
+            <div class="section">
+                <h2>☁️ Метод 1: Облачная сборка через EAS Build</h2>
+                <p><strong>Рекомендуется для большинства случаев.</strong> Expo Build Service соберет APK на своих серверах.</p>
+
+                <h3>Шаг 1: Регистрация на Expo</h3>
+                <ol class="steps">
+                    <li>Зарегистрируйтесь на <a href="https://expo.dev/signup" target="_blank">expo.dev/signup</a></li>
+                    <li>Подтвердите email адрес</li>
+                    <li>Запомните свой username и пароль для входа</li>
+                </ol>
+
+                <h3>Шаг 2: Установка EAS CLI</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Установка EAS CLI глобально
+npm install -g eas-cli
+
+# Проверка установки
+eas --version</code>
+                </div>
+
+                <h3>Шаг 3: Вход в аккаунт Expo</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Войти в аккаунт
+eas login
+
+# Ввести email и пароль когда попросит</code>
+                </div>
+
+                <h3>Шаг 4: Настройка проекта</h3>
+                <p>В корне проекта Good Road уже создан файл <code>eas.json</code> со следующей конфигурацией:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code>{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}</code>
+                </div>
+
+                <h3>Шаг 5: Сборка APK</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Перейти в папку frontend
+cd /app/frontend
+
+# Запустить сборку preview APK
+eas build --platform android --profile preview
+
+# Или production версию
+eas build --platform android --profile production</code>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>⏳ Время сборки:</strong> Обычно занимает 5-15 минут. Вы получите ссылку для скачивания APK после завершения.
+                </div>
+
+                <h3>Шаг 6: Скачивание APK</h3>
+                <p>После успешной сборки:</p>
+                <ol class="steps">
+                    <li>Expo CLI покажет ссылку на скачивание APK</li>
+                    <li>Или зайдите на <a href="https://expo.dev/accounts/[your-username]/projects/good-road-frontend/builds" target="_blank">expo.dev</a> в раздел Builds</li>
+                    <li>Скачайте APK файл на устройство Android</li>
+                    <li>Установите APK на телефон (разрешите установку из неизвестных источников)</li>
+                </ol>
+            </div>
+
+            <!-- Метод 2: Локальная сборка -->
+            <div class="section">
+                <h2>💻 Метод 2: Локальная сборка</h2>
+                <p><strong>Для продвинутых пользователей.</strong> Требует Android Studio и Android SDK.</p>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Требования:</strong>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Android Studio установлена</li>
+                        <li>Android SDK настроен</li>
+                        <li>Java Development Kit (JDK) 11+</li>
+                        <li>~10GB свободного места на диске</li>
+                    </ul>
+                </div>
+
+                <h3>Команды для локальной сборки:</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Установить зависимости
+cd /app/frontend
+npm install
+
+# Сборка локально
+eas build --platform android --profile preview --local
+
+# APK будет создан в папке проекта</code>
+                </div>
+            </div>
+
+            <!-- Конфигурация app.json -->
+            <div class="section">
+                <h2>⚙️ Конфигурация приложения (app.json)</h2>
+                <p>Основные параметры для настройки в файле <code>/app/frontend/app.json</code>:</p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>name</h4>
+                        <p>Имя приложения (Good Road)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>version</h4>
+                        <p>Версия приложения (например, 1.0.0)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>android.package</h4>
+                        <p>ID приложения (com.goodroad.app)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>android.versionCode</h4>
+                        <p>Числовая версия (увеличивать при каждой сборке)</p>
+                    </div>
+                </div>
+
+                <h3>Пример конфигурации:</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code>{
+  "expo": {
+    "name": "Good Road",
+    "slug": "good-road-frontend",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.goodroad.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    }
+  }
+}</code>
+                </div>
+            </div>
+
+            <!-- Переменные окружения -->
+            <div class="section">
+                <h2>🔐 Переменные окружения</h2>
+                <p>Для подключения к production backend убедитесь, что в файле <code>.env</code> правильно указан URL:</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code>EXPO_PUBLIC_BACKEND_URL=https://road-monitor-4.emergent.host</code>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Важно:</strong> При локальной разработке используется другой URL. Перед сборкой APK измените его на production URL.
+                </div>
+            </div>
+
+            <!-- Подписание APK -->
+            <div class="section">
+                <h2>🔑 Подписание APK</h2>
+                <p>EAS Build автоматически создаст и подпишет APK за вас. Но если нужен контроль:</p>
+
+                <h3>Создание keystore:</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Генерация нового keystore
+keytool -genkeypair -v -keystore my-release-key.keystore \
+  -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
+
+# EAS может использовать ваш keystore
+eas credentials</code>
+                </div>
+            </div>
+
+            <!-- Тестирование APK -->
+            <div class="section">
+                <h2>🧪 Тестирование APK</h2>
+                <ol class="steps">
+                    <li><strong>Скачайте APK</strong> на Android устройство</li>
+                    <li><strong>Включите установку из неизвестных источников:</strong>
+                        <br>Настройки → Безопасность → Неизвестные источники</li>
+                    <li><strong>Откройте файл APK</strong> через файловый менеджер</li>
+                    <li><strong>Установите приложение</strong></li>
+                    <li><strong>Запустите Good Road</strong> и проверьте все функции</li>
+                </ol>
+
+                <div class="alert alert-success">
+                    <strong>✅ Что проверить:</strong>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Подключение к серверу (road-monitor-4.emergent.host)</li>
+                        <li>Сбор данных с GPS и акселерометра</li>
+                        <li>Отправка данных на сервер</li>
+                        <li>Аудио оповещения о препятствиях</li>
+                        <li>Работа в фоновом режиме</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Частые проблемы -->
+            <div class="section">
+                <h2>❗ Частые проблемы и решения</h2>
+
+                <h3>1. Build failed: Invalid credentials</h3>
+                <p><strong>Решение:</strong> Выйдите и войдите заново в аккаунт Expo</p>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code>eas logout
+eas login</code>
+                </div>
+
+                <h3>2. APK не устанавливается на телефон</h3>
+                <p><strong>Решение:</strong> Разрешите установку из неизвестных источников в настройках Android</p>
+
+                <h3>3. Приложение не подключается к серверу</h3>
+                <p><strong>Решение:</strong> Проверьте переменную EXPO_PUBLIC_BACKEND_URL в .env файле</p>
+
+                <h3>4. Build занимает слишком много времени</h3>
+                <p><strong>Решение:</strong> Подождите до 20 минут. Если долго - проверьте статус на expo.dev/builds</p>
+            </div>
+
+            <!-- Полезные ссылки -->
+            <div class="section">
+                <h2>🔗 Полезные ссылки</h2>
+                <ul style="margin-left: 2rem; color: #6b7280; line-height: 2;">
+                    <li><a href="https://expo.dev" target="_blank">Expo.dev - Главная страница</a></li>
+                    <li><a href="https://docs.expo.dev/build/introduction/" target="_blank">Документация EAS Build</a></li>
+                    <li><a href="https://expo.dev/accounts/[your-username]/settings/access-tokens" target="_blank">Управление токенами доступа</a></li>
+                    <li><a href="https://docs.expo.dev/build-reference/apk/" target="_blank">Создание APK файлов</a></li>
+                    <li><a href="https://docs.expo.dev/build-reference/local-builds/" target="_blank">Локальные сборки</a></li>
+                    <li><a href="https://docs.expo.dev/app-signing/local-credentials/" target="_blank">Управление credentials</a></li>
+                </ul>
+            </div>
+
+            <!-- Команды для копирования -->
+            <div class="section">
+                <h2>📋 Быстрые команды</h2>
+                <p>Скопируйте эти команды для быстрого создания APK:</p>
+
+                <h3>Полный процесс сборки:</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># 1. Установка EAS CLI
+npm install -g eas-cli
+
+# 2. Вход в аккаунт
+eas login
+
+# 3. Переход в папку проекта
+cd /app/frontend
+
+# 4. Сборка preview APK
+eas build --platform android --profile preview
+
+# 5. Или production APK
+eas build --platform android --profile production</code>
+                </div>
+
+                <h3>Проверка статуса сборки:</h3>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">Копировать</button>
+                    <code># Список всех сборок
+eas build:list
+
+# Статус конкретной сборки
+eas build:view [BUILD_ID]</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCode(button) {
+            const codeBlock = button.parentElement;
+            const code = codeBlock.querySelector('code').textContent;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                button.textContent = '✓ Скопировано!';
+                button.style.background = '#10b981';
+                
+                setTimeout(() => {
+                    button.textContent = 'Копировать';
+                    button.style.background = '#3b82f6';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
