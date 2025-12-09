@@ -174,31 +174,39 @@ class EventClassifier:
             (event_type, severity, confidence)
         """
         
-        # Потенциальная яма (резкое изменение по Y и Z)
-        if (abs(deltaY) > self.thresholds['pothole']['deltaY'] and 
-            abs(deltaZ) > self.thresholds['pothole']['deltaZ'] and
+        # 1. ⚠️ ЯМА (самые строгие условия - высокая скорость + резкий удар)
+        if (speed >= self.thresholds['pothole']['min_speed'] and
+            abs(deltaZ) > self.thresholds['pothole']['deltaZ'] and 
+            abs(deltaY) > self.thresholds['pothole']['deltaY'] and
             magnitude > self.thresholds['pothole']['magnitude']):
-            severity = self._calculate_severity(magnitude, 12.0, 16.0)
-            return ('pothole', severity, 0.85)
+            severity = self._calculate_severity(magnitude, 1.25, 1.40)
+            return ('pothole', severity, 0.90)
         
-        # Резкое торможение (большое изменение по Y при движении)
-        if (abs(deltaY) > self.thresholds['braking']['deltaY'] and 
-            magnitude > self.thresholds['braking']['magnitude'] and
-            speed > 5):
-            severity = self._calculate_severity(magnitude, 11.0, 15.0)
+        # 2. 🚧 ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ (средняя скорость + плавное изменение)
+        if (self.thresholds['speed_bump']['min_speed'] <= speed <= self.thresholds['speed_bump']['max_speed'] and
+            abs(deltaZ) > self.thresholds['speed_bump']['deltaZ'] and
+            magnitude > self.thresholds['speed_bump']['magnitude']):
+            severity = self._calculate_severity(magnitude, 1.15, 1.30)
+            return ('speed_bump', severity, 0.85)
+        
+        # 3. 🚗 РЕЗКОЕ ТОРМОЖЕНИЕ (продольное изменение)
+        if (speed > self.thresholds['braking']['min_speed'] and
+            abs(deltaY) > self.thresholds['braking']['deltaY'] and 
+            magnitude > self.thresholds['braking']['magnitude']):
+            severity = self._calculate_severity(magnitude, 1.10, 1.25)
             return ('braking', severity, 0.80)
         
-        # Неровность/бугор (изменение по Z)
-        if (abs(deltaZ) > self.thresholds['bump']['deltaZ'] and 
-            magnitude > self.thresholds['bump']['magnitude']):
-            severity = self._calculate_severity(magnitude, 11.5, 15.0)
-            return ('bump', severity, 0.75)
-        
-        # Вибрация/плохое покрытие (высокая вариация)
+        # 4. 〰️〰️ ВИБРАЦИЯ (высокая вариация без резких скачков)
         if (variance > self.thresholds['vibration']['variance'] and 
             magnitude > self.thresholds['vibration']['magnitude']):
-            severity = self._calculate_severity(variance, 0.8, 2.0)
-            return ('vibration', severity, 0.70)
+            severity = self._calculate_severity(variance, 0.015, 0.030)
+            return ('vibration', severity, 0.75)
+        
+        # 5. 〰️ НЕРОВНОСТЬ/БУГОР (базовое отклонение - самое частое)
+        if (abs(deltaZ) > self.thresholds['bump']['deltaZ'] and 
+            magnitude > self.thresholds['bump']['magnitude']):
+            severity = self._calculate_severity(magnitude, 1.08, 1.20)
+            return ('bump', severity, 0.70)
         
         return ('normal', 5, 0.60)
     
