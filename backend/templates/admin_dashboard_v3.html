@@ -394,6 +394,25 @@
             else selectedIds.delete(cb.value);
             document.getElementById('bulk-actions').classList.toggle('active', selectedIds.size > 0);
             document.getElementById('selected-count').textContent = selectedIds.size;
+            updateMapHighlights(); // Обновляем подсветку на карте
+        }
+        
+        function selectAllFiltered(checked) {
+            // Выбираем/снимаем выбор со всех отфильтрованных элементов
+            selectedIds.clear();
+            if (checked) {
+                filteredData.forEach(item => {
+                    const id = currentMode === 'events' ? item.id : item.clusterId;
+                    selectedIds.add(id);
+                });
+            }
+            // Обновляем чекбоксы в списке
+            document.querySelectorAll('.data-item .checkbox').forEach(cb => {
+                cb.checked = checked;
+            });
+            document.getElementById('bulk-actions').classList.toggle('active', selectedIds.size > 0);
+            document.getElementById('selected-count').textContent = selectedIds.size;
+            updateMapHighlights(); // Обновляем подсветку на карте
         }
 
         function editItem(id, type) {
