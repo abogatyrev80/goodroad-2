@@ -400,6 +400,11 @@
                 map.setView(coords, 16);
             }
         }
+        
+        function updateMapHighlights() {
+            // Перерисовываем карту для обновления подсветки
+            renderData();
+        }
 
         function toggleSelect(cb) {
             if (cb.checked) selectedIds.add(cb.value);
