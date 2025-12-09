@@ -89,12 +89,13 @@
         <div class="stats">
             <div class="stat">
                 <div class="stat-value" id="event-count">0</div>
-                <div class="stat-label">Событий</div>
+                <div class="stat-label" title="Отдельные детекции от каждого устройства">Событий</div>
             </div>
             <div class="stat">
                 <div class="stat-value" id="cluster-count">0</div>
-                <div class="stat-label">Кластеров</div>
+                <div class="stat-label" title="Группировка событий по местоположению">Кластеров</div>
             </div>
+            <button class="btn btn-primary" onclick="showHelp()" title="Показать справку" style="margin-right: 0.5rem;">❓</button>
             <button class="btn btn-primary" onclick="loadData()">🔄 Обновить</button>
         </div>
     </div>
