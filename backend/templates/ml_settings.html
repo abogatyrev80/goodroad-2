@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки ML - Good Road Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .section:last-child { border-bottom: none; }
+        .section h2 { color: #111827; font-size: 1.5rem; margin-bottom: 1rem; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+        .form-group input {
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group small {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #93c5fd;
+        }
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #6ee7b7;
+        }
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #fcd34d;
+        }
+        .current-values {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+        }
+        .current-values h3 {
+            color: #374151;
+            margin-bottom: 1rem;
+        }
+        .current-values pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/api/admin" class="back-btn">← Назад к админ-панели</a>
+
+        <div class="header">
+            <h1>⚙️ Настройки ML Детектора</h1>
+            <div class="subtitle">Пороговые значения для определения типов препятствий</div>
+        </div>
+
+        <div class="content">
+            <div class="alert alert-info">
+                <strong>ℹ️ Информация:</strong> Текущие настройки оптимизированы для снижения ложных срабатываний. 
+                Пороги повышены на 08.12.2025 на основе обратной связи (улица Андрея Щелколова).
+            </div>
+
+            <div class="section">
+                <h2>📊 Текущие значения порогов</h2>
+                <div class="current-values">
+                    <h3>Обновлено: 08.12.2025</h3>
+                    <pre>
+🚧 Лежачий полицейский (speed_bump):
+  • deltaZ: 0.25 (2.5σ) - вертикальное изменение
+  • deltaY: 0.20 - продольное изменение
+  • magnitude: 1.20 - сила удара
+  • Скорость: 2.8-12.5 м/с (10-45 км/ч)
+
+⚠️ Яма в дороге (pothole):
+  • deltaZ: 0.30 (3.0σ) - ПОВЫШЕНО
+  • deltaY: 0.25 - ДОБАВЛЕНО
+  • magnitude: 1.25 - ПОВЫШЕНО
+  • Минимальная скорость: 12.5 м/с (45 км/ч)
+
+〰️ Неровность/бугор (bump):
+  • deltaZ: 0.20 (2.0σ)
+  • magnitude: 1.15
+
+🚗 Резкое торможение (braking):
+  • deltaY: 0.20 - ПОВЫШЕНО
+  • magnitude: 1.15
+  • Минимальная скорость: 5.0 м/с (18 км/ч)
+
+〰️〰️ Вибрация (vibration):
+  • variance: 0.015 - ИСПРАВЛЕНО
+  • magnitude: 1.12
+  • Минимальная длительность: 2 сек
+
+🎯 Уровни серьёзности:
+  • Критический: ΔZ > 0.35 (было 0.291)
+  • Высокий: ΔZ > 0.30 (было 0.243)
+  • Средний: ΔZ > 0.25 (было 0.194)
+  • Низкий: ΔZ > 0.20 (было 0.145)
+                    </pre>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📈 Изменения от 08.12.2025</h2>
+                <div class="alert alert-success">
+                    <strong>✅ Внесенные улучшения:</strong>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li><strong>Яма (pothole):</strong> deltaZ повышено с 0.145 до 0.30 (+107%)</li>
+                        <li><strong>Яма (pothole):</strong> magnitude повышено с 1.10 до 1.25 (+14%)</li>
+                        <li><strong>Яма (pothole):</strong> добавлена проверка deltaY (0.25)</li>
+                        <li><strong>Лежачий полицейский:</strong> deltaZ с 0.145 до 0.25 (+72%)</li>
+                        <li><strong>Лежачий полицейский:</strong> magnitude с 1.10 до 1.20 (+9%)</li>
+                        <li><strong>Неровность:</strong> deltaZ с 0.145 до 0.20 (+38%)</li>
+                        <li><strong>Торможение:</strong> deltaY с 0.15 до 0.20 (+33%)</li>
+                        <li><strong>Вибрация:</strong> исправлена ошибка в параметре (std_magnitude → variance)</li>
+                        <li><strong>Серьёзность:</strong> все уровни повышены на 30-40%</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🎯 Ожидаемые результаты</h2>
+                <div class="alert alert-warning">
+                    <strong>⚠️ Что изменится:</strong>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Значительное снижение ложных срабатываний на лежачие полицейские</li>
+                        <li>Более строгая детекция ям (требуется резкий удар + высокая скорость)</li>
+                        <li>Лучшая дифференциация между типами препятствий</li>
+                        <li>Меньше событий типа "vibration" на хорошем покрытии</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>📊 Рекомендации по тестированию:</strong>
+                    <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Проедьте по улице Андрея Щелколова</li>
+                        <li>Проверьте сколько лежачих полицейских детектируется корректно</li>
+                        <li>Убедитесь что ложные срабатывания на ямы минимизированы</li>
+                        <li>Проверьте детекцию на других улицах с реальными ямами</li>
+                        <li>Сообщите о результатах для дальнейшей калибровки</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📍 Данные для калибровки</h2>
+                <p style="color: #6b7280; margin-bottom: 1rem;">
+                    Baseline параметры основаны на анализе реальных данных с телефона в держателе (~63° от горизонтали):
+                </p>
+                <div class="current-values">
+                    <pre>
+Базовые значения:
+  • Z mean: 0.440 м/с²
+  • Z std: 0.097 м/с²
+  • Magnitude mean: 1.049 м/с²
+  • Magnitude std: 0.044 м/с²
+
+Пороги рассчитаны как кратные σ (сигма):
+  • 1.5σ = 0.145 (старые "низкие" пороги)
+  • 2.0σ = 0.194 (новые "неровность")
+  • 2.5σ = 0.243 (новые "лежачий")
+  • 3.0σ = 0.291 (новые "яма")
+  • 3.5σ = 0.340 (критическая яма)
+                    </pre>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🔧 Ручная настройка (для разработчиков)</h2>
+                <p style="color: #6b7280; margin-bottom: 1rem;">
+                    Для изменения порогов отредактируйте файл:
+                    <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">/app/backend/ml_processor.py</code>
+                </p>
+                <p style="color: #6b7280;">
+                    После изменений перезапустите backend:
+                    <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">sudo supervisorctl restart backend</code>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
