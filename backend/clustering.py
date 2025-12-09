@@ -17,7 +17,7 @@ class ObstacleClusterer:
     
     def __init__(self, db):
         self.db = db
-        self.CLUSTER_RADIUS = 15.0  # метров - радиус для объединения событий (уменьшено с 20)
+        self.CLUSTER_RADIUS = 8.0   # метров - УМЕНЬШЕНО до 8м для точной группировки (было 15, потом 20)
         self.DEFAULT_TTL_DAYS = 15  # дней - время жизни кластера
         self.MIN_CONFIDENCE = 0.80  # минимальная уверенность для нового кластера (повышено с 0.70)
         self.MIN_REPORT_COUNT = 3  # минимум отчётов для "подтверждённого" кластера
