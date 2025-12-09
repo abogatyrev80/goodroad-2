@@ -1183,6 +1183,80 @@ async def get_obstacle_clusters(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving clusters: {str(e)}")
 
+@api_router.post("/admin/recalculate-clusters")
+async def recalculate_all_clusters():
+    """
+    🔄 Удалить все кластеры и пересоздать их заново на основе событий
+    
+    Используется после изменения параметров кластеризации
+    """
+    try:
+        if not obstacle_clusterer:
+            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
+        
+        logger.info("🗑️ Удаление всех существующих кластеров...")
+        
+        # Удаляем все кластеры
+        delete_result = await db.obstacle_clusters.delete_many({})
+        deleted_count = delete_result.deleted_count
+        
+        logger.info(f"✅ Удалено кластеров: {deleted_count}")
+        
+        # Получаем все события
+        logger.info("📊 Получение всех событий...")
+        all_events = await db.processed_events.find({}).to_list(None)
+        
+        logger.info(f"📦 Найдено событий: {len(all_events)}")
+        
+        # Пересоздаём кластеры
+        logger.info("🔄 Создание кластеров с новыми параметрами...")
+        created_count = 0
+        
+        for event in all_events:
+            try:
+                # Используем функцию add_event_to_cluster
+                await obstacle_clusterer.add_event_to_cluster(
+                    event_id=str(event['_id']),
+                    event_type=event.get('eventType'),
+                    latitude=event.get('latitude'),
+                    longitude=event.get('longitude'),
+                    severity=event.get('severity', 3),
+                    confidence=event.get('confidence', 0.7),
+                    speed=event.get('speed', 0),
+                    timestamp=event.get('timestamp'),
+                    device_id=event.get('deviceId')
+                )
+                created_count += 1
+                
+                if created_count % 100 == 0:
+                    logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
+                    
+            except Exception as e:
+                logger.error(f"Ошибка обработки события {event.get('_id')}: {str(e)}")
+                continue
+        
+        # Подсчитываем итоговое количество кластеров
+        final_clusters = await db.obstacle_clusters.count_documents({})
+        
+        logger.info(f"✅ Пересоздание завершено!")
+        logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
+        logger.info(f"  Создано кластеров: {final_clusters}")
+        
+        return {
+            "success": True,
+            "deleted_clusters": deleted_count,
+            "processed_events": created_count,
+            "total_events": len(all_events),
+            "final_clusters": final_clusters,
+            "message": f"Пересоздано кластеров: {final_clusters} (было: {deleted_count})"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recalculating clusters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error recalculating clusters: {str(e)}")
+
 @api_router.get("/admin/v2/heatmap")
 async def get_heatmap_data_simple():
     """Получить данные для heatmap из processed_events (упрощенная версия)"""
