@@ -1268,6 +1268,130 @@ async def recalculate_all_clusters():
         logger.error(f"Error recalculating clusters: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error recalculating clusters: {str(e)}")
 
+@api_router.post("/admin/cleanup-old-data")
+async def cleanup_old_data(
+    days: int = 30,
+    delete_events: bool = False,
+    delete_clusters: bool = False,
+    delete_raw_data: bool = True
+):
+    """
+    🗑️ Очистить старые данные
+    
+    Args:
+        days: Удалить данные старше N дней
+        delete_events: Удалить старые события
+        delete_clusters: Удалить старые кластеры
+        delete_raw_data: Удалить старые сырые данные (по умолчанию True)
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        logger.info(f"🗑️ Очистка данных старше {cutoff_date.strftime('%Y-%m-%d')}")
+        
+        results = {
+            "cutoff_date": cutoff_date.isoformat(),
+            "days": days
+        }
+        
+        # Удаление сырых данных
+        if delete_raw_data:
+            raw_result = await db.raw_sensor_data.delete_many({
+                "created_at": {"$lt": cutoff_date}
+            })
+            results["deleted_raw_data"] = raw_result.deleted_count
+            logger.info(f"  ✅ Удалено сырых данных: {raw_result.deleted_count}")
+        
+        # Удаление событий
+        if delete_events:
+            events_result = await db.processed_events.delete_many({
+                "timestamp": {"$lt": cutoff_date}
+            })
+            results["deleted_events"] = events_result.deleted_count
+            logger.info(f"  ✅ Удалено событий: {events_result.deleted_count}")
+        
+        # Удаление кластеров
+        if delete_clusters:
+            clusters_result = await db.obstacle_clusters.delete_many({
+                "created_at": {"$lt": cutoff_date}
+            })
+            results["deleted_clusters"] = clusters_result.deleted_count
+            logger.info(f"  ✅ Удалено кластеров: {clusters_result.deleted_count}")
+        
+        # Статистика после очистки
+        remaining_raw = await db.raw_sensor_data.count_documents({})
+        remaining_events = await db.processed_events.count_documents({})
+        remaining_clusters = await db.obstacle_clusters.count_documents({})
+        
+        results["remaining"] = {
+            "raw_data": remaining_raw,
+            "events": remaining_events,
+            "clusters": remaining_clusters
+        }
+        
+        logger.info(f"✅ Очистка завершена. Осталось: raw={remaining_raw}, events={remaining_events}, clusters={remaining_clusters}")
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up old data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error cleaning up: {str(e)}")
+
+@api_router.post("/admin/delete-all-data")
+async def delete_all_data(
+    confirm: str = None,
+    delete_events: bool = False,
+    delete_clusters: bool = False,
+    delete_raw_data: bool = False
+):
+    """
+    ⚠️ Удалить ВСЕ данные (требует подтверждение)
+    
+    Args:
+        confirm: Должно быть "DELETE_ALL_DATA"
+        delete_events: Удалить все события
+        delete_clusters: Удалить все кластеры
+        delete_raw_data: Удалить все сырые данные
+    """
+    try:
+        if confirm != "DELETE_ALL_DATA":
+            raise HTTPException(
+                status_code=400,
+                detail="Требуется подтверждение: confirm='DELETE_ALL_DATA'"
+            )
+        
+        logger.warning("⚠️ УДАЛЕНИЕ ВСЕХ ДАННЫХ!")
+        
+        results = {}
+        
+        if delete_raw_data:
+            raw_result = await db.raw_sensor_data.delete_many({})
+            results["deleted_raw_data"] = raw_result.deleted_count
+            logger.warning(f"  🗑️ Удалено всех сырых данных: {raw_result.deleted_count}")
+        
+        if delete_events:
+            events_result = await db.processed_events.delete_many({})
+            results["deleted_events"] = events_result.deleted_count
+            logger.warning(f"  🗑️ Удалено всех событий: {events_result.deleted_count}")
+        
+        if delete_clusters:
+            clusters_result = await db.obstacle_clusters.delete_many({})
+            results["deleted_clusters"] = clusters_result.deleted_count
+            logger.warning(f"  🗑️ Удалено всех кластеров: {clusters_result.deleted_count}")
+        
+        return {
+            "success": True,
+            "deleted": results,
+            "message": "Данные успешно удалены"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting all data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting data: {str(e)}")
+
 @api_router.get("/admin/v2/heatmap")
 async def get_heatmap_data_simple():
     """Получить данные для heatmap из processed_events (упрощенная версия)"""
