@@ -240,7 +240,7 @@
             try {
                 const [eventsRes, clustersRes] = await Promise.all([
                     fetch('/api/admin/v2/events?limit=1000'),
-                    fetch('/api/admin/v2/clusters?limit=1000')
+                    fetch('/api/admin/v2/clusters?limit=1000&min_reports=3')  // 🆕 Показываем только подтверждённые кластеры (≥3 отчёта)
                 ]);
                 const eventsData = await eventsRes.json();
                 const clustersData = await clustersRes.json();
