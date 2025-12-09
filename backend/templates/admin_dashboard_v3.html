@@ -275,20 +275,42 @@
             const searchText = document.getElementById('search-filter').value.toLowerCase();
             const typeFilter = document.getElementById('type-filter').value;
             const severityFilter = document.getElementById('severity-filter').value;
+            const dateFromFilter = document.getElementById('date-from-filter').value;
+            const dateToFilter = document.getElementById('date-to-filter').value;
             
             const data = currentMode === 'events' ? allEvents : allClusters;
             
             filteredData = data.filter(item => {
                 const itemType = currentMode === 'events' ? item.eventType : item.obstacleType;
                 const itemSeverity = currentMode === 'events' ? item.severity : item.severity?.max;
+                const itemDate = currentMode === 'events' ? item.timestamp : item.lastReported;
                 
                 const searchMatch = !searchText || 
                     JSON.stringify(item).toLowerCase().includes(searchText);
                 const typeMatch = !typeFilter || itemType === typeFilter;
                 const severityMatch = !severityFilter || itemSeverity === parseInt(severityFilter);
                 
-                return searchMatch && typeMatch && severityMatch;
+                // Фильтр по дате
+                let dateMatch = true;
+                if (dateFromFilter || dateToFilter) {
+                    const itemDateObj = new Date(itemDate);
+                    if (dateFromFilter) {
+                        const fromDateObj = new Date(dateFromFilter);
+                        fromDateObj.setHours(0, 0, 0, 0);
+                        dateMatch = dateMatch && itemDateObj >= fromDateObj;
+                    }
+                    if (dateToFilter) {
+                        const toDateObj = new Date(dateToFilter);
+                        toDateObj.setHours(23, 59, 59, 999);
+                        dateMatch = dateMatch && itemDateObj <= toDateObj;
+                    }
+                }
+                
+                return searchMatch && typeMatch && severityMatch && dateMatch;
             });
+            
+            // Обновляем счетчик отфильтрованных
+            document.getElementById('filtered-count').textContent = filteredData.length;
             
             renderData();
         }
