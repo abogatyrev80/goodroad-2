@@ -1123,7 +1123,8 @@ async def get_processed_events(
 @api_router.get("/admin/v2/clusters")
 async def get_obstacle_clusters(
     limit: int = 1000,
-    status: str = "active"
+    status: str = "active",
+    min_reports: int = 0  # 🆕 Минимум отчётов для фильтрации
 ):
     """
     🆕 Получить кластеры препятствий
@@ -1131,6 +1132,7 @@ async def get_obstacle_clusters(
     Args:
         limit: Максимальное количество кластеров
         status: Статус кластера (active, expired, fixed)
+        min_reports: Минимальное количество отчётов (0 = все, 3 = подтверждённые)
     
     Returns:
         Список кластеров с агрегированной информацией
@@ -1146,6 +1148,10 @@ async def get_obstacle_clusters(
         query = {"status": status}
         if status == "active":
             query["expiresAt"] = {"$gt": datetime.utcnow()}
+        
+        # 🆕 Фильтр по минимальному количеству отчётов
+        if min_reports > 0:
+            query["reportCount"] = {"$gte": min_reports}
         
         clusters = await db.obstacle_clusters.find(
             query,
