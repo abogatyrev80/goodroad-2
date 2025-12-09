@@ -1202,20 +1202,30 @@ async def recalculate_all_clusters():
         
         logger.info(f"✅ Удалено кластеров: {deleted_count}")
         
-        # Получаем все события (без лимита)
+        # Получаем ВСЕ события (используем cursor для больших объёмов)
         logger.info("📊 Получение всех событий...")
-        all_events = await db.processed_events.find({}).to_list(length=None)
         
-        logger.info(f"📦 Найдено событий: {len(all_events)}")
+        # Подсчитываем сначала
+        total_events = await db.processed_events.count_documents({})
+        logger.info(f"📦 Всего событий в БД: {total_events}")
+        
+        # Получаем все события батчами
+        all_events = []
+        cursor = db.processed_events.find({})
+        async for event in cursor:
+            all_events.append(event)
+        
+        logger.info(f"📦 Получено событий для обработки: {len(all_events)}")
         
         # Пересоздаём кластеры
         logger.info("🔄 Создание кластеров с новыми параметрами...")
         created_count = 0
+        error_count = 0
         
         for event in all_events:
             try:
-                # Используем функцию add_event_to_cluster
-                await obstacle_clusterer.add_event_to_cluster(
+                # Используем функцию process_event
+                await obstacle_clusterer.process_event(
                     event_id=str(event['_id']),
                     event_type=event.get('eventType'),
                     latitude=event.get('latitude'),
@@ -1228,11 +1238,12 @@ async def recalculate_all_clusters():
                 )
                 created_count += 1
                 
-                if created_count % 100 == 0:
+                if created_count % 500 == 0:
                     logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
                     
             except Exception as e:
                 logger.error(f"Ошибка обработки события {event.get('_id')}: {str(e)}")
+                error_count += 1
                 continue
         
         # Подсчитываем итоговое количество кластеров
