@@ -469,7 +469,7 @@
 
 ## test_plan:
   current_focus:
-    - "Mobile Admin Panel V2 API Integration"
+    - "ML Classification and Clustering Logic Refactor"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
