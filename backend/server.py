@@ -2693,15 +2693,9 @@ async def cleanup_zero_coordinates():
         raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
 
 
-# Admin Dashboard Route - accessible via /api/admin/dashboard
-@api_router.api_route("/admin/dashboard", methods=["GET", "HEAD"], response_class=HTMLResponse)
-async def admin_dashboard_api(request: Request):
-    """Serve the admin dashboard web interface via API route"""
-    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
-
 # Health check is defined earlier in the file (line ~356)
 
-# Legacy route for local access
+# Admin Dashboard v3 Routes
 @app.get("/admin/dashboard/v3", response_class=HTMLResponse)
 async def admin_dashboard_v3(request: Request):
     """Serve the admin dashboard v3 page with integrated editor"""
