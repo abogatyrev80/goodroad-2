@@ -1202,9 +1202,9 @@ async def recalculate_all_clusters():
         
         logger.info(f"✅ Удалено кластеров: {deleted_count}")
         
-        # Получаем все события
+        # Получаем все события (без лимита)
         logger.info("📊 Получение всех событий...")
-        all_events = await db.processed_events.find({}).to_list(None)
+        all_events = await db.processed_events.find({}).to_list(length=None)
         
         logger.info(f"📦 Найдено событий: {len(all_events)}")
         
