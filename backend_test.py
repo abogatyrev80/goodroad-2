@@ -165,6 +165,7 @@ class BackendTester:
         return {
             "deviceId": device_id,
             "data": [{
+                "deviceId": device_id,  # Each data item needs deviceId
                 "timestamp": int(time.time() * 1000),
                 "gps": {
                     "latitude": lat,
