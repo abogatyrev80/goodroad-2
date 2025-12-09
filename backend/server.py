@@ -2921,6 +2921,83 @@ async def admin_dashboard_v3_api(request: Request):
     """Serve the admin dashboard v3 page through /api route"""
     return templates.TemplateResponse("admin_dashboard_v3.html", {"request": request})
 
+@api_router.delete("/admin/editor/events/{event_id}")
+async def delete_event(event_id: str):
+    """
+    Удаление события по ID для админ-панели v3
+    """
+    try:
+        result = await db.processed_events.delete_one({"id": event_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Event not found")
+        return {"success": True, "message": "Event deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting event: {str(e)}")
+
+@api_router.delete("/admin/editor/clusters/{cluster_id}")
+async def delete_cluster(cluster_id: str):
+    """
+    Удаление кластера по ID для админ-панели v3
+    """
+    try:
+        result = await db.obstacle_clusters.delete_one({"_id": cluster_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Cluster not found")
+        return {"success": True, "message": "Cluster deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting cluster: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting cluster: {str(e)}")
+
+@api_router.post("/admin/editor/events/bulk-delete")
+async def bulk_delete_events(ids_data: dict):
+    """
+    Массовое удаление событий для админ-панели v3
+    """
+    try:
+        ids = ids_data.get("ids", [])
+        if not ids:
+            raise HTTPException(status_code=400, detail="No IDs provided")
+        
+        result = await db.processed_events.delete_many({"id": {"$in": ids}})
+        return {
+            "success": True,
+            "message": f"Deleted {result.deleted_count} events",
+            "deleted_count": result.deleted_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk deleting events: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error bulk deleting events: {str(e)}")
+
+@api_router.post("/admin/editor/clusters/bulk-delete")
+async def bulk_delete_clusters(ids_data: dict):
+    """
+    Массовое удаление кластеров для админ-панели v3
+    """
+    try:
+        ids = ids_data.get("ids", [])
+        if not ids:
+            raise HTTPException(status_code=400, detail="No IDs provided")
+        
+        result = await db.obstacle_clusters.delete_many({"_id": {"$in": ids}})
+        return {
+            "success": True,
+            "message": f"Deleted {result.deleted_count} clusters",
+            "deleted_count": result.deleted_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk deleting clusters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error bulk deleting clusters: {str(e)}")
+
+
 @api_router.get("/admin/settings/v2", response_class=HTMLResponse)
 async def admin_settings_v2_api(request: Request):
     """Serve the ML settings page through /api route"""
