@@ -619,7 +619,7 @@ class EventClassifier:
         
         # 〰️〰️ ВИБРАЦИЯ: плохое покрытие, высокая вариативность
         vibration_threshold = self.thresholds['vibration']
-        if (stats['std_magnitude'] >= vibration_threshold['std_magnitude'] and 
+        if (stats['std_magnitude'] >= vibration_threshold['variance'] and 
             speed > 3 and
             stats['max_magnitude'] >= vibration_threshold['magnitude']):
             
