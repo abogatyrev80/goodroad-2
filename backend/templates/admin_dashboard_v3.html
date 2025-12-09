@@ -316,20 +316,32 @@
         }
 
         function renderData() {
-            // Update map
+            // Update map with highlighting for selected items
             map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
             filteredData.forEach(item => {
+                const id = currentMode === 'events' ? item.id : item.clusterId;
                 const coords = currentMode === 'events' 
                     ? [item.latitude, item.longitude]
                     : [item.location.latitude, item.location.longitude];
                 const itemType = currentMode === 'events' ? item.eventType : item.obstacleType;
                 const itemSeverity = currentMode === 'events' ? item.severity : item.severity?.max;
                 
-                L.marker(coords).addTo(map).bindPopup(`
+                // Создаем маркер с кастомной иконкой если элемент выбран
+                const isSelected = selectedIds.has(id);
+                const markerOptions = isSelected ? {
+                    icon: L.divIcon({
+                        className: 'custom-marker-selected',
+                        html: '<div style="background: #fbbf24; width: 24px; height: 24px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 10px rgba(251, 191, 36, 0.8);"></div>',
+                        iconSize: [24, 24]
+                    })
+                } : {};
+                
+                L.marker(coords, markerOptions).addTo(map).bindPopup(`
                     <b>${itemType}</b><br>
                     Серьезность: ${itemSeverity}<br>
                     Уверенность: ${(item.confidence * 100).toFixed(0)}%<br>
-                    <button onclick="editItem('${currentMode === 'events' ? item.id : item.clusterId}', '${currentMode}')" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 0.25rem; cursor: pointer;">✏️ Редактировать</button>
+                    ${isSelected ? '<span style="color: #fbbf24; font-weight: bold;">✓ Выбрано</span><br>' : ''}
+                    <button onclick="editItem('${id}', '${currentMode}')" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 0.25rem; cursor: pointer;">✏️ Редактировать</button>
                 `);
             });
             
