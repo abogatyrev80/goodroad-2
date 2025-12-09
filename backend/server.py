@@ -2753,6 +2753,16 @@ async def apk_guide_api(request: Request):
     """Serve the APK build guide page through /api route"""
     return templates.TemplateResponse("apk_guide.html", {"request": request})
 
+@app.get("/admin/ml-settings", response_class=HTMLResponse)
+async def ml_settings(request: Request):
+    """Serve the ML settings page"""
+    return templates.TemplateResponse("ml_settings.html", {"request": request})
+
+@api_router.get("/admin/ml-settings", response_class=HTMLResponse)
+async def ml_settings_api(request: Request):
+    """Serve the ML settings page through /api route"""
+    return templates.TemplateResponse("ml_settings.html", {"request": request})
+
 
 # Admin Index - Main navigation page
 @app.get("/admin", response_class=HTMLResponse)
