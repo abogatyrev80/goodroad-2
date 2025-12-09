@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Good Road App - Phase 2 Mobile API
-Focus: /api/obstacles/nearby endpoint testing
+Backend Test Suite for ML Classification and Clustering Logic
+Tests the improved ML logic for road obstacle detection and clustering
 
-Test Coverage:
-1. Basic requests with minimal parameters
-2. Custom radius parameter testing
-3. Minimum confirmations filtering
-4. Input validation (invalid types, missing parameters)
-5. Response structure validation
-6. Priority algorithm verification
-7. Geographic filtering accuracy
-8. Integration with clustering system
-9. Performance testing
+Test scenarios based on review request:
+1. ML Classification Tests (speed_bump vs pothole accuracy)
+2. Clustering Tests (radius 8m, min 3 confirmations)
+3. API Endpoint Tests
+4. Performance Tests
 """
 
-import requests
+import asyncio
+import aiohttp
 import json
 import time
-from datetime import datetime
+import random
+import math
+from datetime import datetime, timedelta
 from typing import Dict, List, Any
 
-# Backend URL from environment - using localhost since external routing has issues
-BACKEND_URL = "http://localhost:8001/api"
+# Backend URL from environment
+BACKEND_URL = "https://roadguard-13.preview.emergentagent.com/api"
 
 class NearbyObstaclesAPITester:
     def __init__(self):
