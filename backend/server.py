@@ -2711,16 +2711,6 @@ async def admin_settings_v2_api(request: Request):
     """Serve the ML settings page through /api route"""
     return templates.TemplateResponse("admin_settings_v2.html", {"request": request})
 
-@app.get("/admin/data-editor", response_class=HTMLResponse)
-async def data_editor(request: Request):
-    """Serve the data editor page"""
-    return templates.TemplateResponse("data_editor.html", {"request": request})
-
-@api_router.get("/admin/data-editor", response_class=HTMLResponse)
-async def data_editor_api(request: Request):
-    """Serve the data editor page through /api route"""
-    return templates.TemplateResponse("data_editor.html", {"request": request})
-
 @app.get("/admin/apk-guide", response_class=HTMLResponse)
 async def apk_guide(request: Request):
     """Serve the APK build guide page"""
