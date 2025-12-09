@@ -22,14 +22,18 @@ from typing import Dict, List, Any
 # Backend URL from environment
 BACKEND_URL = "https://roadguard-13.preview.emergentagent.com/api"
 
-class NearbyObstaclesAPITester:
+class BackendTester:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'User-Agent': 'NearbyObstaclesTester/1.0'
-        })
+        self.session = None
         self.test_results = []
+        
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
