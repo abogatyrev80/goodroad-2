@@ -141,6 +141,14 @@
                             <option value="5">5 - Минимальная</option>
                         </select>
                     </div>
+                    <div class="filter-row">
+                        <input type="date" class="filter-input" id="date-from-filter" onchange="applyFilters()" title="Дата от">
+                        <input type="date" class="filter-input" id="date-to-filter" onchange="applyFilters()" title="Дата до">
+                    </div>
+                    <div class="select-all-row">
+                        <input type="checkbox" id="select-all-checkbox" class="checkbox" onchange="selectAllFiltered(this.checked)">
+                        <label for="select-all-checkbox">Выбрать все отфильтрованные (<span id="filtered-count">0</span>)</label>
+                    </div>
                 </div>
                 
                 <div class="bulk-actions" id="bulk-actions">
