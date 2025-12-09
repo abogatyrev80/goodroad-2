@@ -472,6 +472,14 @@
             document.getElementById('edit-modal').classList.remove('active');
         }
 
+        function showHelp() {
+            document.getElementById('help-modal').classList.add('active');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('help-modal').classList.remove('active');
+        }
+
         function showAlert(type, message) {
             const container = document.getElementById('alerts-container');
             const alert = document.createElement('div');
