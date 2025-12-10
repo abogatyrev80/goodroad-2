@@ -436,19 +436,35 @@
         function editItem(id, type) {
             const item = type === 'events' ? allEvents.find(e => e.id === id) : allClusters.find(c => c.clusterId === id);
             if (!item) return;
-            document.getElementById('modal-title').textContent = type === 'events' ? 'Редактировать событие' : 'Редактировать кластер';
+            document.getElementById('modal-title').textContent = type === 'events' ? 'Просмотр/Редактирование события' : 'Просмотр/Редактирование кластера';
+            
+            // Создаем полный список атрибутов
+            const allAttributesHtml = `
+                <div style="background: #0f172a; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; max-height: 400px; overflow-y: auto;">
+                    <h3 style="color: #60a5fa; margin-bottom: 0.5rem;">Все атрибуты:</h3>
+                    <pre style="color: #cbd5e1; font-size: 0.875rem; white-space: pre-wrap; word-break: break-all;">${JSON.stringify(item, null, 2)}</pre>
+                </div>
+            `;
+            
             document.getElementById('edit-form').innerHTML = type === 'events' ? `
+                ${allAttributesHtml}
                 <div class="form-group"><label>Тип</label><select id="edit-type">
                     <option value="pothole" ${item.eventType === 'pothole' ? 'selected' : ''}>Яма</option>
                     <option value="bump" ${item.eventType === 'bump' ? 'selected' : ''}>Неровность</option>
                     <option value="speed_bump" ${item.eventType === 'speed_bump' ? 'selected' : ''}>Лежачий полицейский</option>
+                    <option value="vibration" ${item.eventType === 'vibration' ? 'selected' : ''}>Вибрация</option>
+                    <option value="braking" ${item.eventType === 'braking' ? 'selected' : ''}>Торможение</option>
                 </select></div>
-                <div class="form-group"><label>Серьезность</label><input type="number" id="edit-severity" min="1" max="5" value="${item.severity}"></div>
-                <div class="form-group"><label>Уверенность</label><input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}"></div>
-                <div class="form-group"><label>Заметки</label><textarea id="edit-notes">${item.notes || ''}</textarea></div>
+                <div class="form-group"><label>Серьезность (1-5)</label><input type="number" id="edit-severity" min="1" max="5" value="${item.severity}"></div>
+                <div class="form-group"><label>Уверенность (0-1)</label><input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}"></div>
+                <div class="form-group"><label>Координаты</label><input type="text" readonly value="lat: ${item.latitude?.toFixed(6)}, lon: ${item.longitude?.toFixed(6)}" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Скорость</label><input type="text" readonly value="${((item.speed || 0) * 3.6).toFixed(1)} км/ч" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Magnitude акселерометра</label><input type="text" readonly value="${item.accelerometer_magnitude?.toFixed(3)} м/с²" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Метод детекции</label><input type="text" readonly value="${item.detection_method || 'N/A'}" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Заметки</label><textarea id="edit-notes">${item.notes || item.note || ''}</textarea></div>
                 <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-                    <button type="button" class="btn btn-primary" onclick="saveEdit('${id}', 'events')">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEdit('${id}', 'events')">💾 Сохранить изменения</button>
                 </div>
             ` : `
                 <div class="form-group"><label>Тип</label><select id="edit-type">
