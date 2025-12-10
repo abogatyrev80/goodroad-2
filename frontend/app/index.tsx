@@ -475,6 +475,29 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
         </Pressable>
 
+        {/* 🆕 Обновить предупреждения */}
+        {isTracking && (
+          <Pressable
+            style={[styles.button, styles.refreshButton]}
+            onPress={() => {
+              refetchObstacles();
+              showToast('🔄 Предупреждения обновлены', 'success');
+            }}
+          >
+            <Ionicons name="refresh" size={34} color="#fbbf24" />
+            <Text style={styles.buttonText}>ОБНОВИТЬ ПРЕДУПРЕЖДЕНИЯ</Text>
+          </Pressable>
+        )}
+
+        {/* 🆕 Настройки умных предупреждений */}
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push('/alert-settings')}
+        >
+          <Ionicons name="settings" size={34} color="#22c55e" />
+          <Text style={styles.buttonText}>НАСТРОЙКИ ПРЕДУПРЕЖДЕНИЙ</Text>
+        </Pressable>
+
         {/* 🆕 Динамические предупреждения */}
         <Pressable
           style={styles.button}
