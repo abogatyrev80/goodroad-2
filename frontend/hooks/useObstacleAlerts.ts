@@ -23,6 +23,11 @@ export function useObstacleAlerts(
   // Загрузка препятствий каждые 30 секунд
   useEffect(() => {
     if (!isTracking || !currentLocation) {
+      // 🆕 ОЧИСТКА при остановке мониторинга
+      setObstacles([]);
+      setClosestObstacle(null);
+      lastAlertedObstacles.current.clear();
+      alertedObstaclesForReaction.current.clear();
       return;
     }
 
@@ -63,6 +68,40 @@ export function useObstacleAlerts(
       }
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
+  
+  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени (каждую секунду)
+  useEffect(() => {
+    if (!isTracking || !currentLocation || obstacles.length === 0) {
+      return;
+    }
+    
+    const updateDistances = () => {
+      const lat = currentLocation.coords.latitude;
+      const lon = currentLocation.coords.longitude;
+      
+      // Пересчитываем расстояния для всех препятствий
+      const updatedObstacles = obstacles.map(obstacle => ({
+        ...obstacle,
+        distance: obstacleService.calculateDistance(
+          lat,
+          lon,
+          obstacle.latitude,
+          obstacle.longitude
+        )
+      }));
+      
+      setObstacles(updatedObstacles);
+      
+      // Обновляем ближайшее
+      const closest = obstacleService.getClosestObstacle(updatedObstacles);
+      setClosestObstacle(closest);
+    };
+    
+    // Обновляем каждую секунду
+    const distanceUpdateInterval = setInterval(updateDistances, 1000);
+    
+    return () => clearInterval(distanceUpdateInterval);
+  }, [isTracking, currentLocation, obstacles.length]);
 
   // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
