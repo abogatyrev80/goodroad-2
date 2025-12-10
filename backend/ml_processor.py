@@ -486,18 +486,33 @@ class EventClassifier:
             for x, y, z in zip(x_values, y_values, z_values)
         ]
         
-        # Анализируем каждый паттерн
-        impact_detected, impact_intensity = self._detect_impact_pattern(z_values)
+        # Детектируем паттерны (ТЕПЕРЬ РАЗДЕЛЬНО для ЯМ и ЛЕЖАЧИХ!)
+        pothole_detected, pothole_intensity = self._detect_pothole_pattern(z_values)
+        speedbump_detected, speedbump_intensity = self._detect_speedbump_pattern(z_values)
         wave_detected, wave_amplitude = self._detect_wave_pattern(z_values)
-        vibration_detected, vibration_frequency = self._detect_vibration_pattern(magnitudes)
+        vibration_detected, vibration_freq = self._detect_vibration_pattern(magnitudes)
         
         return {
-            'impact_detected': impact_detected,
-            'impact_intensity': impact_intensity,
-            'wave_detected': wave_detected,
-            'wave_amplitude': wave_amplitude,
-            'vibration_detected': vibration_detected,
-            'vibration_frequency': vibration_frequency
+            'pothole': {
+                'detected': pothole_detected,
+                'intensity': pothole_intensity,
+                'note': f'Pothole pattern (↓↑): падение {pothole_intensity:.2f}' if pothole_detected else None
+            },
+            'speedbump': {
+                'detected': speedbump_detected,
+                'intensity': speedbump_intensity,
+                'note': f'Speed bump pattern (↑↓): подъем {speedbump_intensity:.2f}' if speedbump_detected else None
+            },
+            'wave': {
+                'detected': wave_detected,
+                'amplitude': wave_amplitude,
+                'note': f'Wave pattern detected (amplitude={wave_amplitude:.2f})' if wave_detected else None
+            },
+            'vibration': {
+                'detected': vibration_detected,
+                'frequency': vibration_freq,
+                'note': f'Vibration pattern detected (freq={vibration_freq:.2f})' if vibration_detected else None
+            }
         }
     
     def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
