@@ -108,6 +108,7 @@ export function useObstacleAlerts(
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
     // Получаем настройки динамической системы
     const settings = dynamicAudioService.getSettings();
+    const alertSettings = alertSettingsService.getSettings();
 
     for (const obstacle of obstacleList) {
       const distance = obstacle.distance;
@@ -117,10 +118,21 @@ export function useObstacleAlerts(
         continue;
       }
 
+      // 🆕 ПРОВЕРКА СКОРОСТИ - должны ли мы предупреждать?
+      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, currentSpeed * 3.6); // м/с → км/ч
+      
+      if (!speedCheck.shouldAlert) {
+        continue; // Скорость нормальная - молчим
+      }
+
       // Проверяем, это новое препятствие?
       if (!lastAlertedObstacles.current.has(obstacle.id)) {
-        // Первый раз видим это препятствие - объявляем голосом
-        await dynamicAudioService.announceObstacle(obstacle);
+        // 🆕 Используем кастомный текст и проверяем нужен ли голос
+        if (alertSettingsService.shouldUseVoice(speedCheck.alertLevel)) {
+          const customText = alertSettingsService.getAlertText(obstacle.type, distance);
+          await dynamicAudioService.announceObstacleWithText(obstacle, customText);
+        }
+        
         lastAlertedObstacles.current.add(obstacle.id);
         
         // Сохраняем для отслеживания реакции
@@ -137,8 +149,11 @@ export function useObstacleAlerts(
         }, 60000);
       }
 
-      // Непрерывные динамические сигналы (beep) пока препятствие рядом
-      await dynamicAudioService.alertDynamic(obstacle, currentSpeed);
+      // 🆕 Непрерывные сирены только если нужно (на основе скорости)
+      if (alertSettingsService.shouldUseSiren(speedCheck.alertLevel)) {
+        const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, distance);
+        await dynamicAudioService.alertDynamicWithFrequency(obstacle, currentSpeed, sirenFrequency);
+      }
 
       // Проверяем реакцию водителя
       checkDriverReaction(obstacle);
