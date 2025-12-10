@@ -342,11 +342,11 @@ class EventClassifier:
                 peaks += 1
         return peaks
     
-    def _detect_impact_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
+    def _detect_pothole_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
         """
-        🆕 ДЕТЕКТОР ПАТТЕРНА "УДАР"
-        Ищет характерный паттерн удара в последовательности Z значений
-        Паттерн: ↑↑↑ резко вверх → ↓↓↓ резко вниз (характерно для ямы)
+        🆕 ДЕТЕКТОР ПАТТЕРНА "ЯМА" (POTHOLE)
+        ЯМА: машина ПАДАЕТ ВНИЗ (Z↓), потом ВЫХОДИТ ВВЕРХ (Z↑)
+        Паттерн: ↓↓↓ резко вниз (падение в яму) → ↑↑↑ резко вверх (выход из ямы)
         
         Args:
             z_values: массив значений по оси Z
@@ -358,20 +358,51 @@ class EventClassifier:
         if len(z_values) < 5:
             return False, 0.0
         
-        max_impact_intensity = 0.0
+        max_pothole_intensity = 0.0
         
         for i in range(2, len(z_values) - 2):
             # Вычисляем скорость изменения (производная)
-            rising_rate = z_values[i] - z_values[i-2]   # Подъем
-            falling_rate = z_values[i+2] - z_values[i]  # Спад
+            falling_rate = z_values[i] - z_values[i-2]   # Падение в яму (должно быть ОТРИЦАТЕЛЬНЫМ)
+            rising_rate = z_values[i+2] - z_values[i]    # Выход из ямы (должно быть ПОЛОЖИТЕЛЬНЫМ)
             
-            # Паттерн удара: резкий подъем + резкий спад
-            if rising_rate > threshold and falling_rate < -threshold:
-                impact_intensity = rising_rate + abs(falling_rate)
-                max_impact_intensity = max(max_impact_intensity, impact_intensity)
+            # Паттерн ямы: резкое падение вниз + резкий выход вверх
+            if falling_rate < -threshold and rising_rate > threshold:
+                pothole_intensity = abs(falling_rate) + rising_rate
+                max_pothole_intensity = max(max_pothole_intensity, pothole_intensity)
         
-        detected = max_impact_intensity > threshold * 2
-        return detected, max_impact_intensity
+        detected = max_pothole_intensity > threshold * 2
+        return detected, max_pothole_intensity
+    
+    def _detect_speedbump_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
+        """
+        🆕 ДЕТЕКТОР ПАТТЕРНА "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" (SPEED BUMP)
+        ЛЕЖАЧИЙ: машина ПОДНИМАЕТСЯ ВВЕРХ (Z↑), потом СПУСКАЕТСЯ ВНИЗ (Z↓)
+        Паттерн: ↑↑↑ резко вверх (въезд на бугор) → ↓↓↓ резко вниз (съезд с бугра)
+        
+        Args:
+            z_values: массив значений по оси Z
+            threshold: минимальная скорость изменения для обнаружения
+            
+        Returns:
+            (обнаружен, максимальная_интенсивность)
+        """
+        if len(z_values) < 5:
+            return False, 0.0
+        
+        max_bump_intensity = 0.0
+        
+        for i in range(2, len(z_values) - 2):
+            # Вычисляем скорость изменения (производная)
+            rising_rate = z_values[i] - z_values[i-2]    # Подъем на бугор (должно быть ПОЛОЖИТЕЛЬНЫМ)
+            falling_rate = z_values[i+2] - z_values[i]   # Спуск с бугра (должно быть ОТРИЦАТЕЛЬНЫМ)
+            
+            # Паттерн лежачего: резкий подъем вверх + резкий спуск вниз
+            if rising_rate > threshold and falling_rate < -threshold:
+                bump_intensity = rising_rate + abs(falling_rate)
+                max_bump_intensity = max(max_bump_intensity, bump_intensity)
+        
+        detected = max_bump_intensity > threshold * 2
+        return detected, max_bump_intensity
     
     def _detect_wave_pattern(self, z_values: List[float], threshold: float = 0.06) -> Tuple[bool, float]:
         """
