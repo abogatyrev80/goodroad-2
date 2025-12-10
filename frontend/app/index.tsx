@@ -72,6 +72,7 @@ export default function HomeScreen() {
   // Инициализация при загрузке
   useEffect(() => {
     initializeServices();
+    alertSettingsService.initialize(); // 🆕 Инициализация настроек предупреждений
     return () => {
       cleanup();
     };
