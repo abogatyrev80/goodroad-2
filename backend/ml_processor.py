@@ -99,6 +99,12 @@ class EventClassifier:
         # Вычисление magnitude
         magnitude = math.sqrt(accel_x**2 + accel_y**2 + accel_z**2)
         
+        # ⛔ КРИТИЧЕСКИ ВАЖНО: Игнорируем данные при очень низкой скорости
+        # Это предотвращает ложные срабатывания, когда телефон лежит на месте
+        MIN_MOVEMENT_SPEED = 2.0  # м/с (~7 км/ч)
+        if speed < MIN_MOVEMENT_SPEED:
+            return None  # Игнорируем данные при стоянке/очень медленном движении
+        
         # Добавляем в историю
         data_point = {
             'x': accel_x,
