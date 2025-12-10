@@ -692,6 +692,10 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.4,
   },
+  refreshButton: {
+    borderColor: '#fbbf24', // Желтая рамка для кнопки обновления
+    backgroundColor: 'rgba(251, 191, 36, 0.1)', // Слегка желтоватый фон
+  },
   reportButton: {
     borderColor: '#ff3b30', // Красная рамка для кнопки отчета
     backgroundColor: 'rgba(255, 59, 48, 0.1)', // Слегка красноватый фон
