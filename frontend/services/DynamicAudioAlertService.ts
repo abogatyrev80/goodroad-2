@@ -305,6 +305,94 @@ class DynamicAudioAlertService {
   }
 
   /**
+   * 🆕 Объявить препятствие с кастомным текстом
+   */
+  async announceObstacleWithText(obstacle: Obstacle, customText: string): Promise<void> {
+    await this.ensureInitialized();
+    
+    if (!this.settings.voiceEnabled) {
+      return;
+    }
+
+    try {
+      await Speech.speak(customText, {
+        language: this.settings.language === 'ru' ? 'ru-RU' : 'en-US',
+        pitch: 1.0,
+        rate: 0.9,
+        volume: this.settings.volume,
+      });
+      
+      console.log(`🗣️ Announced obstacle with custom text: ${customText}`);
+    } catch (error) {
+      console.error('❌ Error announcing obstacle with custom text:', error);
+    }
+  }
+
+  /**
+   * 🆕 Динамическое оповещение с заданной частотой
+   */
+  async alertDynamicWithFrequency(
+    obstacle: Obstacle,
+    currentSpeedMS: number,
+    frequency: number
+  ): Promise<void> {
+    await this.ensureInitialized();
+    
+    if (!this.settings.beepEnabled) {
+      return;
+    }
+
+    const distance = obstacle.distance;
+    const now = Date.now();
+    const timeSinceLastBeep = now - this.lastBeepTime;
+    
+    // Вычисляем интервал на основе частоты
+    // frequency = количество beep в секунду
+    const interval = 1000 / frequency; // мс между beep
+    
+    // Проверяем можно ли уже сделать beep
+    if (timeSinceLastBeep < interval) {
+      return; // Еще рано
+    }
+
+    // Определяем высоту тона на основе расстояния
+    let pitch = 1.0;
+    if (distance < 50) {
+      pitch = 1.5; // Высокий тон - очень близко!
+    } else if (distance < 100) {
+      pitch = 1.3;
+    } else if (distance < 200) {
+      pitch = 1.1;
+    }
+
+    // Воспроизводим звук
+    await this.playBeepWithPitch(pitch);
+    this.lastBeepTime = now;
+    
+    console.log(`🔊 Dynamic beep at ${distance}m (frequency: ${frequency.toFixed(2)}/s, pitch: ${pitch})`);
+  }
+
+  /**
+   * 🆕 Воспроизведение beep с заданной высотой тона
+   */
+  private async playBeepWithPitch(pitch: number): Promise<void> {
+    try {
+      if (!this.beepSound) {
+        await this.initBeepSound();
+      }
+      
+      if (this.beepSound) {
+        await this.beepSound.setPositionAsync(0);
+        await this.beepSound.setRateAsync(pitch, true); // Изменяем высоту тона
+        await this.beepSound.setVolumeAsync(this.settings.volume);
+        await this.beepSound.playAsync();
+      }
+    } catch (error) {
+      console.error('❌ Error playing beep with pitch:', error);
+    }
+  }
+
+  /**
    * Очистка ресурсов
    */
   async cleanup(): Promise<void> {
