@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import obstacleService, { Obstacle } from '../services/ObstacleService';
 import dynamicAudioService from '../services/DynamicAudioAlertService';
+import alertSettingsService from '../services/AlertSettingsService';
 
 export function useObstacleAlerts(
   isTracking: boolean,
