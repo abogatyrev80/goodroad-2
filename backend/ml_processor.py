@@ -531,17 +531,18 @@ class EventClassifier:
         patterns = stats.get('patterns', {})
         
         if patterns:
-            # 🔥 ПАТТЕРН "УДАР" - характерно для ямы
-            # Резкий скачок вверх + быстрый спад вниз
-            if patterns.get('impact_detected', False):
-                impact_intensity = patterns.get('impact_intensity', 0)
+            # 🔥 ПАТТЕРН "ЯМА" - характерно для ямы
+            # Резкий скачок вниз + быстрый выход вверх (↓↑)
+            pothole_pattern = patterns.get('pothole', {})
+            if pothole_pattern.get('detected', False):
+                pothole_intensity = pothole_pattern.get('intensity', 0)
                 
-                # Определяем severity по интенсивности удара
-                if impact_intensity > 0.30:
+                # Определяем severity по интенсивности ямы
+                if pothole_intensity > 0.30:
                     severity = 1  # Critical
-                elif impact_intensity > 0.24:
+                elif pothole_intensity > 0.24:
                     severity = 2  # High
-                elif impact_intensity > 0.18:
+                elif pothole_intensity > 0.18:
                     severity = 3  # Medium
                 else:
                     severity = 4  # Low
@@ -552,15 +553,43 @@ class EventClassifier:
                     'confidence': 0.88,  # Высокая уверенность для паттернов
                     'magnitude': stats['max_magnitude'],
                     'delta_z': delta_z,
-                    'impact_intensity': impact_intensity,
+                    'pothole_intensity': pothole_intensity,
                     'detection_method': 'pattern_analysis',
-                    'note': f'Impact pattern detected (intensity={impact_intensity:.3f})'
+                    'note': pothole_pattern.get('note', f'Pothole pattern detected (intensity={pothole_intensity:.3f})')
                 }
             
-            # 🌊 ПАТТЕРН "ВОЛНА" - характерно для лежачего полицейского
+            # 🚧 ПАТТЕРН "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" - характерно для лежачего полицейского
+            # Резкий подъем вверх + спуск вниз (↑↓)
+            speedbump_pattern = patterns.get('speedbump', {})
+            if speedbump_pattern.get('detected', False):
+                speedbump_intensity = speedbump_pattern.get('intensity', 0)
+                
+                # Определяем severity по интенсивности лежачего
+                if speedbump_intensity > 0.24:
+                    severity = 1  # Critical
+                elif speedbump_intensity > 0.18:
+                    severity = 2  # High
+                elif speedbump_intensity > 0.14:
+                    severity = 3  # Medium
+                else:
+                    severity = 4  # Low
+                
+                return {
+                    'eventType': 'speed_bump',
+                    'severity': severity,
+                    'confidence': 0.90,  # Очень высокая уверенность
+                    'magnitude': stats['max_magnitude'],
+                    'delta_z': delta_z,
+                    'speedbump_intensity': speedbump_intensity,
+                    'detection_method': 'pattern_analysis',
+                    'note': speedbump_pattern.get('note', f'Speed bump pattern detected (intensity={speedbump_intensity:.3f})')
+                }
+            
+            # 🌊 ПАТТЕРН "ВОЛНА" - характерно для плавных неровностей
             # Плавный подъем → пик → плавный спуск
-            if patterns.get('wave_detected', False):
-                wave_amplitude = patterns.get('wave_amplitude', 0)
+            wave_pattern = patterns.get('wave', {})
+            if wave_pattern.get('detected', False):
+                wave_amplitude = wave_pattern.get('amplitude', 0)
                 
                 # Определяем severity по амплитуде волны
                 if wave_amplitude > 0.24:
@@ -573,20 +602,21 @@ class EventClassifier:
                     severity = 4  # Low
                 
                 return {
-                    'eventType': 'speed_bump',
+                    'eventType': 'wave',
                     'severity': severity,
-                    'confidence': 0.90,  # Очень высокая уверенность
+                    'confidence': 0.85,
                     'magnitude': stats['max_magnitude'],
                     'delta_z': delta_z,
                     'wave_amplitude': wave_amplitude,
                     'detection_method': 'pattern_analysis',
-                    'note': f'Wave pattern detected (amplitude={wave_amplitude:.3f})'
+                    'note': wave_pattern.get('note', f'Wave pattern detected (amplitude={wave_amplitude:.3f})')
                 }
             
             # 〰️〰️ ПАТТЕРН "ВИБРАЦИЯ" - плохое покрытие
             # Высокочастотные колебания
-            if patterns.get('vibration_detected', False) and speed > 3:
-                vibration_frequency = patterns.get('vibration_frequency', 0)
+            vibration_pattern = patterns.get('vibration', {})
+            if vibration_pattern.get('detected', False) and speed > 3:
+                vibration_frequency = vibration_pattern.get('frequency', 0)
                 
                 severity = 3 if vibration_frequency > 0.4 else 4
                 
@@ -597,7 +627,7 @@ class EventClassifier:
                     'magnitude': stats['mean_magnitude'],
                     'vibration_frequency': vibration_frequency,
                     'detection_method': 'pattern_analysis',
-                    'note': f'Vibration pattern detected (freq={vibration_frequency:.2f})'
+                    'note': vibration_pattern.get('note', f'Vibration pattern detected (freq={vibration_frequency:.2f})')
                 }
         
         # ПРИОРИТЕТ 2: КЛАССИЧЕСКАЯ ЛОГИКА (на основе порогов)
