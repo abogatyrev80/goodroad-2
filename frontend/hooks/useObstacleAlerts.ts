@@ -203,9 +203,36 @@ export function useObstacleAlerts(
     }
   }, [isTracking]);
 
+  // 🆕 Функция для ручного обновления препятствий
+  const refetchObstacles = async () => {
+    if (!isTracking || !currentLocation) {
+      return;
+    }
+
+    try {
+      const lat = currentLocation.coords.latitude;
+      const lon = currentLocation.coords.longitude;
+
+      const nearbyObstacles = await obstacleService.fetchNearbyObstacles(
+        lat,
+        lon,
+        5000,
+        3
+      );
+
+      setObstacles(nearbyObstacles);
+      const closest = obstacleService.getClosestObstacle(nearbyObstacles);
+      setClosestObstacle(closest);
+      checkForAlerts(nearbyObstacles);
+    } catch (error) {
+      console.error('❌ Error refetching obstacles:', error);
+    }
+  };
+
   return {
     obstacles,
     closestObstacle,
-    obstaclesCount: obstacles.length,
+    isNearObstacle: !!closestObstacle,
+    refetchObstacles, // 🆕 Экспортируем функцию обновления
   };
 }
