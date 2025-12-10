@@ -63,7 +63,7 @@ export default function HomeScreen() {
   const currentLocationRef = useRef<any>(null);
 
   // Хук для препятствий
-  const { obstacles, closestObstacle, obstaclesCount } = useObstacleAlerts(
+  const { obstacles, closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
     isTracking,
     currentLocation,
     currentSpeed
