@@ -467,21 +467,29 @@
                     <button type="button" class="btn btn-primary" onclick="saveEdit('${id}', 'events')">💾 Сохранить изменения</button>
                 </div>
             ` : `
+                ${allAttributesHtml}
                 <div class="form-group"><label>Тип</label><select id="edit-type">
                     <option value="pothole" ${item.obstacleType === 'pothole' ? 'selected' : ''}>Яма</option>
                     <option value="bump" ${item.obstacleType === 'bump' ? 'selected' : ''}>Неровность</option>
                     <option value="speed_bump" ${item.obstacleType === 'speed_bump' ? 'selected' : ''}>Лежачий полицейский</option>
+                    <option value="vibration" ${item.obstacleType === 'vibration' ? 'selected' : ''}>Вибрация</option>
+                    <option value="braking" ${item.obstacleType === 'braking' ? 'selected' : ''}>Торможение</option>
                 </select></div>
-                <div class="form-group"><label>Макс. серьезность</label><input type="number" id="edit-severity-max" min="1" max="5" value="${item.severity?.max || 5}"></div>
-                <div class="form-group"><label>Уверенность</label><input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}"></div>
+                <div class="form-group"><label>Макс. серьезность (1-5)</label><input type="number" id="edit-severity-max" min="1" max="5" value="${item.severity?.max || 5}"></div>
+                <div class="form-group"><label>Уверенность (0-1)</label><input type="number" id="edit-confidence" step="0.01" min="0" max="1" value="${item.confidence}"></div>
+                <div class="form-group"><label>Подтверждений (reportCount)</label><input type="text" readonly value="${item.reportCount} от ${item.devices?.length || 0} устройств" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Координаты</label><input type="text" readonly value="lat: ${item.location?.latitude?.toFixed(6)}, lon: ${item.location?.longitude?.toFixed(6)}" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Средняя скорость</label><input type="text" readonly value="${((item.roadInfo?.avgSpeed || 0) * 3.6).toFixed(1)} км/ч" style="background: #1e293b;"></div>
+                <div class="form-group"><label>Радиус кластера</label><input type="text" readonly value="${item.location?.radius || 8} метров" style="background: #1e293b;"></div>
                 <div class="form-group"><label>Статус</label><select id="edit-status">
                     <option value="active" ${item.status === 'active' ? 'selected' : ''}>Активный</option>
                     <option value="expired" ${item.status === 'expired' ? 'selected' : ''}>Истёкший</option>
+                    <option value="fixed" ${item.status === 'fixed' ? 'selected' : ''}>Исправлено</option>
                 </select></div>
                 <div class="form-group"><label>Заметки</label><textarea id="edit-notes">${item.notes || ''}</textarea></div>
                 <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-                    <button type="button" class="btn btn-primary" onclick="saveEdit('${id}', 'clusters')">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEdit('${id}', 'clusters')">💾 Сохранить изменения</button>
                 </div>
             `;
             document.getElementById('edit-modal').classList.add('active');
