@@ -26,6 +26,7 @@ import SimpleToast, { showToast } from '../components/SimpleToast';
 import RawDataCollector from '../services/RawDataCollector';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
+import alertSettingsService from '../services/AlertSettingsService';
 
 // Константы
 const LOCATION_TASK_NAME = 'background-location-task';
