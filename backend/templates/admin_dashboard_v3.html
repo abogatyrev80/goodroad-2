@@ -357,6 +357,7 @@
                 const itemType = currentMode === 'events' ? item.eventType : item.obstacleType;
                 const itemSeverity = currentMode === 'events' ? item.severity : item.severity?.max || 5;
                 const timestamp = currentMode === 'events' ? item.timestamp : item.lastReported;
+                const isChecked = selectedIds.has(id);  // Проверяем, выбран ли элемент
                 const typeLabels = {
                     'pothole': '🕳️ Яма',
                     'bump': '〰️ Неровность',
@@ -366,17 +367,17 @@
                 };
                 
                 return `
-                    <div class="data-item">
+                    <div class="data-item" style="${isChecked ? 'border-color: #fbbf24; background: rgba(251, 191, 36, 0.1);' : ''}">
                         <div class="item-header">
                             <div>
-                                <input type="checkbox" class="checkbox" value="${id}" onchange="toggleSelect(this)">
+                                <input type="checkbox" class="checkbox" value="${id}" ${isChecked ? 'checked' : ''} onchange="toggleSelect(this)">
                                 <span class="item-type">${typeLabels[itemType] || itemType}</span>
                                 <span class="severity-badge severity-${itemSeverity}">S${itemSeverity}</span>
                             </div>
                         </div>
                         <div class="item-details">
                             Уверенность: ${(item.confidence * 100).toFixed(0)}%<br>
-                            ${currentMode === 'events' ? `Скорость: ${(item.speed || 0).toFixed(1)} км/ч<br>` : `Отчётов: ${item.reportCount}<br>`}
+                            ${currentMode === 'events' ? `Скорость: ${((item.speed || 0) * 3.6).toFixed(1)} км/ч<br>` : `Подтверждений: ${item.reportCount} (от разных устройств)<br>`}
                             Время: ${new Date(timestamp).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}
                         </div>
                         <div class="item-actions">
