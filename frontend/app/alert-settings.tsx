@@ -169,88 +169,21 @@ export default function AlertSettingsScreen() {
           ))}
         </View>
 
-        {/* Настройки звука */}
+        {/* Информация о настройках звука */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🔊 Настройки звука</Text>
-          
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Голосовые предупреждения</Text>
-            <Switch
-              value={settings.soundSettings.voiceEnabled}
-              onValueChange={(value) => updateNestedSetting('soundSettings', 'voiceEnabled', value)}
-              trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
-              thumbColor={settings.soundSettings.voiceEnabled ? '#22c55e' : '#9ca3af'}
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Звуковая сирена</Text>
-            <Switch
-              value={settings.soundSettings.sirenEnabled}
-              onValueChange={(value) => updateNestedSetting('soundSettings', 'sirenEnabled', value)}
-              trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
-              thumbColor={settings.soundSettings.sirenEnabled ? '#22c55e' : '#9ca3af'}
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Повторять голос несколько раз</Text>
-            <Switch
-              value={settings.soundSettings.repeatVoice}
-              onValueChange={(value) => updateNestedSetting('soundSettings', 'repeatVoice', value)}
-              trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
-              thumbColor={settings.soundSettings.repeatVoice ? '#22c55e' : '#9ca3af'}
-            />
-          </View>
-
-          {/* Тема сирены */}
-          <Text style={styles.subSectionTitle}>Тема сирены:</Text>
-          <View style={styles.themeButtons}>
-            <Pressable
-              style={[
-                styles.themeButton,
-                settings.soundSettings.sirenTheme === 'gentle' && styles.themeButtonActive,
-              ]}
-              onPress={() => updateNestedSetting('soundSettings', 'sirenTheme', 'gentle')}
-            >
-              <Text style={[
-                styles.themeButtonText,
-                settings.soundSettings.sirenTheme === 'gentle' && styles.themeButtonTextActive,
-              ]}>
-                🌸 Мягкая
-              </Text>
-            </Pressable>
-            
-            <Pressable
-              style={[
-                styles.themeButton,
-                settings.soundSettings.sirenTheme === 'moderate' && styles.themeButtonActive,
-              ]}
-              onPress={() => updateNestedSetting('soundSettings', 'sirenTheme', 'moderate')}
-            >
-              <Text style={[
-                styles.themeButtonText,
-                settings.soundSettings.sirenTheme === 'moderate' && styles.themeButtonTextActive,
-              ]}>
-                🔔 Средняя
-              </Text>
-            </Pressable>
-            
-            <Pressable
-              style={[
-                styles.themeButton,
-                settings.soundSettings.sirenTheme === 'urgent' && styles.themeButtonActive,
-              ]}
-              onPress={() => updateNestedSetting('soundSettings', 'sirenTheme', 'urgent')}
-            >
-              <Text style={[
-                styles.themeButtonText,
-                settings.soundSettings.sirenTheme === 'urgent' && styles.themeButtonTextActive,
-              ]}>
-                🚨 Срочная
-              </Text>
-            </Pressable>
-          </View>
+          <Text style={styles.sectionDescription}>
+            Для настройки звука (голос, сирена, громкость, динамические сигналы) используйте кнопку "ЗВУК И СИГНАЛЫ" на главном экране.
+          </Text>
+          <Pressable
+            style={[styles.button, styles.linkButton]}
+            onPress={() => {
+              // @ts-ignore
+              router.push('/audio-settings');
+            }}
+          >
+            <Text style={styles.buttonText}>🔊 Открыть настройки звука</Text>
+          </Pressable>
         </View>
 
         {/* Кнопки */}
