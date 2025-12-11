@@ -70,39 +70,43 @@ export function useObstacleAlerts(
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
   
-  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени (каждую секунду)
+  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени (каждые 2 секунды)
   useEffect(() => {
     if (!isTracking || !currentLocation || obstacles.length === 0) {
       return;
     }
     
     const updateDistances = () => {
-      const lat = currentLocation.coords.latitude;
-      const lon = currentLocation.coords.longitude;
-      
-      // Пересчитываем расстояния для всех препятствий
-      const updatedObstacles = obstacles.map(obstacle => ({
-        ...obstacle,
-        distance: obstacleService.calculateDistance(
-          lat,
-          lon,
-          obstacle.latitude,
-          obstacle.longitude
-        )
-      }));
-      
-      setObstacles(updatedObstacles);
-      
-      // Обновляем ближайшее
-      const closest = obstacleService.getClosestObstacle(updatedObstacles);
-      setClosestObstacle(closest);
+      try {
+        const lat = currentLocation.coords.latitude;
+        const lon = currentLocation.coords.longitude;
+        
+        // Пересчитываем расстояния для всех препятствий
+        const updatedObstacles = obstacles.map(obstacle => ({
+          ...obstacle,
+          distance: obstacleService.calculateDistance(
+            lat,
+            lon,
+            obstacle.latitude,
+            obstacle.longitude
+          )
+        }));
+        
+        setObstacles(updatedObstacles);
+        
+        // Обновляем ближайшее
+        const closest = obstacleService.getClosestObstacle(updatedObstacles);
+        setClosestObstacle(closest);
+      } catch (error) {
+        console.error('❌ Error updating distances:', error);
+      }
     };
     
-    // Обновляем каждую секунду
-    const distanceUpdateInterval = setInterval(updateDistances, 1000);
+    // Обновляем каждые 2 секунды (не слишком часто)
+    const distanceUpdateInterval = setInterval(updateDistances, 2000);
     
     return () => clearInterval(distanceUpdateInterval);
-  }, [isTracking, currentLocation, obstacles.length]);
+  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
 
   // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
