@@ -208,13 +208,14 @@ class ObstacleClusterer:
         """
         cluster_id = cluster['_id']
         
-        # Обновляем счетчик отчетов
-        new_report_count = cluster['reportCount'] + 1
-        
         # Добавляем устройство если уникальное
         devices = cluster['devices']
-        if device_id not in devices:
+        is_new_device = device_id not in devices
+        if is_new_device:
             devices.append(device_id)
+        
+        # ✅ ИСПРАВЛЕНО: Обновляем счетчик отчетов только при НОВОМ устройстве
+        new_report_count = len(devices)  # reportCount = количество уникальных устройств!
         
         # Обновляем severity
         severity_history = cluster['severity']['history']
