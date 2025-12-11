@@ -498,16 +498,16 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>НАСТРОЙКИ ПРЕДУПРЕЖДЕНИЙ</Text>
         </Pressable>
 
-        {/* 🆕 Динамические предупреждения */}
+        {/* 🆕 Объединенные настройки звука (Аудио + Динамические) */}
         <Pressable
           style={styles.button}
-          onPress={() => router.push('/dynamic-audio-settings')}
+          onPress={() => router.push('/audio-settings')}
         >
-          <Ionicons name="pulse" size={34} color="#ff3b30" />
-          <Text style={styles.buttonText}>ДИНАМИЧЕСКИЕ СИГНАЛЫ</Text>
+          <Ionicons name="volume-high" size={34} color="#ff3b30" />
+          <Text style={styles.buttonText}>НАСТРОЙКИ ЗВУКА</Text>
         </Pressable>
 
-        {/* Настройки предупреждений */}
+        {/* Визуальные оповещения */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/warning-settings')}
@@ -521,7 +521,7 @@ export default function HomeScreen() {
           style={styles.button}
           onPress={() => router.push('/autostart-settings')}
         >
-          <Ionicons name="flash" size={34} color="#00d4ff" />
+          <Ionicons name="flash" size={34} color="#fbbf24" />
           <Text style={styles.buttonText}>АВТОЗАПУСК</Text>
         </Pressable>
 
