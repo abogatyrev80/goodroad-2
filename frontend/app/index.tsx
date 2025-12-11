@@ -88,15 +88,25 @@ export default function HomeScreen() {
     if (!isTracking) return;
     
     // Отслеживание состояния зарядки во время активного мониторинга
-    const subscription = Battery.addBatteryStateListener(({ batteryState }) => {
+    const subscription = Battery.addBatteryStateListener(async ({ batteryState }) => {
       console.log('🔋 Battery state changed:', batteryState);
       
+      // ✅ ИСПРАВЛЕНО: Проверяем уровень батареи для обработки ограничения 80%
+      const batteryLevel = await Battery.getBatteryLevelAsync();
+      const batteryPercent = Math.round(batteryLevel * 100);
+      console.log(`🔋 Battery level: ${batteryPercent}%`);
+      
       // Если отключили от зарядки во время мониторинга - предупреждаем
-      if (batteryState !== Battery.BatteryState.CHARGING) {
-        console.log('⚠️ Warning - device unplugged during monitoring');
+      // НО: Игнорируем если уровень > 75% (вероятно ограничение Андройд 80%)
+      const isReallyUnplugged = batteryState !== Battery.BatteryState.CHARGING && 
+                                 batteryState !== Battery.BatteryState.FULL &&
+                                 batteryPercent < 75; // < 75% = реально отключено
+      
+      if (isReallyUnplugged) {
+        console.log(`⚠️ Warning - device unplugged during monitoring (${batteryPercent}%)`);
         Alert.alert(
           '⚠️ Зарядка отключена',
-          'Мониторинг дороги активен и расходует больше энергии. Телефон может быстро разрядиться.\n\nВы можете остановить мониторинг вручную, если это необходимо.',
+          `Мониторинг дороги активен и расходует больше энергии. Уровень батареи: ${batteryPercent}%\n\nТелефон может быстро разрядиться. Вы можете остановить мониторинг вручную, если это необходимо.`,
           [
             {
               text: 'Продолжить мониторинг',
@@ -111,9 +121,12 @@ export default function HomeScreen() {
             },
           ]
         );
+      } else if (batteryPercent >= 75) {
+        // Уровень > 75% и не заряжается = вероятно ограничение 80%
+        console.log(`✅ Battery at ${batteryPercent}% (likely 80% limit) - no warning`);
       } else {
         // Подключили зарядку - можно показать позитивное уведомление
-        console.log('✅ Device plugged in - battery charging');
+        console.log(`✅ Device plugged in - battery charging (${batteryPercent}%)`);
       }
     });
     
