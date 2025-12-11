@@ -489,22 +489,22 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* 🆕 Настройки умных предупреждений */}
+        {/* 🆕 Настройки умных предупреждений (логика скорости + тексты) */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/alert-settings')}
         >
-          <Ionicons name="settings" size={34} color="#22c55e" />
-          <Text style={styles.buttonText}>НАСТРОЙКИ ПРЕДУПРЕЖДЕНИЙ</Text>
+          <Ionicons name="speedometer" size={34} color="#22c55e" />
+          <Text style={styles.buttonText}>ЛОГИКА ПРЕДУПРЕЖДЕНИЙ</Text>
         </Pressable>
 
-        {/* 🆕 Объединенные настройки звука (Аудио + Динамические) */}
+        {/* 🆕 Настройки звука (всё звуковое: голос + beep + динамика) */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/audio-settings')}
         >
           <Ionicons name="volume-high" size={34} color="#ff3b30" />
-          <Text style={styles.buttonText}>НАСТРОЙКИ ЗВУКА</Text>
+          <Text style={styles.buttonText}>ЗВУК И СИГНАЛЫ</Text>
         </Pressable>
 
         {/* Визуальные оповещения */}
@@ -512,17 +512,17 @@ export default function HomeScreen() {
           style={styles.button}
           onPress={() => router.push('/warning-settings')}
         >
-          <Ionicons name="resize" size={34} color="#00d4ff" />
-          <Text style={styles.buttonText}>ВИЗУАЛЬНЫЕ ОПОВЕЩЕНИЯ</Text>
+          <Ionicons name="eye" size={34} color="#00d4ff" />
+          <Text style={styles.buttonText}>ВИЗУАЛЬНЫЕ КАРТОЧКИ</Text>
         </Pressable>
 
-        {/* Автозапуск */}
+        {/* 🆕 Автозапуск при подключении BT/CarPlay */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/autostart-settings')}
         >
           <Ionicons name="flash" size={34} color="#fbbf24" />
-          <Text style={styles.buttonText}>АВТОЗАПУСК</Text>
+          <Text style={styles.buttonText}>АВТОЗАПУСК (BT/CARPLAY)</Text>
         </Pressable>
 
         {/* Ручная отметка препятствия */}
