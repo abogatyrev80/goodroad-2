@@ -703,6 +703,20 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     letterSpacing: 1.2,
   },
+  buttonSubtext: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  autostartButton: {
+    borderColor: '#fbbf24',
+    backgroundColor: 'rgba(251, 191, 36, 0.15)', // Более яркий фон
+    borderWidth: 3, // Толще рамка
+  },
+  autostartButtonText: {
+    color: '#fbbf24',
+    fontSize: 16, // Крупнее текст
+  },
   buttonDisabled: {
     opacity: 0.4,
   },
