@@ -367,4 +367,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+  linkButton: {
+    backgroundColor: '#3b82f6',
+    marginTop: 12,
+  },
 });
