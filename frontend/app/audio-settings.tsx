@@ -1,7 +1,6 @@
 /**
- * AudioSettings - Настройки аудио-оповещений
- * 
- * Позволяет настроить голосовые и звуковые предупреждения
+ * Объединенный экран настроек звука
+ * Включает: Аудио настройки + Динамические сигналы
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,384 +8,307 @@ import {
   View,
   Text,
   StyleSheet,
-  Switch,
   ScrollView,
   Pressable,
-  Alert,
-  StatusBar,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Slider from '@react-native-community/slider';
-import audioAlertService, { AudioSettings } from '../services/AudioAlertService';
+import dynamicAudioService, { DynamicAudioSettings } from '../services/DynamicAudioAlertService';
 
 export default function AudioSettingsScreen() {
-  const [settings, setSettings] = useState<AudioSettings>(audioAlertService.getSettings());
-  const [stats, setStats] = useState(audioAlertService.getEffectivenessStats());
+  const [settings, setSettings] = useState<DynamicAudioSettings>(dynamicAudioService.getSettings());
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    // Загружаем текущие настройки
-    const currentSettings = audioAlertService.getSettings();
-    setSettings(currentSettings);
-    setStats(audioAlertService.getEffectivenessStats());
+    loadSettings();
   }, []);
 
-  const handleSettingChange = async (key: keyof AudioSettings, value: any) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    await audioAlertService.saveSettings({ [key]: value });
+  const loadSettings = async () => {
+    const current = dynamicAudioService.getSettings();
+    setSettings(current);
   };
 
-  const handleTestAlert = async () => {
-    await audioAlertService.testAlert();
-    Alert.alert('Тест', 'Тестовое оповещение воспроизведено');
+  const updateSetting = (key: keyof DynamicAudioSettings, value: any) => {
+    const updated = { ...settings, [key]: value };
+    setSettings(updated);
+    setHasChanges(true);
   };
 
-  const playExamplePhrase = async (urgency: string) => {
-    const examples = {
-      emergency: { ru: 'ОПАСНОСТЬ! Яма через 100 метров!', en: 'DANGER! Pothole in 100 meters!' },
-      critical: { ru: 'Внимание! Яма через 200 метров', en: 'Warning! Pothole in 200 meters' },
-      warning: { ru: 'Впереди яма, 400 метров', en: 'Pothole ahead, 400 meters' },
-      info: { ru: 'Яма на расстоянии 800 метров', en: 'Pothole at 800 meters' },
-    };
+  const saveSettings = async () => {
+    await dynamicAudioService.saveSettings(settings);
+    setHasChanges(false);
+    alert('✅ Настройки звука сохранены!');
+  };
 
-    const message = examples[urgency as keyof typeof examples][settings.language];
-    await audioAlertService.speakDirect(message);
+  const resetToDefaults = async () => {
+    if (confirm('Сбросить все настройки звука на значения по умолчанию?')) {
+      await dynamicAudioService.saveSettings({
+        voiceEnabled: true,
+        beepEnabled: true,
+        volume: 0.8,
+        language: 'ru',
+        minDistance: 30,
+        maxDistance: 300,
+        minSpeed: 5,
+        beepStartDistance: 200,
+        beepIntervalAtFar: 3000,
+        beepIntervalAtNear: 500,
+      });
+      loadSettings();
+      setHasChanges(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" />
-      
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Аудио-оповещения</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>🔊 Настройки звука</Text>
       </View>
 
       <ScrollView style={styles.content}>
         {/* Основные настройки */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔊 Основные настройки</Text>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Голосовые подсказки</Text>
-              <Text style={styles.settingDescription}>
-                Произносит тип и расстояние до препятствия
-              </Text>
+          <Text style={styles.sectionTitle}>🎙️ Основные настройки</Text>
+          
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text style={styles.switchLabel}>Голосовые предупреждения</Text>
+              <Text style={styles.switchDescription}>Произносить название препятствия</Text>
             </View>
             <Switch
               value={settings.voiceEnabled}
-              onValueChange={(value) => handleSettingChange('voiceEnabled', value)}
-              trackColor={{ false: '#475569', true: '#3b82f6' }}
-              thumbColor="#fff"
+              onValueChange={(value) => updateSetting('voiceEnabled', value)}
+              trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
+              thumbColor={settings.voiceEnabled ? '#22c55e' : '#9ca3af'}
             />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Звуковые сигналы</Text>
-              <Text style={styles.settingDescription}>
-                Воспроизводит звук перед голосом
-              </Text>
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text style={styles.switchLabel}>Звуковая сирена (Beep)</Text>
+              <Text style={styles.switchDescription}>Динамические сигналы по расстоянию</Text>
             </View>
             <Switch
-              value={settings.soundEnabled}
-              onValueChange={(value) => handleSettingChange('soundEnabled', value)}
-              trackColor={{ false: '#475569', true: '#3b82f6' }}
-              thumbColor="#fff"
+              value={settings.beepEnabled}
+              onValueChange={(value) => updateSetting('beepEnabled', value)}
+              trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
+              thumbColor={settings.beepEnabled ? '#22c55e' : '#9ca3af'}
             />
           </View>
-        </View>
 
-        {/* Громкость */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔉 Громкость</Text>
+          {/* Громкость */}
           <View style={styles.sliderContainer}>
-            <Ionicons name="volume-low" size={20} color="#94a3b8" />
+            <Text style={styles.sliderLabel}>Громкость: {Math.round(settings.volume * 100)}%</Text>
             <Slider
               style={styles.slider}
               minimumValue={0}
               maximumValue={1}
+              step={0.1}
               value={settings.volume}
-              onValueChange={(value) => handleSettingChange('volume', value)}
-              minimumTrackTintColor="#3b82f6"
-              maximumTrackTintColor="#475569"
-              thumbTintColor="#3b82f6"
+              onValueChange={(value) => updateSetting('volume', value)}
+              minimumTrackTintColor="#22c55e"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#22c55e"
             />
-            <Ionicons name="volume-high" size={20} color="#94a3b8" />
           </View>
-          <Text style={styles.volumeLabel}>{Math.round(settings.volume * 100)}%</Text>
-        </View>
 
-        {/* Минимальные подтверждения */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>✅ Уровень доверия</Text>
-          <Text style={styles.sectionDescription}>
-            Минимальное количество подтверждений для оповещения
-          </Text>
-
-          <View style={styles.confirmationOptions}>
-            {[1, 2, 3].map((level) => (
-              <Pressable
-                key={level}
-                style={[
-                  styles.confirmationOption,
-                  settings.minConfirmations === level && styles.confirmationOptionActive,
-                ]}
-                onPress={() => handleSettingChange('minConfirmations', level)}
-              >
-                <Text
-                  style={[
-                    styles.confirmationOptionText,
-                    settings.minConfirmations === level &&
-                      styles.confirmationOptionTextActive,
-                  ]}
-                >
-                  {level}+
-                </Text>
-                <Text style={styles.confirmationOptionLabel}>
-                  {level === 1 && 'Все'}
-                  {level === 2 && 'Проверенные'}
-                  {level === 3 && 'Надежные'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Язык */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🌍 Язык оповещений</Text>
-          <View style={styles.languageOptions}>
+          {/* Язык */}
+          <Text style={styles.subSectionTitle}>Язык:</Text>
+          <View style={styles.themeButtons}>
             <Pressable
               style={[
-                styles.languageOption,
-                settings.language === 'ru' && styles.languageOptionActive,
+                styles.themeButton,
+                settings.language === 'ru' && styles.themeButtonActive,
               ]}
-              onPress={() => handleSettingChange('language', 'ru')}
+              onPress={() => updateSetting('language', 'ru')}
             >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  settings.language === 'ru' && styles.languageOptionTextActive,
-                ]}
-              >
+              <Text style={[
+                styles.themeButtonText,
+                settings.language === 'ru' && styles.themeButtonTextActive,
+              ]}>
                 🇷🇺 Русский
               </Text>
             </Pressable>
-
+            
             <Pressable
               style={[
-                styles.languageOption,
-                settings.language === 'en' && styles.languageOptionActive,
+                styles.themeButton,
+                settings.language === 'en' && styles.themeButtonActive,
               ]}
-              onPress={() => handleSettingChange('language', 'en')}
+              onPress={() => updateSetting('language', 'en')}
             >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  settings.language === 'en' && styles.languageOptionTextActive,
-                ]}
-              >
+              <Text style={[
+                styles.themeButtonText,
+                settings.language === 'en' && styles.themeButtonTextActive,
+              ]}>
                 🇬🇧 English
               </Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Звуковая тема */}
+        {/* Динамические сигналы */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎵 Звуковая тема</Text>
-          
-          <Pressable
-            style={[
-              styles.themeCard,
-              settings.soundTheme === 'motion-tracker' && styles.themeCardActive,
-            ]}
-            onPress={() => handleSettingChange('soundTheme', 'motion-tracker')}
-          >
-            <View style={styles.themeHeader}>
-              <Ionicons name="radio" size={24} color={settings.soundTheme === 'motion-tracker' ? '#00d4ff' : '#8b94a8'} />
-              <View style={styles.themeInfo}>
-                <Text style={[styles.themeTitle, settings.soundTheme === 'motion-tracker' && styles.themeTitleActive]}>
-                  Motion Tracker
-                </Text>
-                <Text style={styles.themeDescription}>
-                  Звук датчика движения из фильма "Чужие" 👽
-                </Text>
-              </View>
-              {settings.soundTheme === 'motion-tracker' && (
-                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-              )}
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.themeCard,
-              settings.soundTheme === 'radar-detector' && styles.themeCardActive,
-            ]}
-            onPress={() => handleSettingChange('soundTheme', 'radar-detector')}
-          >
-            <View style={styles.themeHeader}>
-              <Ionicons name="speedometer" size={24} color={settings.soundTheme === 'radar-detector' ? '#00d4ff' : '#8b94a8'} />
-              <View style={styles.themeInfo}>
-                <Text style={[styles.themeTitle, settings.soundTheme === 'radar-detector' && styles.themeTitleActive]}>
-                  Радар-Детектор
-                </Text>
-                <Text style={styles.themeDescription}>
-                  Звуки автомобильного радар-детектора 📡
-                </Text>
-              </View>
-              {settings.soundTheme === 'radar-detector' && (
-                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-              )}
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.themeCard,
-              settings.soundTheme === 'voice-only' && styles.themeCardActive,
-            ]}
-            onPress={() => handleSettingChange('soundTheme', 'voice-only')}
-          >
-            <View style={styles.themeHeader}>
-              <Ionicons name="mic" size={24} color={settings.soundTheme === 'voice-only' ? '#00d4ff' : '#8b94a8'} />
-              <View style={styles.themeInfo}>
-                <Text style={[styles.themeTitle, settings.soundTheme === 'voice-only' && styles.themeTitleActive]}>
-                  Только голос
-                </Text>
-                <Text style={styles.themeDescription}>
-                  Без звуковых сигналов, только голосовые подсказки 🗣️
-                </Text>
-              </View>
-              {settings.soundTheme === 'voice-only' && (
-                <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-              )}
-            </View>
-          </Pressable>
-        </View>
-
-        {/* Примеры голосовых фраз */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🗣️ Примеры голосовых фраз</Text>
-          
-          <Text style={styles.examplesHint}>
-            Система произносит разные фразы в зависимости от расстояния и опасности препятствия. Нажмите для прослушивания:
+          <Text style={styles.sectionTitle}>📡 Динамические сигналы (Beep)</Text>
+          <Text style={styles.sectionDescription}>
+            Частота сигналов увеличивается при приближении к препятствию
           </Text>
 
-          {/* Info - далеко */}
-          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('info')}>
-            <View style={[styles.exampleBadge, { backgroundColor: '#3b82f6' }]}>
-              <Text style={styles.exampleBadgeText}>800м+</Text>
-            </View>
-            <View style={styles.exampleContent}>
-              <Text style={styles.exampleTitle}>Информационное</Text>
-              <Text style={styles.exampleText}>
-                {settings.language === 'ru' ? '"Яма на расстоянии 800 метров"' : '"Pothole at 800 meters"'}
-              </Text>
-            </View>
-            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
-          </Pressable>
-
-          {/* Warning - средняя дистанция */}
-          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('warning')}>
-            <View style={[styles.exampleBadge, { backgroundColor: '#f59e0b' }]}>
-              <Text style={styles.exampleBadgeText}>400м</Text>
-            </View>
-            <View style={styles.exampleContent}>
-              <Text style={styles.exampleTitle}>Предупреждение</Text>
-              <Text style={styles.exampleText}>
-                {settings.language === 'ru' ? '"Впереди яма, 400 метров"' : '"Pothole ahead, 400 meters"'}
-              </Text>
-            </View>
-            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
-          </Pressable>
-
-          {/* Critical - близко */}
-          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('critical')}>
-            <View style={[styles.exampleBadge, { backgroundColor: '#ef4444' }]}>
-              <Text style={styles.exampleBadgeText}>200м</Text>
-            </View>
-            <View style={styles.exampleContent}>
-              <Text style={styles.exampleTitle}>Критическое</Text>
-              <Text style={styles.exampleText}>
-                {settings.language === 'ru' ? '"Внимание! Яма через 200 метров"' : '"Warning! Pothole in 200 meters"'}
-              </Text>
-            </View>
-            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
-          </Pressable>
-
-          {/* Emergency - очень близко */}
-          <Pressable style={styles.exampleCard} onPress={() => playExamplePhrase('emergency')}>
-            <View style={[styles.exampleBadge, { backgroundColor: '#dc2626' }]}>
-              <Text style={styles.exampleBadgeText}>100м!</Text>
-            </View>
-            <View style={styles.exampleContent}>
-              <Text style={styles.exampleTitle}>Экстренное</Text>
-              <Text style={styles.exampleText}>
-                {settings.language === 'ru' ? '"ОПАСНОСТЬ! Яма через 100 метров!"' : '"DANGER! Pothole in 100 meters!"'}
-              </Text>
-              <Text style={styles.exampleNote}>Громче и быстрее</Text>
-            </View>
-            <Ionicons name="play-circle-outline" size={28} color="#00d4ff" />
-          </Pressable>
-        </View>
-
-        {/* Статистика эффективности */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📊 Статистика</Text>
-          
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalAlerts}</Text>
-              <Text style={styles.statLabel}>Всего оповещений</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {Math.round(stats.reactionRate * 100)}%
-              </Text>
-              <Text style={styles.statLabel}>Реакция водителя</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {Math.round(stats.averageReactionDistance)}м
-              </Text>
-              <Text style={styles.statLabel}>Среднее расстояние</Text>
-            </View>
+          {/* Минимальное расстояние */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Мин. расстояние: {settings.minDistance}м
+            </Text>
+            <Text style={styles.sliderDescription}>
+              Ближе этого расстояния сигналы не подаются
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={10}
+              maximumValue={100}
+              step={5}
+              value={settings.minDistance}
+              onValueChange={(value) => updateSetting('minDistance', value)}
+              minimumTrackTintColor="#ff3b30"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#ff3b30"
+            />
           </View>
 
-          <Text style={styles.statsDescription}>
-            Система адаптируется под ваш стиль вождения на основе этих данных
-          </Text>
+          {/* Максимальное расстояние */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Макс. расстояние: {settings.maxDistance}м
+            </Text>
+            <Text style={styles.sliderDescription}>
+              Дальше этого расстояния сигналы не подаются
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={100}
+              maximumValue={1000}
+              step={50}
+              value={settings.maxDistance}
+              onValueChange={(value) => updateSetting('maxDistance', value)}
+              minimumTrackTintColor="#fbbf24"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#fbbf24"
+            />
+          </View>
+
+          {/* Минимальная скорость */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Мин. скорость: {settings.minSpeed} м/с ({Math.round(settings.minSpeed * 3.6)} км/ч)
+            </Text>
+            <Text style={styles.sliderDescription}>
+              Ниже этой скорости сигналы не подаются
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={20}
+              step={1}
+              value={settings.minSpeed}
+              onValueChange={(value) => updateSetting('minSpeed', value)}
+              minimumTrackTintColor="#60a5fa"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#60a5fa"
+            />
+          </View>
+
+          {/* Расстояние начала сигналов */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Начало сигналов: {settings.beepStartDistance}м
+            </Text>
+            <Text style={styles.sliderDescription}>
+              На каком расстоянии начинать подавать сигналы
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={50}
+              maximumValue={500}
+              step={25}
+              value={settings.beepStartDistance}
+              onValueChange={(value) => updateSetting('beepStartDistance', value)}
+              minimumTrackTintColor="#a855f7"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#a855f7"
+            />
+          </View>
+
+          {/* Интервал на дальнем расстоянии */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Интервал (далеко): {(settings.beepIntervalAtFar / 1000).toFixed(1)}с
+            </Text>
+            <Text style={styles.sliderDescription}>
+              Частота сигналов на дальнем расстоянии
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={1000}
+              maximumValue={5000}
+              step={500}
+              value={settings.beepIntervalAtFar}
+              onValueChange={(value) => updateSetting('beepIntervalAtFar', value)}
+              minimumTrackTintColor="#22c55e"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#22c55e"
+            />
+          </View>
+
+          {/* Интервал на близком расстоянии */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Интервал (близко): {(settings.beepIntervalAtNear / 1000).toFixed(1)}с
+            </Text>
+            <Text style={styles.sliderDescription}>
+              Частота сигналов на близком расстоянии
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={100}
+              maximumValue={2000}
+              step={100}
+              value={settings.beepIntervalAtNear}
+              onValueChange={(value) => updateSetting('beepIntervalAtNear', value)}
+              minimumTrackTintColor="#ef4444"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#ef4444"
+            />
+          </View>
         </View>
 
-        {/* Кнопка теста */}
-        <Pressable style={styles.testButton} onPress={handleTestAlert}>
-          <Ionicons name="play-circle" size={24} color="#fff" />
-          <Text style={styles.testButtonText}>Тестовое оповещение</Text>
-        </Pressable>
+        {/* Кнопки */}
+        <View style={styles.buttonContainer}>
+          <Pressable
+            style={[styles.button, styles.resetButton]}
+            onPress={resetToDefaults}
+          >
+            <Text style={styles.buttonText}>🔄 Сбросить</Text>
+          </Pressable>
 
-        {/* Информация */}
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={20} color="#60a5fa" />
-          <Text style={styles.infoText}>
-            Система автоматически регулирует дистанцию и частоту оповещений на основе
-            вашей реакции. Чем чаще вы реагируете на предупреждения, тем точнее они
-            становятся.
-          </Text>
+          <Pressable
+            style={[styles.button, styles.saveButton, !hasChanges && styles.buttonDisabled]}
+            onPress={saveSettings}
+            disabled={!hasChanges}
+          >
+            <Text style={styles.buttonText}>
+              {hasChanges ? '💾 Сохранить' : '✅ Сохранено'}
+            </Text>
+          </Pressable>
         </View>
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -395,277 +317,141 @@ export default function AudioSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0a0a0a',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#1e293b',
+    padding: 16,
+    backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#2a2a2a',
   },
   backButton: {
+    marginRight: 16,
     padding: 8,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff',
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
     flex: 1,
   },
   section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    padding: 20,
+    backgroundColor: '#1a1a1a',
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#e2e8f0',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#888',
     marginBottom: 16,
+    lineHeight: 20,
   },
-  settingRow: {
+  subSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  switchRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
-  settingInfo: {
+  switchInfo: {
     flex: 1,
     marginRight: 16,
   },
-  settingLabel: {
+  switchLabel: {
     fontSize: 16,
-    color: '#e2e8f0',
+    color: '#fff',
+    fontWeight: '600',
     marginBottom: 4,
   },
-  settingDescription: {
+  switchDescription: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#888',
   },
   sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    marginBottom: 24,
+  },
+  sliderLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  sliderDescription: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 8,
   },
   slider: {
-    flex: 1,
+    width: '100%',
     height: 40,
   },
-  volumeLabel: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  confirmationOptions: {
+  themeButtons: {
     flexDirection: 'row',
     gap: 12,
   },
-  confirmationOption: {
+  themeButton: {
     flex: 1,
-    alignItems: 'center',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
-    backgroundColor: '#1e293b',
     borderWidth: 2,
-    borderColor: '#334155',
+    borderColor: '#2a2a2a',
+    alignItems: 'center',
   },
-  confirmationOptionActive: {
-    backgroundColor: '#1e40af',
-    borderColor: '#3b82f6',
+  themeButtonActive: {
+    backgroundColor: '#22c55e',
+    borderColor: '#22c55e',
   },
-  confirmationOptionText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#94a3b8',
-    marginBottom: 4,
+  themeButtonText: {
+    fontSize: 14,
+    color: '#ccc',
+    fontWeight: '600',
   },
-  confirmationOptionTextActive: {
+  themeButtonTextActive: {
     color: '#fff',
   },
-  confirmationOptionLabel: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  languageOptions: {
+  buttonContainer: {
     flexDirection: 'row',
     gap: 12,
+    padding: 20,
   },
-  languageOption: {
+  button: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16,
     borderRadius: 12,
-    backgroundColor: '#1e293b',
-    borderWidth: 2,
-    borderColor: '#334155',
     alignItems: 'center',
   },
-  languageOptionActive: {
-    backgroundColor: '#1e40af',
-    borderColor: '#3b82f6',
+  resetButton: {
+    backgroundColor: '#ef4444',
   },
-  languageOptionText: {
+  saveButton: {
+    backgroundColor: '#22c55e',
+  },
+  buttonDisabled: {
+    backgroundColor: '#4a5568',
+  },
+  buttonText: {
     fontSize: 16,
-    color: '#94a3b8',
-  },
-  languageOptionTextActive: {
+    fontWeight: '700',
     color: '#fff',
-    fontWeight: 'bold',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  statsDescription: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 12,
-    fontStyle: 'italic',
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    margin: 16,
-    padding: 16,
-    backgroundColor: '#3b82f6',
-    borderRadius: 12,
-  },
-  testButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    margin: 16,
-    padding: 16,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    gap: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#94a3b8',
-    lineHeight: 20,
-  },
-  examplesHint: {
-    fontSize: 14,
-    color: '#94a3b8',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  exampleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    marginBottom: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  exampleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  exampleBadgeText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  exampleContent: {
-    flex: 1,
-  },
-  exampleTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#e2e8f0',
-    marginBottom: 4,
-  },
-  exampleText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-  },
-  exampleNote: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  themeCard: {
-    padding: 16,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#334155',
-  },
-  themeCardActive: {
-    borderColor: '#00d4ff',
-    backgroundColor: '#1e2547',
-  },
-  themeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  themeInfo: {
-    flex: 1,
-  },
-  themeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#e2e8f0',
-    marginBottom: 4,
-  },
-  themeTitleActive: {
-    color: '#00d4ff',
-  },
-  themeDescription: {
-    fontSize: 14,
-    color: '#94a3b8',
-  },
-  bottomSpacer: {
-    height: 32,
   },
 });
