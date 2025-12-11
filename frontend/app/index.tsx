@@ -502,7 +502,17 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* 🆕 Настройки умных предупреждений (логика скорости + тексты) */}
+        {/* ⚡ АВТОЗАПУСК - САМОЕ ВАЖНОЕ! */}
+        <Pressable
+          style={[styles.button, styles.autostartButton]}
+          onPress={() => router.push('/autostart-settings')}
+        >
+          <Ionicons name="flash" size={40} color="#fbbf24" />
+          <Text style={[styles.buttonText, styles.autostartButtonText]}>⚡ АВТОЗАПУСК</Text>
+          <Text style={styles.buttonSubtext}>При подключении Bluetooth / CarPlay</Text>
+        </Pressable>
+
+        {/* Настройки предупреждений */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/alert-settings')}
@@ -511,7 +521,7 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>ЛОГИКА ПРЕДУПРЕЖДЕНИЙ</Text>
         </Pressable>
 
-        {/* 🆕 Настройки звука (всё звуковое: голос + beep + динамика) */}
+        {/* Настройки звука */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/audio-settings')}
@@ -527,15 +537,6 @@ export default function HomeScreen() {
         >
           <Ionicons name="eye" size={34} color="#00d4ff" />
           <Text style={styles.buttonText}>ВИЗУАЛЬНЫЕ КАРТОЧКИ</Text>
-        </Pressable>
-
-        {/* 🆕 Автозапуск при подключении BT/CarPlay */}
-        <Pressable
-          style={styles.button}
-          onPress={() => router.push('/autostart-settings')}
-        >
-          <Ionicons name="flash" size={34} color="#fbbf24" />
-          <Text style={styles.buttonText}>АВТОЗАПУСК (BT/CARPLAY)</Text>
         </Pressable>
 
         {/* Ручная отметка препятствия */}
