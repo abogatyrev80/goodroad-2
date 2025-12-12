@@ -1071,7 +1071,10 @@ async def get_v2_analytics():
         raise HTTPException(status_code=500, detail=f"Error retrieving v2 analytics: {str(e)}")
 
 @api_router.get("/admin/v2/raw-data")
-async def get_raw_data(limit: int = 100, skip: int = 0):
+async def get_raw_data(
+    limit: int = Query(100, ge=1, le=50000, description="Максимальное количество записей (1-50000)"),
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска")
+):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
         total = await db.raw_sensor_data.count_documents({})
