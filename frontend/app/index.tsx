@@ -700,6 +700,16 @@ const styles = StyleSheet.create({
     color: '#fbbf24',
     fontSize: 16, // Крупнее текст
   },
+  audioSettingsButton: {
+    borderColor: '#00d4ff',
+    backgroundColor: 'rgba(0, 212, 255, 0.15)', // Более яркий фон
+    borderWidth: 3, // Толще рамка
+    height: 90, // Повыше кнопка для важности
+  },
+  audioSettingsButtonText: {
+    color: '#00d4ff',
+    fontSize: 16, // Крупнее текст
+  },
   buttonDisabled: {
     opacity: 0.4,
   },
