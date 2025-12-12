@@ -620,6 +620,53 @@ const styles = StyleSheet.create({
   themeButtonTextActive: {
     color: '#fff',
   },
+  themeButtonSubtext: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 4,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  inputLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: '#ccc',
+  },
+  input: {
+    width: 80,
+    height: 40,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  inputUnit: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#888',
+    width: 50,
+  },
+  textInputRow: {
+    marginBottom: 16,
+  },
+  textInputLabel: {
+    fontSize: 14,
+    color: '#ccc',
+    marginBottom: 8,
+  },
+  textInput: {
+    height: 44,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#fff',
+    fontSize: 16,
+  },
   buttonContainer: {
     flexDirection: 'row',
     gap: 12,
