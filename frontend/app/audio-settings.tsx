@@ -266,6 +266,85 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* 🆕 Логика предупреждений */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🚗 Логика предупреждений</Text>
+          <Text style={styles.sectionDescription}>
+            Настройте когда будут срабатывать звуковые предупреждения
+          </Text>
+
+          {/* Порог превышения скорости */}
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>Порог превышения скорости:</Text>
+            <TextInput
+              style={styles.input}
+              value={String(settings.speedThresholdExcess || 20)}
+              onChangeText={(text) => updateSetting('speedThresholdExcess', parseInt(text) || 20)}
+              keyboardType="number-pad"
+            />
+            <Text style={styles.inputUnit}>км/ч</Text>
+          </View>
+          <Text style={styles.sliderDescription}>
+            Если ваша скорость превышает рекомендованную менее чем на это значение - предупреждение будет только визуальным
+          </Text>
+
+          {/* Рекомендованные скорости */}
+          <Text style={styles.subSectionTitle}>Рекомендованная скорость для типов препятствий:</Text>
+          {settings.recommendedSpeeds && Object.entries(settings.recommendedSpeeds).map(([key, value]) => (
+            <View key={key} style={styles.inputRow}>
+              <Text style={styles.inputLabel}>
+                {key === 'pothole' && '🕳️ Яма:'}
+                {key === 'speed_bump' && '🚧 Лежачий:'}
+                {key === 'bump' && '〰️ Неровность:'}
+                {key === 'vibration' && '〰️〰️ Вибрация:'}
+                {key === 'braking' && '🚗 Торможение:'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={String(value)}
+                onChangeText={(text) => {
+                  const updated = { ...settings, recommendedSpeeds: { ...settings.recommendedSpeeds, [key]: parseInt(text) || 40 } };
+                  setSettings(updated);
+                  setHasChanges(true);
+                }}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.inputUnit}>км/ч</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* 🆕 Кастомные тексты озвучки */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💬 Тексты озвучки</Text>
+          <Text style={styles.sectionDescription}>
+            Настройте фразы для голосовых предупреждений
+          </Text>
+          
+          {settings.customTexts && Object.entries(settings.customTexts).map(([key, value]) => (
+            <View key={key} style={styles.textInputRow}>
+              <Text style={styles.textInputLabel}>
+                {key === 'pothole' && '🕳️ Яма:'}
+                {key === 'speed_bump' && '🚧 Лежачий:'}
+                {key === 'bump' && '〰️ Неровность:'}
+                {key === 'vibration' && '〰️〰️ Вибрация:'}
+                {key === 'braking' && '🚗 Торможение:'}
+              </Text>
+              <TextInput
+                style={styles.textInput}
+                value={value}
+                onChangeText={(text) => {
+                  const updated = { ...settings, customTexts: { ...settings.customTexts, [key]: text } };
+                  setSettings(updated);
+                  setHasChanges(true);
+                }}
+                placeholder="Текст предупреждения"
+                placeholderTextColor="#666"
+              />
+            </View>
+          ))}
+        </View>
+
         {/* Динамические сигналы */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📡 Динамические сигналы (Beep)</Text>
