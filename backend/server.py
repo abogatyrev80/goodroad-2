@@ -1096,8 +1096,8 @@ async def get_raw_data(
 
 @api_router.get("/admin/v2/events")
 async def get_processed_events(
-    limit: int = 100,
-    skip: int = 0,
+    limit: int = Query(100, ge=1, le=50000, description="Максимальное количество событий (1-50000)"),
+    skip: int = Query(0, ge=0, description="Количество событий для пропуска"),
     event_type: str = None
 ):
     """Получить обработанные события из коллекции processed_events"""
