@@ -59,9 +59,23 @@ class DynamicAudioAlertService {
     volume: 0.8,
     minDistance: 50,   // Не предупреждать ближе 50м (слишком поздно)
     maxDistance: 600,  // Не предупреждать дальше 600м (слишком рано)
+    minSpeed: 5,      // м/с (~18 км/ч)
     language: 'ru',
+    soundTheme: 'motion-tracker', // 🆕 По умолчанию "Чужие"
+    theme: 'moderate',
+    beepStartDistance: 200,
+    beepIntervalAtFar: 3000,
+    beepIntervalAtNear: 500,
     speedWarningEnabled: true,
-    recommendedSpeeds: { ...DEFAULT_RECOMMENDED_SPEEDS }, // 🆕 Копируем значения по умолчанию
+    recommendedSpeeds: { ...DEFAULT_RECOMMENDED_SPEEDS }, // Копируем значения по умолчанию
+    speedThresholdExcess: 20, // 🆕 +20 км/ч сверх рекомендованной
+    customTexts: { // 🆕 Кастомные тексты по умолчанию
+      'pothole': 'Яма через',
+      'speed_bump': 'Лежачий полицейский через',
+      'bump': 'Неровность через',
+      'vibration': 'Плохое покрытие через',
+      'braking': 'Место торможения через',
+    },
   };
 
   private beepSound: Audio.Sound | null = null;
