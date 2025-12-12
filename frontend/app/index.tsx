@@ -521,13 +521,13 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>ЛОГИКА ПРЕДУПРЕЖДЕНИЙ</Text>
         </Pressable>
 
-        {/* Настройки звука */}
+        {/* Аудио настройки (темы озвучки, голос, сигналы) */}
         <Pressable
           style={styles.button}
           onPress={() => router.push('/audio-settings')}
         >
-          <Ionicons name="volume-high" size={34} color="#ff3b30" />
-          <Text style={styles.buttonText}>ЗВУК И СИГНАЛЫ</Text>
+          <Ionicons name="musical-notes" size={34} color="#ff3b30" />
+          <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
         </Pressable>
 
         {/* Визуальные оповещения */}
