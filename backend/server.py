@@ -2675,9 +2675,9 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
 
 @api_router.get("/admin/sensor-data/export/csv")
 async def export_sensor_data_csv(
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    limit: int = Query(10000, description="Maximum records to export")
+    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    limit: int = Query(10000, ge=1, le=100000, description="Максимальное количество записей для экспорта (1-100000)")
 ):
     """
     Export sensor data as CSV file
