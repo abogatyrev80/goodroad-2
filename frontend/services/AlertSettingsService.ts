@@ -35,16 +35,6 @@ export interface AlertSettings {
     braking: string;
   };
   
-  // Настройки звука
-  soundSettings: {
-    voiceEnabled: boolean;
-    sirenEnabled: boolean;
-    sirenTheme: 'gentle' | 'moderate' | 'urgent'; // Тема сирены
-    sirenIntensity: number; // 0.0 - 1.0
-    voiceSpeed: number; // 0.5 - 2.0
-    repeatVoice: boolean; // Повторять ли голос несколько раз
-  };
-  
   // Расстояния для предупреждений (метры)
   alertDistances: {
     earlyWarning: number;   // Раннее предупреждение (200м)
