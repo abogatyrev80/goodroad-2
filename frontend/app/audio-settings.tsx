@@ -120,7 +120,7 @@ export default function AudioSettingsScreen() {
           </View>
 
           {/* Язык */}
-          <Text style={styles.subSectionTitle}>Язык:</Text>
+          <Text style={styles.subSectionTitle}>Язык озвучки:</Text>
           <View style={styles.themeButtons}>
             <Pressable
               style={[
@@ -149,6 +149,58 @@ export default function AudioSettingsScreen() {
                 settings.language === 'en' && styles.themeButtonTextActive,
               ]}>
                 🇬🇧 English
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Тема звука */}
+          <Text style={styles.subSectionTitle}>Тема звуковых сигналов:</Text>
+          <Text style={styles.sliderDescription}>
+            Выберите стиль звуковых сигналов для предупреждений
+          </Text>
+          <View style={styles.themeButtons}>
+            <Pressable
+              style={[
+                styles.themeButton,
+                settings.theme === 'gentle' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateSetting('theme', 'gentle')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                settings.theme === 'gentle' && styles.themeButtonTextActive,
+              ]}>
+                🌸 Мягкая
+              </Text>
+            </Pressable>
+            
+            <Pressable
+              style={[
+                styles.themeButton,
+                settings.theme === 'moderate' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateSetting('theme', 'moderate')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                settings.theme === 'moderate' && styles.themeButtonTextActive,
+              ]}>
+                🔔 Средняя
+              </Text>
+            </Pressable>
+            
+            <Pressable
+              style={[
+                styles.themeButton,
+                settings.theme === 'urgent' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateSetting('theme', 'urgent')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                settings.theme === 'urgent' && styles.themeButtonTextActive,
+              ]}>
+                🚨 Срочная
               </Text>
             </Pressable>
           </View>
