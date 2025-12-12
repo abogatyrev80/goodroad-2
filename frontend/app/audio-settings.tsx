@@ -50,12 +50,30 @@ export default function AudioSettingsScreen() {
         beepEnabled: true,
         volume: 0.8,
         language: 'ru',
+        soundTheme: 'motion-tracker',
+        theme: 'moderate',
         minDistance: 30,
         maxDistance: 300,
         minSpeed: 5,
         beepStartDistance: 200,
         beepIntervalAtFar: 3000,
         beepIntervalAtNear: 500,
+        speedWarningEnabled: true,
+        recommendedSpeeds: {
+          'pothole': 40,
+          'speed_bump': 20,
+          'bump': 50,
+          'vibration': 60,
+          'braking': 50,
+        },
+        speedThresholdExcess: 20,
+        customTexts: {
+          'pothole': 'Яма через',
+          'speed_bump': 'Лежачий полицейский через',
+          'bump': 'Неровность через',
+          'vibration': 'Плохое покрытие через',
+          'braking': 'Место торможения через',
+        },
       });
       loadSettings();
       setHasChanges(false);
