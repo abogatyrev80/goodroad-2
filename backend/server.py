@@ -1905,8 +1905,8 @@ async def delete_raw_data(data_id: str):
 
 @api_router.get("/admin/sensor-data")
 async def get_all_sensor_data(
-    limit: int = Query(1000, description="Maximum number of records to return"),
-    skip: int = Query(0, description="Number of records to skip"),
+    limit: int = Query(1000, ge=1, le=100000, description="Максимальное количество записей (1-100000)"),
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
 ):
