@@ -132,62 +132,7 @@ class AlertSettingsService {
     return `${baseText} ${Math.round(distance)} метров`;
   }
 
-  /**
-   * Определяет нужно ли использовать голос
-   */
-  shouldUseVoice(alertLevel: 'silent' | 'visual' | 'voice' | 'full'): boolean {
-    if (!this.settings.soundSettings.voiceEnabled) return false;
-    return alertLevel === 'voice' || alertLevel === 'full';
-  }
-
-  /**
-   * Определяет нужно ли использовать сирену
-   */
-  shouldUseSiren(alertLevel: 'silent' | 'visual' | 'voice' | 'full'): boolean {
-    if (!this.settings.soundSettings.sirenEnabled) return false;
-    return alertLevel === 'full';
-  }
-
-  /**
-   * Получает частоту сирены на основе скорости и расстояния
-   */
-  getSirenFrequency(speedExcess: number, distance: number): number {
-    const { alertDistances } = this.settings;
-    
-    // Базовая частота от расстояния
-    let baseFrequency = 0.5; // Медленная (каждые 2 секунды)
-    
-    if (distance < alertDistances.urgentWarning) {
-      baseFrequency = 3.0; // Очень быстрая (3 раза в секунду)
-    } else if (distance < alertDistances.mainWarning) {
-      baseFrequency = 1.0; // Средняя (1 раз в секунду)
-    } else if (distance < alertDistances.earlyWarning) {
-      baseFrequency = 0.5; // Медленная
-    }
-    
-    // Увеличиваем частоту при превышении скорости
-    if (speedExcess > 40) {
-      baseFrequency *= 2.0;
-    } else if (speedExcess > 30) {
-      baseFrequency *= 1.5;
-    }
-    
-    return baseFrequency;
-  }
-
-  /**
-   * Получает тему сирены
-   */
-  getSirenTheme(): 'gentle' | 'moderate' | 'urgent' {
-    return this.settings.soundSettings.sirenTheme;
-  }
-
-  /**
-   * Нужно ли повторять голосовое предупреждение
-   */
-  shouldRepeatVoice(): boolean {
-    return this.settings.soundSettings.repeatVoice;
-  }
 }
+// Звуковые настройки теперь находятся в DynamicAudioAlertService (audio-settings.tsx)
 
 export default new AlertSettingsService();
