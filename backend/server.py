@@ -2921,6 +2921,77 @@ async def admin_dashboard_v3_api(request: Request):
     """Serve the admin dashboard v3 page through /api route"""
     return templates.TemplateResponse("admin_dashboard_v3.html", {"request": request})
 
+
+@api_router.put("/admin/editor/events/{event_id}")
+async def update_event(event_id: str, data: dict):
+    """
+    Обновление события по ID для админ-панели v3
+    """
+    try:
+        update_data = {}
+        if 'eventType' in data:
+            update_data['eventType'] = data['eventType']
+        if 'severity' in data:
+            update_data['severity'] = data['severity']
+        if 'confidence' in data:
+            update_data['confidence'] = data['confidence']
+        if 'notes' in data:
+            update_data['notes'] = data['notes']
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data to update")
+        
+        result = await db.processed_events.update_one(
+            {"id": event_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        return {"success": True, "message": "Event updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating event: {str(e)}")
+
+@api_router.put("/admin/editor/clusters/{cluster_id}")
+async def update_cluster(cluster_id: str, data: dict):
+    """
+    Обновление кластера по ID для админ-панели v3
+    """
+    try:
+        update_data = {}
+        if 'obstacleType' in data:
+            update_data['obstacleType'] = data['obstacleType']
+        if 'severity_max' in data:
+            update_data['severity.max'] = data['severity_max']
+        if 'confidence' in data:
+            update_data['confidence'] = data['confidence']
+        if 'status' in data:
+            update_data['status'] = data['status']
+        if 'notes' in data:
+            update_data['notes'] = data['notes']
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data to update")
+        
+        result = await db.obstacle_clusters.update_one(
+            {"_id": cluster_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Cluster not found")
+        
+        return {"success": True, "message": "Cluster updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating cluster: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating cluster: {str(e)}")
+
 @api_router.delete("/admin/editor/events/{event_id}")
 async def delete_event(event_id: str):
     """
