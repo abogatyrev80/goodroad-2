@@ -91,6 +91,47 @@ export default function AudioSettingsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* 🆕 Звуковая тема */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎵 Звуковая тема зуммера</Text>
+          <Text style={styles.sectionDescription}>
+            Выберите звук для предупреждений о препятствиях
+          </Text>
+          <View style={styles.themeButtons}>
+            <Pressable
+              style={[
+                styles.themeButton,
+                settings.soundTheme === 'motion-tracker' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateSetting('soundTheme', 'motion-tracker')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                settings.soundTheme === 'motion-tracker' && styles.themeButtonTextActive,
+              ]}>
+                👽 "Чужие"
+              </Text>
+              <Text style={styles.themeButtonSubtext}>Датчик движения</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[
+                styles.themeButton,
+                settings.soundTheme === 'radar-detector' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateSetting('soundTheme', 'radar-detector')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                settings.soundTheme === 'radar-detector' && styles.themeButtonTextActive,
+              ]}>
+                📡 "Радар детектор"
+              </Text>
+              <Text style={styles.themeButtonSubtext}>Автомобильный радар</Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* Основные настройки */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎙️ Основные настройки</Text>
