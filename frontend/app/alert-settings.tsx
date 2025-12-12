@@ -169,23 +169,6 @@ export default function AlertSettingsScreen() {
           ))}
         </View>
 
-        {/* Информация о настройках звука */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔊 Настройки звука</Text>
-          <Text style={styles.sectionDescription}>
-            Для настройки звука (голос, сирена, громкость, динамические сигналы) используйте кнопку "ЗВУК И СИГНАЛЫ" на главном экране.
-          </Text>
-          <Pressable
-            style={[styles.button, styles.linkButton]}
-            onPress={() => {
-              // @ts-ignore
-              router.push('/audio-settings');
-            }}
-          >
-            <Text style={styles.buttonText}>🔊 Открыть настройки звука</Text>
-          </Pressable>
-        </View>
-
         {/* Кнопки */}
         <View style={styles.buttonContainer}>
           <Pressable
