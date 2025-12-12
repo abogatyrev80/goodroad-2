@@ -60,14 +60,6 @@ const DEFAULT_SETTINGS: AlertSettings = {
     vibration: 'Плохое покрытие через',
     braking: 'Место торможения через',
   },
-  soundSettings: {
-    voiceEnabled: true,
-    sirenEnabled: true,
-    sirenTheme: 'moderate',
-    sirenIntensity: 0.7,
-    voiceSpeed: 1.0,
-    repeatVoice: false, // НЕ повторять
-  },
   alertDistances: {
     earlyWarning: 200,
     mainWarning: 100,
