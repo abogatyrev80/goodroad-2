@@ -479,22 +479,13 @@ export default function HomeScreen() {
           )}
         </Pressable>
 
-        {/* Настройки аудио */}
-        <Pressable
-          style={styles.button}
-          onPress={() => router.push('/audio-settings')}
-        >
-          <Ionicons name="volume-high" size={34} color="#00d4ff" />
-          <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
-        </Pressable>
-
         {/* 🆕 Обновить предупреждения */}
         {isTracking && (
           <Pressable
             style={[styles.button, styles.refreshButton]}
             onPress={() => {
               refetchObstacles();
-              showToast('🔄 Предупреждения обновлены', 'success');
+              showToast('success', '🔄 Обновлено', 'Предупреждения обновлены', 2000);
             }}
           >
             <Ionicons name="refresh" size={34} color="#fbbf24" />
@@ -502,7 +493,7 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {/* ⚡ АВТОЗАПУСК - САМОЕ ВАЖНОЕ! */}
+        {/* ⚡ АВТОЗАПУСК */}
         <Pressable
           style={[styles.button, styles.autostartButton]}
           onPress={() => router.push('/autostart-settings')}
@@ -512,22 +503,14 @@ export default function HomeScreen() {
           <Text style={styles.buttonSubtext}>При подключении Bluetooth / CarPlay</Text>
         </Pressable>
 
-        {/* Настройки предупреждений */}
+        {/* 🔊 АУДИО НАСТРОЙКИ - ЕДИНСТВЕННАЯ КНОПКА НАСТРОЕК ЗВУКА */}
         <Pressable
-          style={styles.button}
-          onPress={() => router.push('/alert-settings')}
-        >
-          <Ionicons name="speedometer" size={34} color="#22c55e" />
-          <Text style={styles.buttonText}>ЛОГИКА ПРЕДУПРЕЖДЕНИЙ</Text>
-        </Pressable>
-
-        {/* Аудио настройки (темы озвучки, голос, сигналы) */}
-        <Pressable
-          style={styles.button}
+          style={[styles.button, styles.audioSettingsButton]}
           onPress={() => router.push('/audio-settings')}
         >
-          <Ionicons name="musical-notes" size={34} color="#ff3b30" />
-          <Text style={styles.buttonText}>АУДИО НАСТРОЙКИ</Text>
+          <Ionicons name="volume-high" size={40} color="#00d4ff" />
+          <Text style={[styles.buttonText, styles.audioSettingsButtonText]}>🔊 АУДИО НАСТРОЙКИ</Text>
+          <Text style={styles.buttonSubtext}>Звуки, озвучка, логика предупреждений</Text>
         </Pressable>
 
         {/* Визуальные оповещения */}
