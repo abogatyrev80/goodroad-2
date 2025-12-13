@@ -487,44 +487,52 @@ export default function HomeScreen() {
         {/* 🆕 Обновить предупреждения */}
         {isTracking && (
           <Pressable
-            style={[styles.button, styles.refreshButton]}
+            style={[styles.compactButton, styles.refreshButton]}
             onPress={() => {
               refetchObstacles();
               showToast('success', '🔄 Обновлено', 'Предупреждения обновлены', 2000);
             }}
           >
-            <Ionicons name="refresh" size={34} color="#fbbf24" />
-            <Text style={styles.buttonText}>ОБНОВИТЬ ПРЕДУПРЕЖДЕНИЯ</Text>
+            <Ionicons name="refresh" size={24} color="#fbbf24" />
+            <Text style={styles.compactButtonText}>ОБНОВИТЬ</Text>
           </Pressable>
         )}
 
         {/* ⚡ АВТОЗАПУСК */}
         <Pressable
-          style={[styles.button, styles.autostartButton]}
+          style={[styles.compactButton, styles.autostartButton]}
           onPress={() => router.push('/autostart-settings')}
         >
-          <Ionicons name="flash" size={40} color="#fbbf24" />
-          <Text style={[styles.buttonText, styles.autostartButtonText]}>⚡ АВТОЗАПУСК</Text>
-          <Text style={styles.buttonSubtext}>При подключении Bluetooth / CarPlay</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="flash" size={28} color="#fbbf24" />
+            <View style={styles.buttonTextContainer}>
+              <Text style={[styles.compactButtonText, styles.autostartButtonText]}>АВТОЗАПУСК</Text>
+              <Text style={styles.buttonSubtext}>Bluetooth / CarPlay</Text>
+            </View>
+          </View>
         </Pressable>
 
-        {/* 🔊 АУДИО НАСТРОЙКИ - ЕДИНСТВЕННАЯ КНОПКА НАСТРОЕК ЗВУКА */}
+        {/* 🔊 АУДИО НАСТРОЙКИ */}
         <Pressable
-          style={[styles.button, styles.audioSettingsButton]}
+          style={[styles.compactButton, styles.audioSettingsButton]}
           onPress={() => router.push('/audio-settings')}
         >
-          <Ionicons name="volume-high" size={40} color="#00d4ff" />
-          <Text style={[styles.buttonText, styles.audioSettingsButtonText]}>🔊 АУДИО НАСТРОЙКИ</Text>
-          <Text style={styles.buttonSubtext}>Звуки, озвучка, логика предупреждений</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons name="volume-high" size={28} color="#00d4ff" />
+            <View style={styles.buttonTextContainer}>
+              <Text style={[styles.compactButtonText, styles.audioSettingsButtonText]}>АУДИО НАСТРОЙКИ</Text>
+              <Text style={styles.buttonSubtext}>Звуки, озвучка, логика</Text>
+            </View>
+          </View>
         </Pressable>
 
         {/* Визуальные оповещения */}
         <Pressable
-          style={styles.button}
+          style={styles.compactButton}
           onPress={() => router.push('/warning-settings')}
         >
-          <Ionicons name="eye" size={34} color="#00d4ff" />
-          <Text style={styles.buttonText}>ВИЗУАЛЬНЫЕ КАРТОЧКИ</Text>
+          <Ionicons name="eye" size={24} color="#00d4ff" />
+          <Text style={styles.compactButtonText}>ВИЗУАЛЬНЫЕ КАРТОЧКИ</Text>
         </Pressable>
 
         {/* Ручная отметка препятствия */}
