@@ -424,7 +424,12 @@ export default function HomeScreen() {
       {/* Плавающее предупреждение о препятствии */}
       <ObstacleWarningOverlay
         obstacle={closestObstacle}
-        visible={isTracking && closestObstacle !== null && closestObstacle.distance < 1000}
+        visible={
+          isTracking && 
+          closestObstacle !== null && 
+          closestObstacle.distance < 1000 && 
+          currentSpeed > 1 // 🆕 Показываем только если движемся (>1 м/с ≈ 3.6 км/ч)
+        }
         size={warningSize}
         position={warningPosition}
       />
