@@ -373,7 +373,7 @@ class EventClassifier:
         detected = max_pothole_intensity > threshold * 1.5  # Снижен порог с 2.0 до 1.5
         return detected, max_pothole_intensity
     
-    def _detect_speedbump_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
+    def _detect_speedbump_pattern(self, z_values: List[float], threshold: float = 0.04) -> Tuple[bool, float]:
         """
         🆕 ДЕТЕКТОР ПАТТЕРНА "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" (SPEED BUMP)
         ЛЕЖАЧИЙ: машина ПОДНИМАЕТСЯ ВВЕРХ (Z↑), потом СПУСКАЕТСЯ ВНИЗ (Z↓)
@@ -381,7 +381,7 @@ class EventClassifier:
         
         Args:
             z_values: массив значений по оси Z
-            threshold: минимальная скорость изменения для обнаружения
+            threshold: минимальная скорость изменения для обнаружения (снижен до 0.04)
             
         Returns:
             (обнаружен, максимальная_интенсивность)
@@ -401,7 +401,7 @@ class EventClassifier:
                 bump_intensity = rising_rate + abs(falling_rate)
                 max_bump_intensity = max(max_bump_intensity, bump_intensity)
         
-        detected = max_bump_intensity > threshold * 2
+        detected = max_bump_intensity > threshold * 1.5  # Снижен порог с 2.0 до 1.5
         return detected, max_bump_intensity
     
     def _detect_wave_pattern(self, z_values: List[float], threshold: float = 0.06) -> Tuple[bool, float]:
