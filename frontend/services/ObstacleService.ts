@@ -315,6 +315,111 @@ class ObstacleService {
     if (severity <= 3) return '#f59e0b'; // Средне
     return '#22c55e'; // Низко
   }
+
+  /**
+   * Вычислить расстояние между двумя точками (формула Haversine)
+   */
+  calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number {
+    const R = 6371e3; // Радиус Земли в метрах
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Расстояние в метрах
+  }
+
+  /**
+   * 🆕 Вычислить bearing (направление) от точки 1 к точке 2 в градусах (0-360)
+   */
+  calculateBearing(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number {
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    const θ = Math.atan2(y, x);
+    
+    return ((θ * 180) / Math.PI + 360) % 360; // Нормализуем до 0-360
+  }
+
+  /**
+   * 🆕 Проверить, находится ли препятствие впереди по курсу
+   * @param currentBearing - текущее направление движения (градусы)
+   * @param bearingToObstacle - направление на препятствие (градусы)
+   * @param tolerance - допуск в градусах (по умолчанию 45° = впереди в секторе 90°)
+   * @returns true если препятствие впереди по курсу
+   */
+  isObstacleAhead(
+    currentBearing: number,
+    bearingToObstacle: number,
+    tolerance: number = 45
+  ): boolean {
+    // Вычисляем разницу углов (учитываем переход через 0/360)
+    let diff = Math.abs(bearingToObstacle - currentBearing);
+    if (diff > 180) {
+      diff = 360 - diff;
+    }
+    
+    // Препятствие считается впереди если угол меньше tolerance
+    return diff <= tolerance;
+  }
+
+  /**
+   * 🆕 Получить релевантное расстояние с учетом вектора движения
+   * Возвращает null если препятствие не на пути
+   */
+  getRelevantDistance(
+    currentLat: number,
+    currentLon: number,
+    currentBearing: number | null | undefined,
+    obstacleLat: number,
+    obstacleLon: number
+  ): number | null {
+    // Вычисляем прямое расстояние
+    const distance = this.calculateDistance(currentLat, currentLon, obstacleLat, obstacleLon);
+    
+    // Если нет данных о направлении движения (например стоим), используем прямое расстояние
+    if (currentBearing === null || currentBearing === undefined || currentBearing === -1) {
+      return distance;
+    }
+
+    // Вычисляем направление на препятствие
+    const bearingToObstacle = this.calculateBearing(
+      currentLat,
+      currentLon,
+      obstacleLat,
+      obstacleLon
+    );
+
+    // Проверяем, находится ли препятствие впереди по курсу
+    const isAhead = this.isObstacleAhead(currentBearing, bearingToObstacle, 45);
+    
+    if (!isAhead) {
+      // Препятствие сбоку/сзади - игнорируем
+      console.log(`🔄 Obstacle not ahead: bearing=${currentBearing}°, to obstacle=${bearingToObstacle}°`);
+      return null;
+    }
+
+    // Препятствие впереди - возвращаем расстояние
+    return distance;
+  }
 }
 
 // Singleton
