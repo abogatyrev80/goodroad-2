@@ -342,7 +342,7 @@ class EventClassifier:
                 peaks += 1
         return peaks
     
-    def _detect_pothole_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
+    def _detect_pothole_pattern(self, z_values: List[float], threshold: float = 0.04) -> Tuple[bool, float]:
         """
         🆕 ДЕТЕКТОР ПАТТЕРНА "ЯМА" (POTHOLE)
         ЯМА: машина ПАДАЕТ ВНИЗ (Z↓), потом ВЫХОДИТ ВВЕРХ (Z↑)
@@ -350,7 +350,7 @@ class EventClassifier:
         
         Args:
             z_values: массив значений по оси Z
-            threshold: минимальная скорость изменения для обнаружения
+            threshold: минимальная скорость изменения для обнаружения (снижен до 0.04)
             
         Returns:
             (обнаружен, максимальная_интенсивность)
@@ -370,7 +370,7 @@ class EventClassifier:
                 pothole_intensity = abs(falling_rate) + rising_rate
                 max_pothole_intensity = max(max_pothole_intensity, pothole_intensity)
         
-        detected = max_pothole_intensity > threshold * 2
+        detected = max_pothole_intensity > threshold * 1.5  # Снижен порог с 2.0 до 1.5
         return detected, max_pothole_intensity
     
     def _detect_speedbump_pattern(self, z_values: List[float], threshold: float = 0.08) -> Tuple[bool, float]:
