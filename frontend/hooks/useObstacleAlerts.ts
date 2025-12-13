@@ -70,7 +70,7 @@ export function useObstacleAlerts(
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
   
-  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени (каждые 2 секунды)
+  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени с учетом ВЕКТОРА ДВИЖЕНИЯ
   useEffect(() => {
     if (!isTracking || !currentLocation || obstacles.length === 0) {
       return;
@@ -80,17 +80,29 @@ export function useObstacleAlerts(
       try {
         const lat = currentLocation.coords.latitude;
         const lon = currentLocation.coords.longitude;
+        const bearing = currentLocation.coords.heading; // 🆕 Направление движения из GPS
         
-        // Пересчитываем расстояния для всех препятствий
-        const updatedObstacles = obstacles.map(obstacle => ({
-          ...obstacle,
-          distance: obstacleService.calculateDistance(
-            lat,
-            lon,
-            obstacle.latitude,
-            obstacle.longitude
-          )
-        }));
+        console.log(`📍 Current bearing: ${bearing !== null && bearing !== undefined ? bearing.toFixed(1) + '°' : 'N/A'}`);
+        
+        // Пересчитываем расстояния для всех препятствий с учетом вектора
+        const updatedObstacles = obstacles
+          .map(obstacle => {
+            // 🆕 Используем новую логику с проверкой направления
+            const relevantDistance = obstacleService.getRelevantDistance(
+              lat,
+              lon,
+              bearing,
+              obstacle.latitude,
+              obstacle.longitude
+            );
+            
+            // Если препятствие не на пути (relevantDistance === null), возвращаем с большим расстоянием
+            return {
+              ...obstacle,
+              distance: relevantDistance !== null ? relevantDistance : 999999 // Большое число = игнорируем
+            };
+          })
+          .filter(obstacle => obstacle.distance < 999999); // Фильтруем препятствия не на пути
         
         setObstacles(updatedObstacles);
         
@@ -106,7 +118,7 @@ export function useObstacleAlerts(
     const distanceUpdateInterval = setInterval(updateDistances, 2000);
     
     return () => clearInterval(distanceUpdateInterval);
-  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
+  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading]);
 
   // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
