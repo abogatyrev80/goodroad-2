@@ -531,45 +531,46 @@ class EventClassifier:
         patterns = stats.get('patterns', {})
         
         if patterns:
-            # 🔥 ПАТТЕРН "ЯМА" - характерно для ямы
-            # Резкий скачок вниз + быстрый выход вверх (↓↑)
+            # 🆕 УЛУЧШЕННАЯ ЛОГИКА: оба паттерна могут быть обнаружены одновременно
+            # Выбираем тот, у которого интенсивность выше
             pothole_pattern = patterns.get('pothole', {})
-            if pothole_pattern.get('detected', False):
-                pothole_intensity = pothole_pattern.get('intensity', 0)
-                
-                # Определяем severity по интенсивности ямы
-                if pothole_intensity > 0.30:
-                    severity = 1  # Critical
-                elif pothole_intensity > 0.24:
-                    severity = 2  # High
-                elif pothole_intensity > 0.18:
-                    severity = 3  # Medium
-                else:
-                    severity = 4  # Low
-                
-                return {
-                    'eventType': 'pothole',
-                    'severity': severity,
-                    'confidence': 0.88,  # Высокая уверенность для паттернов
-                    'magnitude': stats['max_magnitude'],
-                    'delta_z': delta_z,
-                    'pothole_intensity': pothole_intensity,
-                    'detection_method': 'pattern_analysis',
-                    'note': pothole_pattern.get('note', f'Pothole pattern detected (intensity={pothole_intensity:.3f})')
-                }
-            
-            # 🚧 ПАТТЕРН "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" - характерно для лежачего полицейского
-            # Резкий подъем вверх + спуск вниз (↑↓)
             speedbump_pattern = patterns.get('speedbump', {})
-            if speedbump_pattern.get('detected', False):
-                speedbump_intensity = speedbump_pattern.get('intensity', 0)
-                
+            
+            pothole_detected = pothole_pattern.get('detected', False)
+            speedbump_detected = speedbump_pattern.get('detected', False)
+            pothole_intensity = pothole_pattern.get('intensity', 0)
+            speedbump_intensity = speedbump_pattern.get('intensity', 0)
+            
+            # Если оба паттерна обнаружены - выбираем по интенсивности
+            if pothole_detected and speedbump_detected:
+                # Если разница менее 15% - предпочитаем speed_bump (чаще встречается)
+                intensity_diff = abs(pothole_intensity - speedbump_intensity)
+                if intensity_diff < 0.05:  # Разница менее 0.05
+                    # Предпочитаем speed_bump если примерно равны
+                    detected_type = 'speed_bump'
+                    intensity = speedbump_intensity
+                else:
+                    # Иначе выбираем с большей интенсивностью
+                    detected_type = 'speed_bump' if speedbump_intensity > pothole_intensity else 'pothole'
+                    intensity = max(speedbump_intensity, pothole_intensity)
+            elif speedbump_detected:
+                detected_type = 'speed_bump'
+                intensity = speedbump_intensity
+            elif pothole_detected:
+                detected_type = 'pothole'
+                intensity = pothole_intensity
+            else:
+                detected_type = None
+                intensity = 0
+            
+            # 🚧 ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ обнаружен
+            if detected_type == 'speed_bump':
                 # Определяем severity по интенсивности лежачего
-                if speedbump_intensity > 0.24:
+                if intensity > 0.40:
                     severity = 1  # Critical
-                elif speedbump_intensity > 0.18:
+                elif intensity > 0.28:
                     severity = 2  # High
-                elif speedbump_intensity > 0.14:
+                elif intensity > 0.18:
                     severity = 3  # Medium
                 else:
                     severity = 4  # Low
@@ -580,9 +581,32 @@ class EventClassifier:
                     'confidence': 0.90,  # Очень высокая уверенность
                     'magnitude': stats['max_magnitude'],
                     'delta_z': delta_z,
-                    'speedbump_intensity': speedbump_intensity,
+                    'speedbump_intensity': intensity,
                     'detection_method': 'pattern_analysis',
-                    'note': speedbump_pattern.get('note', f'Speed bump pattern detected (intensity={speedbump_intensity:.3f})')
+                    'note': f'Speed bump pattern (↑↓): подъем {intensity:.2f}'
+                }
+            
+            # 🔥 ЯМА обнаружена
+            elif detected_type == 'pothole':
+                # Определяем severity по интенсивности ямы
+                if intensity > 0.35:
+                    severity = 1  # Critical
+                elif intensity > 0.28:
+                    severity = 2  # High
+                elif intensity > 0.18:
+                    severity = 3  # Medium
+                else:
+                    severity = 4  # Low
+                
+                return {
+                    'eventType': 'pothole',
+                    'severity': severity,
+                    'confidence': 0.88,  # Высокая уверенность для паттернов
+                    'magnitude': stats['max_magnitude'],
+                    'delta_z': delta_z,
+                    'pothole_intensity': intensity,
+                    'detection_method': 'pattern_analysis',
+                    'note': f'Pothole pattern (↓↑): падение {intensity:.2f}'
                 }
             
             # 🌊 ПАТТЕРН "ВОЛНА" - характерно для плавных неровностей
