@@ -18,9 +18,15 @@
       }
     },
     "production": {
+      "distribution": "internal",
       "android": {
-        "buildType": "apk"
-      }
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://road-monitor-4.emergent.host"
+      },
+      "channel": "production"
     }
   },
   "submit": {
