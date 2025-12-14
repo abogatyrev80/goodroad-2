@@ -68,8 +68,89 @@ export default function AudioSettingsScreen() {
     alert('✅ Настройки звука сохранены!');
   };
 
+  const pickCustomSound = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+      const customSound: CustomSound = {
+        id: Date.now().toString(),
+        name: file.name,
+        uri: file.uri,
+      };
+
+      const updated = [...customSounds, customSound];
+      setCustomSounds(updated);
+      await AsyncStorage.setItem('custom_sounds', JSON.stringify(updated));
+      
+      Alert.alert('✅ Успешно', `Звук "${file.name}" добавлен!`);
+    } catch (error) {
+      console.error('Error picking sound:', error);
+      Alert.alert('❌ Ошибка', 'Не удалось загрузить звуковой файл');
+    }
+  };
+
+  const playSound = async (uri: string) => {
+    try {
+      // Останавливаем предыдущий звук если играет
+      if (playingSound) {
+        await playingSound.stopAsync();
+        await playingSound.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync({ uri });
+      setPlayingSound(sound);
+      await sound.playAsync();
+
+      // Автоматически останавливаем после воспроизведения
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+          setPlayingSound(null);
+        }
+      });
+    } catch (error) {
+      console.error('Error playing sound:', error);
+      Alert.alert('❌ Ошибка', 'Не удалось воспроизвести звук');
+    }
+  };
+
+  const deleteCustomSound = async (id: string) => {
+    Alert.alert(
+      'Удалить звук?',
+      'Вы уверены, что хотите удалить этот звук?',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = customSounds.filter(s => s.id !== id);
+            setCustomSounds(updated);
+            await AsyncStorage.setItem('custom_sounds', JSON.stringify(updated));
+          },
+        },
+      ]
+    );
+  };
+
   const resetToDefaults = async () => {
-    if (confirm('Сбросить все настройки звука на значения по умолчанию?')) {
+    Alert.alert(
+      'Сбросить настройки?',
+      'Сбросить все настройки звука на значения по умолчанию?',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Сбросить',
+          style: 'destructive',
+          onPress: async () => {
       await dynamicAudioService.saveSettings({
         voiceEnabled: true,
         beepEnabled: true,
