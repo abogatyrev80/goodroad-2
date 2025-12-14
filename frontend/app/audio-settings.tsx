@@ -23,17 +23,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import dynamicAudioService, { DynamicAudioSettings } from '../services/DynamicAudioAlertService';
 
+interface CustomSound {
+  name: string;
+  uri: string;
+  id: string;
+}
+
 export default function AudioSettingsScreen() {
   const [settings, setSettings] = useState<DynamicAudioSettings>(dynamicAudioService.getSettings());
   const [hasChanges, setHasChanges] = useState(false);
+  const [customSounds, setCustomSounds] = useState<CustomSound[]>([]);
+  const [playingSound, setPlayingSound] = useState<Audio.Sound | null>(null);
 
   useEffect(() => {
     loadSettings();
+    loadCustomSounds();
   }, []);
 
   const loadSettings = async () => {
     const current = dynamicAudioService.getSettings();
     setSettings(current);
+  };
+
+  const loadCustomSounds = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('custom_sounds');
+      if (stored) {
+        setCustomSounds(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading custom sounds:', error);
+    }
   };
 
   const updateSetting = (key: keyof DynamicAudioSettings, value: any) => {
