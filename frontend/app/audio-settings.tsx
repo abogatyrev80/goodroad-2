@@ -181,9 +181,12 @@ export default function AudioSettingsScreen() {
           'braking': 'Место торможения через',
         },
       });
-      loadSettings();
-      setHasChanges(false);
-    }
+            loadSettings();
+            setHasChanges(false);
+          },
+        },
+      ]
+    );
   };
 
   return (
