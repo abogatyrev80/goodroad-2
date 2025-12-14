@@ -48,7 +48,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      [
+        "expo-router",
+        {
+          "origin": false
+        }
+      ],
+      "expo-location",
+      "expo-sensors"
     ],
     "experiments": {
       "typedRoutes": true
