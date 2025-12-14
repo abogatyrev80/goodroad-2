@@ -241,6 +241,54 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* 🆕 Пользовательские звуки */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📁 Ваши звуки</Text>
+          <Text style={styles.sectionDescription}>
+            Добавьте свои звуковые файлы для предупреждений
+          </Text>
+
+          {/* Кнопка добавления звука */}
+          <Pressable style={styles.addSoundButton} onPress={pickCustomSound}>
+            <Ionicons name="add-circle" size={24} color="#00d4ff" />
+            <Text style={styles.addSoundButtonText}>Добавить звуковой файл</Text>
+          </Pressable>
+
+          {/* Список пользовательских звуков */}
+          {customSounds.length > 0 ? (
+            <View style={styles.soundsList}>
+              {customSounds.map((sound) => (
+                <View key={sound.id} style={styles.soundItem}>
+                  <View style={styles.soundInfo}>
+                    <Ionicons name="musical-note" size={20} color="#00d4ff" />
+                    <Text style={styles.soundName} numberOfLines={1}>
+                      {sound.name}
+                    </Text>
+                  </View>
+                  <View style={styles.soundActions}>
+                    <Pressable
+                      style={styles.soundActionButton}
+                      onPress={() => playSound(sound.uri)}
+                    >
+                      <Ionicons name="play-circle" size={28} color="#22c55e" />
+                    </Pressable>
+                    <Pressable
+                      style={styles.soundActionButton}
+                      onPress={() => deleteCustomSound(sound.id)}
+                    >
+                      <Ionicons name="trash" size={24} color="#ef4444" />
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyMessage}>
+              Пока нет пользовательских звуков. Нажмите кнопку выше, чтобы добавить свой звук.
+            </Text>
+          )}
+        </View>
+
         {/* Основные настройки */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎙️ Основные настройки</Text>
