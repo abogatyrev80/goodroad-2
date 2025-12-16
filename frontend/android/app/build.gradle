@@ -12,7 +12,7 @@ react {
     // Fix for Windows: use direct paths instead of execute()
     def nodeModulesDir = file("../../node_modules")
     
-    entryFile = file("../../node_modules/expo-router/entry")
+    entryFile = file("../../node_modules/expo-router/entry.js")
     reactNativeDir = file("../../node_modules/react-native")
     hermesCommand = "$reactNativeDir/sdks/hermesc/%OS-BIN%/hermesc"
     codegenDir = file("../../node_modules/@react-native/codegen")
