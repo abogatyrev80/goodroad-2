@@ -14,8 +14,12 @@ react {
     
     entryFile = file("../../node_modules/expo-router/entry.js")
     reactNativeDir = file("../../node_modules/react-native")
-    hermesCommand = "$reactNativeDir/sdks/hermesc/%OS-BIN%/hermesc"
+    // Disable Hermes for easier build (optional, can be enabled later)
+    hermesCommand = ""
     codegenDir = file("../../node_modules/@react-native/codegen")
+    
+    // Disable Hermes engine
+    enableHermes = false
 
     enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
     // Use Expo CLI to bundle the app, this ensures the Metro config
