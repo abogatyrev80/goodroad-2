@@ -76,22 +76,32 @@ class DynamicAudioAlertService {
     maxDistance: 600,  // Не предупреждать дальше 600м (слишком рано)
     minSpeed: 5,      // м/с (~18 км/ч)
     language: 'ru',
-    soundTheme: 'motion-tracker', // 🆕 По умолчанию "Чужие"
+    soundTheme: 'motion-tracker', // По умолчанию "Чужие"
+    customThemeSoundId: undefined, // Нет пользовательского звука
     theme: 'moderate',
     beepStartDistance: 200,
     beepIntervalAtFar: 3000,
     beepIntervalAtNear: 500,
     speedWarningEnabled: true,
     recommendedSpeeds: { ...DEFAULT_RECOMMENDED_SPEEDS }, // Копируем значения по умолчанию
-    speedThresholdExcess: 20, // 🆕 +20 км/ч сверх рекомендованной
-    customTexts: { // 🆕 Кастомные тексты по умолчанию
+    speedThresholdExcess: 20, // +20 км/ч сверх рекомендованной
+    customTexts: { // Кастомные тексты по умолчанию
       'pothole': 'Яма через',
       'speed_bump': 'Лежачий полицейский через',
       'bump': 'Неровность через',
       'vibration': 'Плохое покрытие через',
       'braking': 'Место торможения через',
     },
+    obstacleSounds: { // Звуки для типов препятствий (по умолчанию - используем тему)
+      'pothole': { useCustom: false },
+      'speed_bump': { useCustom: false },
+      'bump': { useCustom: false },
+      'vibration': { useCustom: false },
+      'braking': { useCustom: false },
+    },
   };
+  
+  private customSoundCache: Map<string, Audio.Sound> = new Map();
 
   private beepSound: Audio.Sound | null = null;
   private lastBeepTime: number = 0;
