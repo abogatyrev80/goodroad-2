@@ -440,6 +440,91 @@ class DynamicAudioAlertService {
   }
 
   /**
+   * 🆕 Воспроизвести пользовательский звук по URI
+   */
+  async playCustomSound(uri: string, pitch: number = 1.0): Promise<void> {
+    try {
+      // Проверяем кеш
+      let sound = this.customSoundCache.get(uri);
+      
+      if (!sound) {
+        // Создаем новый звук и кешируем
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri },
+          { volume: this.settings.volume, shouldPlay: false }
+        );
+        sound = newSound;
+        this.customSoundCache.set(uri, sound);
+      }
+
+      // Воспроизводим
+      await sound.setPositionAsync(0);
+      await sound.setRateAsync(pitch, true);
+      await sound.setVolumeAsync(this.settings.volume);
+      await sound.playAsync();
+      
+      this.lastBeepTime = Date.now();
+      console.log(`🎵 Playing custom sound: ${uri}`);
+    } catch (error) {
+      console.error('❌ Error playing custom sound:', error);
+    }
+  }
+
+  /**
+   * 🆕 Воспроизвести звук для типа препятствия
+   * Учитывает настройки: тема или пользовательский звук
+   */
+  async playObstacleSound(obstacleType: string, distance: number, customSounds: CustomSoundItem[]): Promise<void> {
+    await this.ensureInitialized();
+
+    if (!this.settings.beepEnabled) return;
+
+    const now = Date.now();
+    const timeSinceLastBeep = now - this.lastBeepTime;
+    
+    // Вычисляем интервал на основе расстояния
+    let interval = this.settings.beepIntervalAtFar;
+    if (distance < 100) {
+      interval = this.settings.beepIntervalAtNear;
+    } else if (distance < 200) {
+      interval = (this.settings.beepIntervalAtFar + this.settings.beepIntervalAtNear) / 2;
+    }
+
+    if (timeSinceLastBeep < interval) return;
+
+    // Определяем высоту тона
+    let pitch = 1.0;
+    if (distance < 50) pitch = 1.5;
+    else if (distance < 100) pitch = 1.3;
+    else if (distance < 200) pitch = 1.1;
+
+    // Проверяем настройки для этого типа препятствия
+    const obstacleSound = this.settings.obstacleSounds?.[obstacleType];
+    
+    if (obstacleSound?.useCustom && obstacleSound.customSoundId) {
+      // Используем индивидуальный пользовательский звук
+      const customSound = customSounds.find(s => s.id === obstacleSound.customSoundId);
+      if (customSound) {
+        await this.playCustomSound(customSound.uri, pitch);
+        return;
+      }
+    }
+
+    // Проверяем общую тему
+    if (this.settings.soundTheme === 'custom' && this.settings.customThemeSoundId) {
+      // Используем общий пользовательский звук
+      const customSound = customSounds.find(s => s.id === this.settings.customThemeSoundId);
+      if (customSound) {
+        await this.playCustomSound(customSound.uri, pitch);
+        return;
+      }
+    }
+
+    // Используем встроенный звук темы
+    await this.playBeepWithPitch(pitch);
+  }
+
+  /**
    * Очистка ресурсов
    */
   async cleanup(): Promise<void> {
@@ -447,6 +532,12 @@ class DynamicAudioAlertService {
       await this.beepSound.unloadAsync();
       this.beepSound = null;
     }
+    
+    // Очищаем кеш пользовательских звуков
+    for (const sound of this.customSoundCache.values()) {
+      await sound.unloadAsync();
+    }
+    this.customSoundCache.clear();
   }
 }
 
