@@ -343,6 +343,108 @@ export default function AudioSettingsScreen() {
           )}
         </View>
 
+        {/* 🆕 Индивидуальные звуки для типов препятствий */}
+        {customSounds.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🎯 Звуки для типов препятствий</Text>
+            <Text style={styles.sectionDescription}>
+              Назначьте разные звуки для каждого типа препятствия. Если не выбран свой звук - используется общая тема.
+            </Text>
+
+            {[
+              { key: 'pothole', icon: '🕳️', name: 'Яма' },
+              { key: 'speed_bump', icon: '🚧', name: 'Лежачий полицейский' },
+              { key: 'bump', icon: '〰️', name: 'Неровность' },
+              { key: 'vibration', icon: '〰️〰️', name: 'Вибрация / Плохое покрытие' },
+              { key: 'braking', icon: '🚗', name: 'Место торможения' },
+            ].map((obstacle) => {
+              const obstacleSound = settings.obstacleSounds?.[obstacle.key] || { useCustom: false };
+              const selectedSound = obstacleSound.useCustom 
+                ? customSounds.find(s => s.id === obstacleSound.customSoundId) 
+                : null;
+
+              return (
+                <View key={obstacle.key} style={styles.obstacleSoundRow}>
+                  <View style={styles.obstacleSoundHeader}>
+                    <Text style={styles.obstacleSoundLabel}>
+                      {obstacle.icon} {obstacle.name}
+                    </Text>
+                    <Switch
+                      value={obstacleSound.useCustom}
+                      onValueChange={(value) => {
+                        const updated = {
+                          ...settings,
+                          obstacleSounds: {
+                            ...settings.obstacleSounds,
+                            [obstacle.key]: {
+                              useCustom: value,
+                              customSoundId: value ? customSounds[0]?.id : undefined,
+                            },
+                          },
+                        };
+                        setSettings(updated);
+                        setHasChanges(true);
+                      }}
+                      trackColor={{ false: '#3e3e3e', true: '#4ade80' }}
+                      thumbColor={obstacleSound.useCustom ? '#22c55e' : '#9ca3af'}
+                    />
+                  </View>
+                  
+                  {obstacleSound.useCustom ? (
+                    <View style={styles.obstacleSoundPicker}>
+                      {customSounds.map((sound) => (
+                        <Pressable
+                          key={sound.id}
+                          style={[
+                            styles.obstacleSoundOption,
+                            obstacleSound.customSoundId === sound.id && styles.obstacleSoundOptionActive,
+                          ]}
+                          onPress={() => {
+                            const updated = {
+                              ...settings,
+                              obstacleSounds: {
+                                ...settings.obstacleSounds,
+                                [obstacle.key]: {
+                                  useCustom: true,
+                                  customSoundId: sound.id,
+                                },
+                              },
+                            };
+                            setSettings(updated);
+                            setHasChanges(true);
+                          }}
+                        >
+                          <Ionicons 
+                            name={obstacleSound.customSoundId === sound.id ? "checkmark-circle" : "ellipse-outline"} 
+                            size={18} 
+                            color={obstacleSound.customSoundId === sound.id ? '#22c55e' : '#666'} 
+                          />
+                          <Text 
+                            style={[
+                              styles.obstacleSoundOptionText,
+                              obstacleSound.customSoundId === sound.id && styles.obstacleSoundOptionTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {sound.name}
+                          </Text>
+                          <Pressable onPress={() => playSound(sound.uri)}>
+                            <Ionicons name="play" size={16} color="#22c55e" />
+                          </Pressable>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.obstacleSoundDefault}>
+                      Используется общая тема: {settings.soundTheme === 'motion-tracker' ? '👽 Чужие' : settings.soundTheme === 'radar-detector' ? '📡 Радар' : '🎧 Свой звук'}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Основные настройки */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎙️ Основные настройки</Text>
