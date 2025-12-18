@@ -14,6 +14,19 @@ import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Obstacle } from './ObstacleService';
 
+// Пользовательский звук
+export interface CustomSoundItem {
+  id: string;
+  name: string;
+  uri: string;
+}
+
+// Настройки звуков для типов препятствий
+export interface ObstacleSoundSettings {
+  useCustom: boolean; // true = использовать свой звук, false = использовать тему
+  customSoundId?: string; // ID пользовательского звука (если useCustom=true)
+}
+
 export interface DynamicAudioSettings {
   voiceEnabled: boolean;
   beepEnabled: boolean;
@@ -22,7 +35,8 @@ export interface DynamicAudioSettings {
   maxDistance: number; // Максимальная дистанция для предупреждений (метры)
   minSpeed: number; // Минимальная скорость для предупреждений (м/с)
   language: 'ru' | 'en';
-  soundTheme: 'motion-tracker' | 'radar-detector'; // 🆕 Звуковая тема: Чужие или Радар детектор
+  soundTheme: 'motion-tracker' | 'radar-detector' | 'custom'; // 🆕 + custom для своего звука
+  customThemeSoundId?: string; // 🆕 ID пользовательского звука для темы "custom"
   theme: 'gentle' | 'moderate' | 'urgent'; // Тема звуковых сигналов
   beepStartDistance: number; // Расстояние начала beep сигналов (метры)
   beepIntervalAtFar: number; // Интервал beep на дальнем расстоянии (мс)
@@ -31,6 +45,7 @@ export interface DynamicAudioSettings {
   recommendedSpeeds: Record<string, number>; // 🆕 Настраиваемые рекомендуемые скорости
   speedThresholdExcess: number; // 🆕 Порог превышения скорости для звуковых предупреждений (км/ч)
   customTexts: Record<string, string>; // 🆕 Кастомные тексты предупреждений
+  obstacleSounds: Record<string, ObstacleSoundSettings>; // 🆕 Индивидуальные звуки для типов препятствий
 }
 
 // Рекомендуемые скорости по умолчанию для типов препятствий (км/ч)
