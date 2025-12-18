@@ -21,13 +21,9 @@ import Slider from '@react-native-community/slider';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
-import dynamicAudioService, { DynamicAudioSettings } from '../services/DynamicAudioAlertService';
+import dynamicAudioService, { DynamicAudioSettings, CustomSoundItem, ObstacleSoundSettings } from '../services/DynamicAudioAlertService';
 
-interface CustomSound {
-  name: string;
-  uri: string;
-  id: string;
-}
+interface CustomSound extends CustomSoundItem {}
 
 export default function AudioSettingsScreen() {
   const [settings, setSettings] = useState<DynamicAudioSettings>(dynamicAudioService.getSettings());
