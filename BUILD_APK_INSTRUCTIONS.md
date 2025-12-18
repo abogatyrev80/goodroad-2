@@ -181,6 +181,31 @@ npx expo config --type public
 # Исправьте ошибки в app.json
 ```
 
+### Ошибка 6: "Hermes compiler failed" / "hermesc linux64-bin" на Windows
+
+**Симптомы:**
+- `Task :app:createBundleReleaseJsAndAssets FAILED`
+- Логи показывают попытку использовать `linux64-bin/hermesc` на Windows
+
+**Решение:**
+Откройте файл `frontend/android/gradle.properties` и измените:
+```properties
+# Было:
+hermesEnabled=true
+
+# Замените на:
+hermesEnabled=false
+```
+
+Затем очистите и пересоберите:
+```bash
+cd android
+.\gradlew clean
+.\gradlew assembleRelease
+```
+
+**Примечание:** Отключение Hermes переключает JavaScript-движок на JSC (JavaScriptCore). Приложение будет работать корректно.
+
 ---
 
 ## 🔄 Альтернативный способ (локальная сборка)
