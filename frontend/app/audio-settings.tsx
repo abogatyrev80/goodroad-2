@@ -1060,4 +1060,128 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 20,
   },
+  // Новые стили для тем
+  themeButtonsWrap: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  customThemeSection: {
+    marginTop: 8,
+  },
+  customThemeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#1e3a5f',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#00d4ff',
+    gap: 10,
+  },
+  customThemeButtonActive: {
+    backgroundColor: '#00d4ff',
+    borderColor: '#00d4ff',
+  },
+  customThemeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#00d4ff',
+  },
+  customThemeButtonTextActive: {
+    color: '#fff',
+  },
+  customThemePicker: {
+    marginTop: 12,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  pickerLabel: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 10,
+  },
+  soundPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2a2a2a',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  soundPickerItemActive: {
+    borderColor: '#22c55e',
+    backgroundColor: '#1a2e1a',
+  },
+  soundPickerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  soundPickerName: {
+    fontSize: 14,
+    color: '#ccc',
+    flex: 1,
+  },
+  soundPickerNameActive: {
+    color: '#22c55e',
+    fontWeight: '600',
+  },
+  // Стили для индивидуальных звуков препятствий
+  obstacleSoundRow: {
+    marginBottom: 20,
+    padding: 14,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+  },
+  obstacleSoundHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  obstacleSoundLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  obstacleSoundPicker: {
+    gap: 8,
+  },
+  obstacleSoundOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    padding: 10,
+    borderRadius: 8,
+    gap: 8,
+  },
+  obstacleSoundOptionActive: {
+    backgroundColor: '#1a2e1a',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  obstacleSoundOptionText: {
+    fontSize: 13,
+    color: '#888',
+    flex: 1,
+  },
+  obstacleSoundOptionTextActive: {
+    color: '#22c55e',
+    fontWeight: '500',
+  },
+  obstacleSoundDefault: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
+  },
 });
