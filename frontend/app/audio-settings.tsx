@@ -200,9 +200,9 @@ export default function AudioSettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎵 Звуковая тема зуммера</Text>
           <Text style={styles.sectionDescription}>
-            Выберите звук для предупреждений о препятствиях
+            Выберите звук для предупреждений о препятствиях (применяется ко всем типам препятствий, если не настроено индивидуально)
           </Text>
-          <View style={styles.themeButtons}>
+          <View style={styles.themeButtonsWrap}>
             <Pressable
               style={[
                 styles.themeButton,
@@ -235,6 +235,64 @@ export default function AudioSettingsScreen() {
               <Text style={styles.themeButtonSubtext}>Автомобильный радар</Text>
             </Pressable>
           </View>
+
+          {/* Свой звук как тема */}
+          {customSounds.length > 0 && (
+            <View style={styles.customThemeSection}>
+              <Pressable
+                style={[
+                  styles.customThemeButton,
+                  settings.soundTheme === 'custom' && styles.customThemeButtonActive,
+                ]}
+                onPress={() => updateSetting('soundTheme', 'custom')}
+              >
+                <Ionicons 
+                  name="musical-notes" 
+                  size={24} 
+                  color={settings.soundTheme === 'custom' ? '#fff' : '#00d4ff'} 
+                />
+                <Text style={[
+                  styles.customThemeButtonText,
+                  settings.soundTheme === 'custom' && styles.customThemeButtonTextActive,
+                ]}>
+                  🎧 Свой звук
+                </Text>
+              </Pressable>
+
+              {settings.soundTheme === 'custom' && (
+                <View style={styles.customThemePicker}>
+                  <Text style={styles.pickerLabel}>Выберите звук для темы:</Text>
+                  {customSounds.map((sound) => (
+                    <Pressable
+                      key={sound.id}
+                      style={[
+                        styles.soundPickerItem,
+                        settings.customThemeSoundId === sound.id && styles.soundPickerItemActive,
+                      ]}
+                      onPress={() => updateSetting('customThemeSoundId', sound.id)}
+                    >
+                      <View style={styles.soundPickerInfo}>
+                        <Ionicons 
+                          name={settings.customThemeSoundId === sound.id ? "checkmark-circle" : "musical-note"} 
+                          size={20} 
+                          color={settings.customThemeSoundId === sound.id ? '#22c55e' : '#00d4ff'} 
+                        />
+                        <Text style={[
+                          styles.soundPickerName,
+                          settings.customThemeSoundId === sound.id && styles.soundPickerNameActive,
+                        ]} numberOfLines={1}>
+                          {sound.name}
+                        </Text>
+                      </View>
+                      <Pressable onPress={() => playSound(sound.uri)}>
+                        <Ionicons name="play-circle" size={28} color="#22c55e" />
+                      </Pressable>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* 🆕 Пользовательские звуки */}
