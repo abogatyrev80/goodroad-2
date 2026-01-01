@@ -695,3 +695,7 @@ model.patch
 # Environment files
 *.env
 *.env.*
+
+.metro-cache/
+frontend/expo-env.d.ts
+frontend/.expo/
