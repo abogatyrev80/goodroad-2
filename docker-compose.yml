@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # MongoDB Database
@@ -57,14 +57,16 @@ services:
     container_name: road-monitor-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"      # Web interface
-      - "19000:19000"    # Expo DevTools
-      - "19001:19001"    # Expo DevTools (iOS)
-      - "19002:19002"    # Expo DevTools (Android)
+      - "8081:8081" # Metro Bundler (основной порт для Expo)
+      - "19000:19000" # Expo DevTools
+      - "19001:19001" # Expo DevTools (iOS)
+      - "19002:19002" # Expo DevTools (Android)
     environment:
       - EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
       - REACT_APP_BACKEND_URL=http://localhost:8001
       - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      - EXPO_PACKAGER_HOSTNAME=localhost # Для корректной работы с хоста
+      - EXPO_USE_TUNNEL=1 # Включить tunnel режим
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -75,6 +77,8 @@ services:
       - road-monitor-network
     stdin_open: true
     tty: true
+    # command: yarn start
+    command: yarn start --tunnel
 
 networks:
   road-monitor-network:
