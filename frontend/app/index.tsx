@@ -12,6 +12,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +38,12 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<any>(null);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  
+  // #region agent log
+  // Layout measurement refs
+  const containerLayoutRef = useRef<{width: number, height: number} | null>(null);
+  const buttonsContainerLayoutRef = useRef<{width: number, height: number} | null>(null);
+  // #endregion
   
   // Настройки предупреждений
   const [warningSize, setWarningSize] = useState<WarningSize>('medium');
@@ -71,6 +78,10 @@ export default function HomeScreen() {
 
   // Инициализация при загрузке
   useEffect(() => {
+    // #region agent log
+    const screenData = Dimensions.get('window');
+    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:74',message:'Screen dimensions on mount',data:{width:screenData.width,height:screenData.height,scale:screenData.scale},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     initializeServices();
     alertSettingsService.initialize(); // 🆕 Инициализация настроек предупреждений
     return () => {
@@ -417,8 +428,26 @@ export default function HomeScreen() {
     }
   };
 
+  // #region agent log
+  const handleContainerLayout = (event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    containerLayoutRef.current = { width, height };
+    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:420',message:'Container layout measured',data:{width,height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  };
+  const handleButtonsContainerLayout = (event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    buttonsContainerLayoutRef.current = { width, height };
+    // Calculate estimated content height
+    const buttonHeights = 130 + (isTracking ? 64 : 0) + 64 + 90 + 64 + 76 + 76; // mainButton + refreshButton(conditional) + autostart + audio + warning + report + stats
+    const gaps = (isTracking ? 7 : 6) * 16; // number of gaps * gap size
+    const padding = 24 * 2; // vertical padding
+    const estimatedContentHeight = buttonHeights + gaps + padding;
+    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:460',message:'Buttons container layout measured',data:{width,height,estimatedContentHeight,isTracking,wouldOverflow:estimatedContentHeight>height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  };
+  // #endregion
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']} onLayout={handleContainerLayout}>
       <StatusBar barStyle="light-content" />
 
       {/* Плавающее предупреждение о препятствии */}
@@ -457,7 +486,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Главные кнопки */}
-      <View style={styles.buttonsContainer}>
+      <View style={styles.buttonsContainer} onLayout={handleButtonsContainerLayout}>
         {/* Кнопка мониторинга */}
         <Pressable
           style={[
