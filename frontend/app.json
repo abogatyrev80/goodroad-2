@@ -64,7 +64,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "backendUrl": "https://road-monitor-4.emergent.host",
+      "backendUrl": "https://goodroad.su",
       "router": {
         "origin": false
       },
