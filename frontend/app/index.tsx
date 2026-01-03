@@ -12,7 +12,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
-  Dimensions,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,11 +39,6 @@ export default function HomeScreen() {
   const [currentLocation, setCurrentLocation] = useState<any>(null);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   
-  // #region agent log
-  // Layout measurement refs
-  const containerLayoutRef = useRef<{width: number, height: number} | null>(null);
-  const buttonsContainerLayoutRef = useRef<{width: number, height: number} | null>(null);
-  // #endregion
   
   // Настройки предупреждений
   const [warningSize, setWarningSize] = useState<WarningSize>('medium');
@@ -78,10 +73,6 @@ export default function HomeScreen() {
 
   // Инициализация при загрузке
   useEffect(() => {
-    // #region agent log
-    const screenData = Dimensions.get('window');
-    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:74',message:'Screen dimensions on mount',data:{width:screenData.width,height:screenData.height,scale:screenData.scale},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     initializeServices();
     alertSettingsService.initialize(); // 🆕 Инициализация настроек предупреждений
     return () => {
@@ -428,26 +419,8 @@ export default function HomeScreen() {
     }
   };
 
-  // #region agent log
-  const handleContainerLayout = (event: any) => {
-    const { width, height } = event.nativeEvent.layout;
-    containerLayoutRef.current = { width, height };
-    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:420',message:'Container layout measured',data:{width,height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  };
-  const handleButtonsContainerLayout = (event: any) => {
-    const { width, height } = event.nativeEvent.layout;
-    buttonsContainerLayoutRef.current = { width, height };
-    // Calculate estimated content height
-    const buttonHeights = 130 + (isTracking ? 64 : 0) + 64 + 90 + 64 + 76 + 76; // mainButton + refreshButton(conditional) + autostart + audio + warning + report + stats
-    const gaps = (isTracking ? 7 : 6) * 16; // number of gaps * gap size
-    const padding = 24 * 2; // vertical padding
-    const estimatedContentHeight = buttonHeights + gaps + padding;
-    fetch('http://127.0.0.1:7242/ingest/4b80fc36-5ea9-4f5f-a405-6f88cb035177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:460',message:'Buttons container layout measured',data:{width,height,estimatedContentHeight,isTracking,wouldOverflow:estimatedContentHeight>height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  };
-  // #endregion
-
   return (
-    <SafeAreaView style={styles.container} edges={['top']} onLayout={handleContainerLayout}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" />
 
       {/* Плавающее предупреждение о препятствии */}
@@ -486,7 +459,11 @@ export default function HomeScreen() {
       </View>
 
       {/* Главные кнопки */}
-      <View style={styles.buttonsContainer} onLayout={handleButtonsContainerLayout}>
+      <ScrollView 
+        style={styles.buttonsContainer} 
+        contentContainerStyle={styles.buttonsContainerContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Кнопка мониторинга */}
         <Pressable
           style={[
@@ -584,12 +561,12 @@ export default function HomeScreen() {
           <Ionicons name="analytics" size={34} color="#00d4ff" />
           <Text style={styles.buttonText}>СТАТИСТИКА</Text>
         </Pressable>
-      </View>
 
-      {/* Информация внизу */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>GoodRoad v2.0</Text>
-      </View>
+        {/* Информация внизу */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>GoodRoad v2.0</Text>
+        </View>
+      </ScrollView>
       
       {/* Toast notifications */}
       <SimpleToast />
@@ -604,42 +581,42 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 12,
     borderBottomWidth: 2,
     borderBottomColor: '#1a1a3e',
   },
   title: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     color: '#00d4ff', // Яркий голубой
-    letterSpacing: 3,
+    letterSpacing: 2,
     textShadowColor: 'rgba(0, 212, 255, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#8b94a8',
-    marginTop: 8,
+    marginTop: 4,
     fontWeight: '500',
   },
   statusContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
-    paddingVertical: 24,
+    gap: 12,
+    paddingVertical: 12,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: '#1a1a3e',
     borderWidth: 2,
     borderColor: '#2d2d5f',
-    gap: 10,
+    gap: 8,
   },
   statusBadgeActive: {
     borderColor: '#00ff88', // Яркий зеленый
@@ -659,7 +636,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   statusText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#c7cad9',
   },
@@ -681,17 +658,20 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flex: 1,
-    padding: 24,
-    gap: 16,
+  },
+  buttonsContainerContent: {
+    padding: 16,
+    paddingBottom: 16,
   },
   mainButton: {
-    height: 130,
+    height: 110,
     backgroundColor: '#0066ff', // Яркий синий
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 10,
+    marginBottom: 12,
     shadowColor: '#0066ff',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.5,
@@ -703,27 +683,28 @@ const styles = StyleSheet.create({
     shadowColor: '#ff3b30',
   },
   mainButtonText: {
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   button: {
-    height: 76,
+    height: 68,
     backgroundColor: '#1a1a3e',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#00d4ff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
+    gap: 12,
+    marginBottom: 12,
   },
   compactButton: {
-    minHeight: 64,
+    minHeight: 56,
     backgroundColor: '#1a1a3e',
     borderRadius: 12,
     borderWidth: 2,
@@ -731,9 +712,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    marginBottom: 12,
   },
   buttonContent: {
     flexDirection: 'row',
@@ -746,16 +728,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '800',
     color: '#00d4ff',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
   compactButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#00d4ff',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   buttonSubtext: {
     fontSize: 10,
@@ -775,7 +757,7 @@ const styles = StyleSheet.create({
     borderColor: '#00d4ff',
     backgroundColor: 'rgba(0, 212, 255, 0.15)', // Более яркий фон
     borderWidth: 3, // Толще рамка
-    height: 90, // Повыше кнопка для важности
+    minHeight: 70, // Компактная высота
   },
   audioSettingsButtonText: {
     color: '#00d4ff',
@@ -797,9 +779,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#1a1a3e',
+    marginTop: 8,
   },
   footerText: {
     fontSize: 12,
