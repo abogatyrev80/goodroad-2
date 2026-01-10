@@ -3,7 +3,7 @@
  * Управление звуками для разных типов событий
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
 
 // Типы событий
 export type EventType = 'pothole' | 'braking' | 'vibration' | 'bump' | 'general';
@@ -71,14 +72,32 @@ const STORAGE_KEY = 'good_road_sound_config';
 
 interface Props {
   onSave?: () => void;
+  hideTitle?: boolean;
 }
 
-export default function SoundManager({ onSave }: Props) {
+export default function SoundManager({ onSave, hideTitle = false }: Props) {
   const [soundConfigs, setSoundConfigs] = useState<SoundConfig[]>([]);
   const [expandedEvent, setExpandedEvent] = useState<EventType | null>(null);
+  const playingSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     loadSoundConfigs();
+    
+    // Инициализация аудио режима
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch((error) => {
+      console.error('Error setting audio mode:', error);
+    });
+    
+    return () => {
+      // Очистка при размонтировании
+      if (playingSoundRef.current) {
+        playingSoundRef.current.unloadAsync().catch(() => {});
+      }
+    };
   }, []);
 
   // Загрузить конфигурацию из AsyncStorage
@@ -165,6 +184,87 @@ export default function SoundManager({ onSave }: Props) {
     Alert.alert('Сброшено', 'Восстановлен стандартный звук');
   };
 
+  // Маппинг звуков для стандартных звуков
+  const getSoundSource = (soundId: string): any => {
+    const soundMap: Record<string, any> = {
+      'pothole_warning': require('../assets/sounds/warning.mp3'),
+      'braking_alert': require('../assets/sounds/info.mp3'),
+      'vibration_beep': require('../assets/sounds/info.mp3'),
+      'bump_notification': require('../assets/sounds/warning.mp3'),
+      'general_beep': require('../assets/sounds/info.mp3'),
+      'beep_short': require('../assets/sounds/info.mp3'),
+      'beep_long': require('../assets/sounds/warning.mp3'),
+      'ding': require('../assets/sounds/info.mp3'),
+      'alert_soft': require('../assets/sounds/info.mp3'),
+      'alert_loud': require('../assets/sounds/warning.mp3'),
+    };
+    return soundMap[soundId] || require('../assets/sounds/info.mp3');
+  };
+
+  // Воспроизвести звук
+  const playTestSound = async (config: SoundConfig) => {
+    if (Platform.OS === 'web') {
+      Alert.alert('⚠️', 'Воспроизведение звуков на веб-платформе может не работать. Используйте мобильное приложение.');
+      return;
+    }
+    
+    try {
+      // Останавливаем предыдущий звук
+      if (playingSoundRef.current) {
+        await playingSoundRef.current.stopAsync();
+        await playingSoundRef.current.unloadAsync();
+        playingSoundRef.current = null;
+      }
+
+      // Инициализируем аудио режим
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      let soundSource: any;
+      
+      if (config.isCustom && config.uri) {
+        // Пользовательский звук
+        soundSource = { uri: config.uri };
+      } else {
+        // Стандартный звук
+        try {
+          soundSource = getSoundSource(config.soundId);
+        } catch (error) {
+          console.error('❌ Error getting sound source:', error);
+          Alert.alert('❌ Ошибка', `Не удалось загрузить звук: ${config.soundId}`);
+          return;
+        }
+      }
+
+      const { sound } = await Audio.Sound.createAsync(
+        soundSource,
+        { volume: 1.0, shouldPlay: false }
+      );
+      
+      playingSoundRef.current = sound;
+      
+      // Устанавливаем громкость
+      await sound.setVolumeAsync(1.0);
+      
+      // Воспроизводим звук
+      await sound.playAsync();
+
+      // Автоматически выгружаем после завершения
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          playingSoundRef.current = null;
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ Error playing test sound:', error);
+      Alert.alert('❌ Ошибка', `Не удалось воспроизвести звук: ${error?.message || 'Неизвестная ошибка'}`);
+    }
+  };
+
   // Получить название события на русском
   const getEventName = (eventType: EventType): string => {
     const names: Record<EventType, string> = {
@@ -202,13 +302,17 @@ export default function SoundManager({ onSave }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🔊 Звуковые оповещения</Text>
-      <Text style={styles.subtitle}>
-        Настройте звуки для каждого типа события. Можете использовать стандартные или загрузить свои.
-      </Text>
+    <View style={[styles.container, hideTitle && styles.containerCompact]}>
+      {!hideTitle && (
+        <>
+          <Text style={styles.title}>🔊 Звуковые оповещения</Text>
+          <Text style={styles.subtitle}>
+            Настройте звуки для каждого типа события. Можете использовать стандартные или загрузить свои.
+          </Text>
+        </>
+      )}
 
-      <ScrollView style={styles.eventList}>
+      <ScrollView style={styles.eventList} nestedScrollEnabled>
         {soundConfigs.map((config) => {
           const isExpanded = expandedEvent === config.eventType;
           const eventColor = getEventColor(config.eventType);
@@ -268,10 +372,7 @@ export default function SoundManager({ onSave }: Props) {
                     {/* Test Sound */}
                     <Pressable
                       style={[styles.actionButton, { backgroundColor: eventColor }]}
-                      onPress={() => {
-                        // TODO: Implement sound playback
-                        Alert.alert('Тест звука', `Воспроизведение: ${config.soundName}`);
-                      }}
+                      onPress={() => playTestSound(config)}
                     >
                       <Ionicons name="play" size={16} color="white" />
                       <Text style={styles.actionButtonText}>Тест</Text>
@@ -381,6 +482,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
     padding: 16,
+  },
+  containerCompact: {
+    flex: 0,
+    padding: 0,
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 22,

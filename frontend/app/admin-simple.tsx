@@ -330,31 +330,6 @@ export default function AdminPanelSimple() {
           </View>
         </View>
 
-        {/* Sound Settings Button */}
-        <Pressable
-          style={styles.soundSettingsButton}
-          onPress={() => {
-            try {
-              router.push('/sound-settings');
-            } catch (error) {
-              console.error('Navigation error:', error);
-            }
-          }}
-        >
-          <View style={styles.soundSettingsContent}>
-            <View style={styles.soundSettingsLeft}>
-              <Ionicons name="volume-high" size={24} color="#4CAF50" />
-              <View style={styles.soundSettingsText}>
-                <Text style={styles.soundSettingsTitle}>🔊 Звуковые оповещения</Text>
-                <Text style={styles.soundSettingsSubtitle}>
-                  Настройте звуки для разных типов событий
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#888" />
-          </View>
-        </Pressable>
-
         {/* Data Points List */}
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>
@@ -593,40 +568,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
-  },
-  soundSettingsButton: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    marginBottom: 16,
-    marginHorizontal: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  soundSettingsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  soundSettingsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  soundSettingsText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  soundSettingsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  soundSettingsSubtitle: {
-    fontSize: 13,
-    color: '#888',
   },
   modalHeader: {
     flexDirection: 'row',

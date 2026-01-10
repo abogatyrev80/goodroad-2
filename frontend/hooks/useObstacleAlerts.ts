@@ -166,7 +166,9 @@ export function useObstacleAlerts(
       }
 
       // 🆕 Непрерывные сирены только если нужно (на основе скорости)
-      if (alertSettingsService.shouldUseSiren(speedCheck.alertLevel)) {
+      const shouldUseSiren = alertSettingsService.shouldUseSiren(speedCheck.alertLevel);
+      
+      if (shouldUseSiren) {
         const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, distance);
         await dynamicAudioService.alertDynamicWithFrequency(obstacle, currentSpeed, sirenFrequency);
       }

@@ -22,6 +22,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import dynamicAudioService, { DynamicAudioSettings, CustomSoundItem, ObstacleSoundSettings } from '../services/DynamicAudioAlertService';
+import SoundManager from '../components/SoundManager';
 
 interface CustomSound extends CustomSoundItem {}
 
@@ -95,14 +96,30 @@ export default function AudioSettingsScreen() {
 
   const playSound = async (uri: string) => {
     try {
+      // Инициализируем аудио режим
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      
       // Останавливаем предыдущий звук если играет
       if (playingSound) {
         await playingSound.stopAsync();
         await playingSound.unloadAsync();
       }
 
-      const { sound } = await Audio.Sound.createAsync({ uri });
+      const { sound } = await Audio.Sound.createAsync({ 
+        uri,
+        volume: settings.volume || 1.0,
+        shouldPlay: false 
+      });
+      
       setPlayingSound(sound);
+      
+      // Устанавливаем громкость перед воспроизведением
+      await sound.setVolumeAsync(settings.volume || 1.0);
+      
       await sound.playAsync();
 
       // Автоматически останавливаем после воспроизведения
@@ -112,9 +129,9 @@ export default function AudioSettingsScreen() {
           setPlayingSound(null);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error playing sound:', error);
-      Alert.alert('❌ Ошибка', 'Не удалось воспроизвести звук');
+      Alert.alert('❌ Ошибка', `Не удалось воспроизвести звук: ${error?.message || 'Неизвестная ошибка'}`);
     }
   };
 
@@ -204,6 +221,22 @@ export default function AudioSettingsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Тест звуковых оповещений */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔊 Тест звуковых оповещений</Text>
+          <Text style={styles.sectionDescription}>
+            Протестируйте звуки для разных типов событий. Выберите тип события, чтобы настроить и протестировать звук.
+          </Text>
+          <View style={styles.soundManagerWrapper}>
+            <SoundManager 
+              hideTitle={true}
+              onSave={() => {
+                Alert.alert('✅ Успешно', 'Настройки звуков сохранены');
+              }} 
+            />
+          </View>
+        </View>
+
         {/* 🆕 Звуковая тема */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎵 Звуковая тема зуммера</Text>
@@ -1191,5 +1224,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     fontStyle: 'italic',
+  },
+  soundManagerWrapper: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
 });

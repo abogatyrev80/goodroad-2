@@ -662,6 +662,7 @@ const styles = StyleSheet.create({
   buttonsContainerContent: {
     padding: 16,
     paddingBottom: 16,
+    flexGrow: 1,
   },
   mainButton: {
     height: 110,

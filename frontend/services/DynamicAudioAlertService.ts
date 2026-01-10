@@ -166,7 +166,7 @@ class DynamicAudioAlertService {
       
       this.beepSound = sound;
       console.log('✅ Beep sound initialized');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error initializing beep sound:', error);
     }
   }
@@ -227,7 +227,9 @@ class DynamicAudioAlertService {
    * Проигрывает звуковой сигнал с динамическими параметрами
    */
   private async playBeep(rate: number): Promise<void> {
-    if (!this.beepSound || !this.settings.beepEnabled) return;
+    if (!this.beepSound || !this.settings.beepEnabled) {
+      return;
+    }
 
     try {
       // Останавливаем предыдущее воспроизведение
@@ -244,7 +246,8 @@ class DynamicAudioAlertService {
       await this.beepSound.playAsync();
       
       this.lastBeepTime = Date.now();
-    } catch (error) {
+      console.log(`🔊 Beep played: rate=${rate}, volume=${this.settings.volume}`);
+    } catch (error: any) {
       console.error('❌ Error playing beep:', error);
     }
   }
@@ -428,13 +431,17 @@ class DynamicAudioAlertService {
         await this.initBeepSound();
       }
       
-      if (this.beepSound) {
-        await this.beepSound.setPositionAsync(0);
-        await this.beepSound.setRateAsync(pitch, true); // Изменяем высоту тона
-        await this.beepSound.setVolumeAsync(this.settings.volume);
-        await this.beepSound.playAsync();
+      if (!this.beepSound || !this.settings.beepEnabled) {
+        return;
       }
-    } catch (error) {
+      
+      await this.beepSound.setPositionAsync(0);
+      await this.beepSound.setRateAsync(pitch, true); // Изменяем высоту тона
+      await this.beepSound.setVolumeAsync(this.settings.volume);
+      await this.beepSound.playAsync();
+      
+      console.log(`🔊 Beep with pitch played: pitch=${pitch}, volume=${this.settings.volume}`);
+    } catch (error: any) {
       console.error('❌ Error playing beep with pitch:', error);
     }
   }
