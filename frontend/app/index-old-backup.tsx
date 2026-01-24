@@ -157,7 +157,7 @@ export default function GoodRoadApp() {
   // Production: использует app.json (extra.backendUrl)
   const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                      Constants.expoConfig?.extra?.backendUrl ||
-                     'https://roadqual-track.emergent.host';
+                     'https://goodroad.su';
   
   // Device ID
   const deviceId = `mobile-app-${Date.now()}`;

@@ -278,7 +278,7 @@ class BatchOfflineManager {
     try {
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                         Constants.expoConfig?.extra?.backendUrl || 
-                        'https://roadquality.emergent.host';
+                        'https://goodroad.su';
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
       
       // Подготовка payload в правильном формате для backend

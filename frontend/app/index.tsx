@@ -181,7 +181,7 @@ export default function HomeScreen() {
       // Инициализируем коллектор данных
       if (!rawDataCollector.current) {
         const deviceId = 'mobile-app-' + Date.now();
-        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://road-monitor-4.emergent.host';
+        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
         rawDataCollector.current = new RawDataCollector(
           deviceId,
           backendUrl,

@@ -3,52 +3,44 @@
 ## ✅ Текущая конфигурация (правильная)
 
 ### Development/Preview Environment
-**URL:** `https://soundzummer.preview.emergentagent.com`
+**URL:** `https://soundzummer.preview.emergentagent.com` (опционально, для разработки)
 **Использование:** Только для разработки и тестирования в preview режиме
 **Конфигурация:** `frontend/.env` → `EXPO_PUBLIC_BACKEND_URL`
-**База данных:** 241 точка (тестовые + ваши данные)
 
 ### Production/Deployed Environment
-**URL:** `https://roadqual-track.emergent.host`
+**URL:** `https://goodroad.su`
 **Использование:** Production deployment, мобильные приложения (iOS/Android)
-**Конфигурация:** `frontend/app.json` → `extra.backendUrl`
-**База данных:** 243 точки (production база)
+**Конфигурация:** 
+- `frontend/app.json` → `extra.backendUrl`
+- `frontend/eas.json` → `production.env.EXPO_PUBLIC_BACKEND_URL`
 
 ## 🔧 Как работает логика выбора URL
 
-Код в `BatchOfflineManager.ts` (строка 267-270):
+Код в `BatchOfflineManager.ts` (строка 279-281):
 ```typescript
 const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                   Constants.expoConfig?.extra?.backendUrl || 
-                  'https://roadquality.emergent.host';
+                  'https://goodroad.su';
 ```
 
 **Приоритет:**
-1. **Development:** `process.env.EXPO_PUBLIC_BACKEND_URL` (из .env)
-   - Используется при `expo start --tunnel`
-   - Preview URL: `https://soundzummer.preview.emergentagent.com`
+1. **Development:** `process.env.EXPO_PUBLIC_BACKEND_URL` (из .env или eas.json)
+   - Используется при `expo start --tunnel` или в EAS build
+   - Может быть установлен в `eas.json` для production сборки
 
 2. **Production:** `Constants.expoConfig.extra.backendUrl` (из app.json)
    - Используется в deployed builds (EAS, app stores)
-   - Production URL: `https://roadquality.emergent.host`
+   - Production URL: `https://goodroad.su`
 
-3. **Fallback:** `https://roadquality.emergent.host`
+3. **Fallback:** `https://goodroad.su`
    - Если оба источника недоступны
 
 ## ✅ Проверка статуса
 
-### Preview Backend
-```bash
-curl https://soundzummer.preview.emergentagent.com/api/
-# Response: {"message": "Good Road API - Smart Road Monitoring System"}
-# Total points: 241
-```
-
 ### Production Backend
 ```bash
-curl https://roadquality.emergent.host/api/
+curl https://goodroad.su/api/
 # Response: {"message": "Good Road API - Smart Road Monitoring System"}
-# Total points: 1
 ```
 
 ## 📱 Что будет использоваться при деплое
@@ -58,21 +50,19 @@ curl https://roadquality.emergent.host/api/
 - Использует preview URL из .env
 
 ### EAS Build / Standalone App
-- ✅ Использует production URL из app.json
-- URL: `https://roadquality.emergent.host`
-- База данных: Production (отдельная от preview)
+- ✅ Использует production URL из app.json или eas.json
+- URL: `https://goodroad.su`
+- Настроено в `eas.json` → `production.env.EXPO_PUBLIC_BACKEND_URL`
 
-### Web Deployment (Emergent Platform)
+### Web Deployment
 - ✅ Использует production URL из app.json
-- URL: `https://roadquality.emergent.host`
-- База данных: Production
+- URL: `https://goodroad.su`
 
 ## 🎯 Вывод
 
 **Конфигурация правильная!** При деплое приложение будет:
-1. Использовать `https://roadquality.emergent.host` (из app.json)
-2. Подключаться к production MongoDB Atlas
-3. Данные будут в отдельной production базе (не смешиваются с preview)
+1. Использовать `https://goodroad.su` (из app.json или eas.json)
+2. Подключаться к production backend на https://goodroad.su
 
 ## 🔐 Environment Variables для Production
 
@@ -84,21 +74,33 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/good_road_produc
 MONGODB_DB_NAME=good_road_production
 ```
 
-**Frontend (уже настроен в app.json):**
+**Frontend (настроено в app.json и eas.json):**
 ```json
+// app.json
 {
   "extra": {
-    "backendUrl": "https://roadquality.emergent.host"
+    "backendUrl": "https://goodroad.su"
+  }
+}
+
+// eas.json
+{
+  "build": {
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://goodroad.su"
+      }
+    }
   }
 }
 ```
 
 ## ✅ Готовность к деплою
 
-- ✅ Preview backend работает
-- ✅ Production backend работает
+- ✅ Production backend URL настроен: `https://goodroad.su`
 - ✅ App.json настроен правильно
-- ✅ Fallback URL настроен
+- ✅ EAS.json настроен правильно
+- ✅ Fallback URL настроен во всех сервисах
 - ✅ Логика выбора URL правильная
 
-**Deployed версия будет отправлять данные на:** `https://roadquality.emergent.host/api/sensor-data`
+**Deployed версия будет отправлять данные на:** `https://goodroad.su/api/sensor-data`

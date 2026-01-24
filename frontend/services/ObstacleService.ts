@@ -67,7 +67,7 @@ class ObstacleService {
     if (this.initialized) return;
 
     // Инициализируем URL
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://road-monitor-4.emergent.host';
+    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
     this.backendUrl = url.endsWith('/') ? url : url + '/';
     console.log('🚧 ObstacleService initialized with URL:', this.backendUrl);
 
