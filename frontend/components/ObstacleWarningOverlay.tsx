@@ -5,7 +5,7 @@
  * Показывает расстояние и тип препятствия с цветовой индикацией
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Obstacle } from '../services/ObstacleService';
@@ -28,6 +28,9 @@ export default function ObstacleWarningOverlay({
 }: ObstacleWarningOverlayProps) {
   const [pulseAnim] = useState(new Animated.Value(1));
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [displayedDistance, setDisplayedDistance] = useState(0); // 🆕 Плавное отображение расстояния
+  const [progressAnim] = useState(new Animated.Value(0)); // 🆕 Анимация прогресс-бара
+  const progressContainerWidth = useRef<number>(0); // 🆕 Ширина контейнера прогресс-бара
 
   // Размеры в зависимости от настройки
   const sizeConfig = {
@@ -45,6 +48,42 @@ export default function ObstacleWarningOverlay({
 
   const currentSize = sizeConfig[size];
   const currentPosition = positionStyle[position];
+
+  // 🆕 ПЛАВНАЯ ИНТЕРПОЛЯЦИЯ РАССТОЯНИЯ
+  useEffect(() => {
+    if (!obstacle) {
+      setDisplayedDistance(0);
+      return;
+    }
+    
+    const targetDistance = obstacle.distance;
+    const currentDistance = displayedDistance || targetDistance;
+    
+    // Если расстояние изменилось значительно, плавно интерполируем
+    if (Math.abs(targetDistance - currentDistance) > 2) {
+      // Используем анимацию для плавного перехода
+      const animValue = new Animated.Value(currentDistance);
+      
+      Animated.timing(animValue, {
+        toValue: targetDistance,
+        duration: 150, // Быстрая анимация для отзывчивости
+        useNativeDriver: false, // Нужен для изменения значения
+      }).start();
+      
+      // Обновляем отображаемое значение
+      const listener = animValue.addListener(({ value }) => {
+        setDisplayedDistance(Math.round(value));
+      });
+      
+      return () => {
+        animValue.removeListener(listener);
+        animValue.stopAnimation();
+      };
+    } else {
+      // Небольшое изменение - обновляем сразу
+      setDisplayedDistance(Math.round(targetDistance));
+    }
+  }, [obstacle?.distance]);
 
   useEffect(() => {
     if (visible && obstacle) {
@@ -150,6 +189,51 @@ export default function ObstacleWarningOverlay({
   const colors = getColors();
   const urgency = getUrgencyLevel();
 
+  // 🆕 УЛУЧШЕННЫЙ РАСЧЕТ ПРОГРЕССА с учетом типа препятствия и расстояния
+  const getProgressPercentage = (obstacle: Obstacle): number => {
+    const distance = obstacle.distance;
+    
+    // Определяем максимальное расстояние предупреждения в зависимости от типа
+    // Более опасные препятствия показываются дальше
+    const maxWarningDistance: Record<string, number> = {
+      accident: 1000,      // Авария - очень далеко
+      braking: 800,        // Торможение - далеко
+      pothole: 600,        // Яма - среднее
+      speed_bump: 500,     // Лежачий полицейский - среднее
+      bump: 500,           // Неровность - среднее
+      vibration: 400,      // Вибрация - близко
+    };
+    
+    const maxDistance = maxWarningDistance[obstacle.type] || 600;
+    const minDistance = 0; // При 0 метрах = 100%
+    
+    // Обратная пропорция: чем ближе, тем больше заполнение
+    // Формула: процент = (maxDistance - distance) / maxDistance * 100
+    const percentage = Math.max(0, Math.min(100, ((maxDistance - distance) / maxDistance) * 100));
+    
+    // Учитываем подтверждения - больше подтверждений = более заметный прогресс
+    const confirmationsMultiplier = Math.min(1.2, 1 + (obstacle.confirmations - 1) * 0.1);
+    const adjustedPercentage = Math.min(100, percentage * confirmationsMultiplier);
+    
+    return Math.round(adjustedPercentage);
+  };
+
+  // 🆕 АНИМАЦИЯ ПРОГРЕСС-БАРА
+  useEffect(() => {
+    if (!obstacle) {
+      progressAnim.setValue(0);
+      return;
+    }
+    
+    const targetProgress = getProgressPercentage(obstacle);
+    
+    Animated.timing(progressAnim, {
+      toValue: targetProgress,
+      duration: 200, // Плавное заполнение
+      useNativeDriver: false, // Нужен для изменения width
+    }).start();
+  }, [obstacle?.distance, obstacle?.type, obstacle?.confirmations]);
+
   return (
     <Animated.View
       style={[
@@ -188,10 +272,10 @@ export default function ObstacleWarningOverlay({
             {getObstacleName()}
           </Text>
 
-          {/* Расстояние - большое и заметное */}
+          {/* Расстояние - большое и заметное с плавной интерполяцией */}
           <View style={styles.distanceContainer}>
             <Text style={[styles.distanceNumber, { color: colors.text, fontSize: currentSize.distance }]}>
-              {Math.round(obstacle.distance)}
+              {displayedDistance || Math.round(obstacle.distance)}
             </Text>
             <Text style={[styles.distanceUnit, { color: colors.text, fontSize: currentSize.distance * 0.5 }]}>м</Text>
           </View>
@@ -215,17 +299,31 @@ export default function ObstacleWarningOverlay({
         </View>
       </View>
 
-      {/* Индикатор расстояния (прогресс бар) */}
-      <View style={styles.progressContainer}>
-        <View 
+      {/* 🆕 УЛУЧШЕННЫЙ ИНДИКАТОР РАССТОЯНИЯ (прогресс бар с учетом типа препятствия) */}
+      <View 
+        style={styles.progressContainer}
+        onLayout={(event) => {
+          progressContainerWidth.current = event.nativeEvent.layout.width;
+        }}
+      >
+        <Animated.View 
           style={[
             styles.progressBar, 
             { 
               backgroundColor: colors.bg,
-              width: `${Math.max(10, Math.min(100, (1000 - obstacle.distance) / 10))}%`
+              width: progressAnim.interpolate({
+                inputRange: [0, 100],
+                outputRange: [0, progressContainerWidth.current || Dimensions.get('window').width - 32],
+              }),
             }
           ]} 
         />
+        {/* 🆕 Визуальные метки на шкале */}
+        <View style={styles.progressMarkers}>
+          <View style={[styles.marker, styles.marker25]} />
+          <View style={[styles.marker, styles.marker50]} />
+          <View style={[styles.marker, styles.marker75]} />
+        </View>
       </View>
     </Animated.View>
   );
@@ -310,14 +408,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   progressContainer: {
-    height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: 5,
     marginTop: 12,
-    overflow: 'hidden',
+    overflow: 'visible',
+    position: 'relative',
   },
   progressBar: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 5,
+  },
+  progressMarkers: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    pointerEvents: 'none',
+  },
+  marker: {
+    position: 'absolute',
+    width: 2,
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    top: 0,
+  },
+  marker25: {
+    left: '25%',
+  },
+  marker50: {
+    left: '50%',
+  },
+  marker75: {
+    left: '75%',
   },
 });

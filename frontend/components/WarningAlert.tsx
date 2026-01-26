@@ -61,11 +61,23 @@ const WarningAlert: React.FC<WarningAlertProps> = ({ warning, onDismiss }) => {
     }
     
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        severity <= 2 
-          ? require('../assets/sounds/alert-high.mp3')
-          : require('../assets/sounds/alert-medium.mp3')
-      );
+      // Используем существующие звуки в зависимости от уровня опасности
+      let soundFile;
+      if (severity <= 1) {
+        // Критическое - используем emergency
+        soundFile = require('../assets/sounds/emergency.mp3');
+      } else if (severity <= 2) {
+        // Высокое - используем critical
+        soundFile = require('../assets/sounds/critical.mp3');
+      } else if (severity <= 3) {
+        // Среднее - используем warning
+        soundFile = require('../assets/sounds/warning.mp3');
+      } else {
+        // Низкое - используем info
+        soundFile = require('../assets/sounds/info.mp3');
+      }
+      
+      const { sound } = await Audio.Sound.createAsync(soundFile);
       await sound.playAsync();
     } catch (error) {
       console.error('Ошибка воспроизведения звука:', error);

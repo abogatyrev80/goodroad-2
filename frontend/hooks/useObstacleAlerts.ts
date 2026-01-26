@@ -71,6 +71,7 @@ export function useObstacleAlerts(
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
   
   // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени с учетом ВЕКТОРА ДВИЖЕНИЯ
+  // 🆕 ДИНАМИЧЕСКИЙ ИНТЕРВАЛ в зависимости от скорости
   useEffect(() => {
     if (!isTracking || !currentLocation || obstacles.length === 0) {
       return;
@@ -81,8 +82,6 @@ export function useObstacleAlerts(
         const lat = currentLocation.coords.latitude;
         const lon = currentLocation.coords.longitude;
         const bearing = currentLocation.coords.heading; // 🆕 Направление движения из GPS
-        
-        console.log(`📍 Current bearing: ${bearing !== null && bearing !== undefined ? bearing.toFixed(1) + '°' : 'N/A'}`);
         
         // Пересчитываем расстояния для всех препятствий с учетом вектора
         const updatedObstacles = obstacles
@@ -114,11 +113,39 @@ export function useObstacleAlerts(
       }
     };
     
-    // Обновляем каждые 2 секунды (не слишком часто)
-    const distanceUpdateInterval = setInterval(updateDistances, 2000);
+    // 🆕 ДИНАМИЧЕСКИЙ ИНТЕРВАЛ на основе скорости
+    // При высокой скорости обновляем чаще для точности
+    // Формула: чем выше скорость, тем чаще обновления
+    // Минимум 200мс (5 раз в секунду), максимум 2000мс (0.5 раз в секунду)
+    const speedKmh = currentSpeed; // уже в км/ч
+    const speedMs = speedKmh / 3.6; // м/с
+    
+    // Базовый интервал: 2000мс при 0 км/ч, уменьшается до 200мс при 120+ км/ч
+    // Интерполяция: interval = 2000 - (speedKmh / 120) * 1800
+    // Но делаем более агрессивно: при 60 км/ч уже 500мс, при 100+ км/ч = 200мс
+    let updateInterval: number;
+    if (speedKmh < 20) {
+      updateInterval = 2000; // Медленно - обновляем реже
+    } else if (speedKmh < 40) {
+      updateInterval = 1000; // Средняя скорость
+    } else if (speedKmh < 60) {
+      updateInterval = 500; // Быстро
+    } else if (speedKmh < 80) {
+      updateInterval = 300; // Очень быстро
+    } else {
+      updateInterval = 200; // Максимальная частота при высокой скорости
+    }
+    
+    // Первое обновление сразу
+    updateDistances();
+    
+    // Затем с динамическим интервалом
+    const distanceUpdateInterval = setInterval(updateDistances, updateInterval);
+    
+    console.log(`⚡ Distance update interval: ${updateInterval}ms (speed: ${speedKmh.toFixed(1)} km/h)`);
     
     return () => clearInterval(distanceUpdateInterval);
-  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading]);
+  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading, currentSpeed, obstacles.length]);
 
   // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {

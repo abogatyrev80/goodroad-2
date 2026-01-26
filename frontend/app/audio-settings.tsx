@@ -227,6 +227,12 @@ export default function AudioSettingsScreen() {
           <Text style={styles.sectionDescription}>
             Протестируйте звуки для разных типов событий. Выберите тип события, чтобы настроить и протестировать звук.
           </Text>
+          <View style={styles.usageHint}>
+            <Ionicons name="bulb" size={16} color="#fbbf24" />
+            <Text style={styles.usageHintText}>
+              Настройки из SoundManager используются в компоненте SoundManager для тестирования звуков
+            </Text>
+          </View>
           <View style={styles.soundManagerWrapper}>
             <SoundManager 
               hideTitle={true}
@@ -237,12 +243,102 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* 🆕 Информация о звуках */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ℹ️ Где используются звуки</Text>
+          
+          {/* Список стандартных звуков */}
+          <View style={styles.standardSoundsBox}>
+            <Text style={styles.standardSoundsTitle}>📚 Стандартные звуки в приложении:</Text>
+            <View style={styles.standardSoundList}>
+              <View style={styles.standardSoundItem}>
+                <Text style={styles.standardSoundName}>info.mp3 / radar-info.mp3</Text>
+                <Text style={styles.standardSoundUsage}>Информационные предупреждения (низкая опасность)</Text>
+              </View>
+              <View style={styles.standardSoundItem}>
+                <Text style={styles.standardSoundName}>warning.mp3 / radar-warning.mp3</Text>
+                <Text style={styles.standardSoundUsage}>Обычные предупреждения (средняя опасность)</Text>
+              </View>
+              <View style={styles.standardSoundItem}>
+                <Text style={styles.standardSoundName}>critical.mp3 / radar-critical.mp3</Text>
+                <Text style={styles.standardSoundUsage}>Критические предупреждения (высокая опасность)</Text>
+              </View>
+              <View style={styles.standardSoundItem}>
+                <Text style={styles.standardSoundName}>emergency.mp3 / radar-emergency.mp3</Text>
+                <Text style={styles.standardSoundUsage}>Экстренные предупреждения (критическая опасность) + Beep-сигналы</Text>
+              </View>
+              <View style={styles.standardSoundItem}>
+                <Text style={styles.standardSoundName}>motion-tracker.mp3</Text>
+                <Text style={styles.standardSoundUsage}>Основной звук темы "Чужие" (датчик движения)</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.infoBox}>
+            <View style={styles.infoItem}>
+              <Ionicons name="information-circle" size={20} color="#00d4ff" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>🔊 Звуковая тема (Beep-сигналы)</Text>
+                <Text style={styles.infoText}>
+                  Используется для динамических сигналов при приближении к препятствию. Частота сигналов увеличивается по мере приближения.
+                </Text>
+                <Text style={styles.infoLocation}>📍 DynamicAudioAlertService → playBeep()</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoItem}>
+              <Ionicons name="information-circle" size={20} color="#fbbf24" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>🎯 Уровни срочности (AudioAlertService)</Text>
+                <Text style={styles.infoText}>
+                  <Text style={styles.infoBold}>info.mp3 / radar-info.mp3</Text> - Информационные предупреждения{'\n'}
+                  <Text style={styles.infoBold}>warning.mp3 / radar-warning.mp3</Text> - Обычные предупреждения{'\n'}
+                  <Text style={styles.infoBold}>critical.mp3 / radar-critical.mp3</Text> - Критические предупреждения{'\n'}
+                  <Text style={styles.infoBold}>emergency.mp3 / radar-emergency.mp3</Text> - Экстренные предупреждения
+                </Text>
+                <Text style={styles.infoLocation}>📍 AudioAlertService → getSoundUri()</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoItem}>
+              <Ionicons name="information-circle" size={20} color="#22c55e" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>⚠️ Карточки предупреждений (WarningAlert)</Text>
+                <Text style={styles.infoText}>
+                  Используются звуки в зависимости от уровня опасности:{'\n'}
+                  • Критическое (severity ≤ 1): <Text style={styles.infoBold}>emergency.mp3</Text>{'\n'}
+                  • Высокое (severity ≤ 2): <Text style={styles.infoBold}>critical.mp3</Text>{'\n'}
+                  • Среднее (severity ≤ 3): <Text style={styles.infoBold}>warning.mp3</Text>{'\n'}
+                  • Низкое: <Text style={styles.infoBold}>info.mp3</Text>
+                </Text>
+                <Text style={styles.infoLocation}>📍 WarningAlert.tsx → playWarningSound()</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoItem}>
+              <Ionicons name="information-circle" size={20} color="#a855f7" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>🎵 Индивидуальные звуки препятствий</Text>
+                <Text style={styles.infoText}>
+                  Можно назначить свой звук для каждого типа препятствия. Если не назначен - используется общая тема.
+                </Text>
+                <Text style={styles.infoLocation}>📍 DynamicAudioAlertService → obstacleSounds</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* 🆕 Звуковая тема */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎵 Звуковая тема зуммера</Text>
           <Text style={styles.sectionDescription}>
             Выберите звук для предупреждений о препятствиях (применяется ко всем типам препятствий, если не настроено индивидуально)
           </Text>
+          <View style={styles.usageHint}>
+            <Ionicons name="bulb" size={16} color="#fbbf24" />
+            <Text style={styles.usageHintText}>
+              Используется для динамических beep-сигналов, частота которых увеличивается при приближении к препятствию
+            </Text>
+          </View>
           <View style={styles.themeButtonsWrap}>
             <Pressable
               style={[
@@ -352,30 +448,66 @@ export default function AudioSettingsScreen() {
           {/* Список пользовательских звуков */}
           {customSounds.length > 0 ? (
             <View style={styles.soundsList}>
-              {customSounds.map((sound) => (
-                <View key={sound.id} style={styles.soundItem}>
-                  <View style={styles.soundInfo}>
-                    <Ionicons name="musical-note" size={20} color="#00d4ff" />
-                    <Text style={styles.soundName} numberOfLines={1}>
-                      {sound.name}
-                    </Text>
+              {customSounds.map((sound) => {
+                // Проверяем где используется звук
+                const isThemeSound = settings.soundTheme === 'custom' && settings.customThemeSoundId === sound.id;
+                const usedInObstacles = Object.entries(settings.obstacleSounds || {})
+                  .filter(([_, config]) => config.useCustom && config.customSoundId === sound.id)
+                  .map(([key]) => {
+                    const names: Record<string, string> = {
+                      'pothole': 'Яма',
+                      'speed_bump': 'Лежачий полицейский',
+                      'bump': 'Неровность',
+                      'vibration': 'Вибрация',
+                      'braking': 'Торможение',
+                    };
+                    return names[key] || key;
+                  });
+                
+                return (
+                  <View key={sound.id} style={styles.soundItem}>
+                    <View style={styles.soundInfo}>
+                      <Ionicons name="musical-note" size={20} color="#00d4ff" />
+                      <View style={styles.soundInfoText}>
+                        <Text style={styles.soundName} numberOfLines={1}>
+                          {sound.name}
+                        </Text>
+                        {/* Индикаторы использования */}
+                        {(isThemeSound || usedInObstacles.length > 0) && (
+                          <View style={styles.soundUsageBadges}>
+                            {isThemeSound && (
+                              <View style={styles.usageBadge}>
+                                <Ionicons name="checkmark-circle" size={12} color="#22c55e" />
+                                <Text style={styles.usageBadgeText}>Тема</Text>
+                              </View>
+                            )}
+                            {usedInObstacles.map((name, idx) => (
+                              <View key={idx} style={styles.usageBadge}>
+                                <Ionicons name="checkmark-circle" size={12} color="#fbbf24" />
+                                <Text style={styles.usageBadgeText}>{name}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.soundActions}>
+                      <Pressable
+                        style={styles.soundActionButton}
+                        onPress={() => playSound(sound.uri)}
+                      >
+                        <Ionicons name="play-circle" size={28} color="#22c55e" />
+                      </Pressable>
+                      <Pressable
+                        style={styles.soundActionButton}
+                        onPress={() => deleteCustomSound(sound.id)}
+                      >
+                        <Ionicons name="trash" size={24} color="#ef4444" />
+                      </Pressable>
+                    </View>
                   </View>
-                  <View style={styles.soundActions}>
-                    <Pressable
-                      style={styles.soundActionButton}
-                      onPress={() => playSound(sound.uri)}
-                    >
-                      <Ionicons name="play-circle" size={28} color="#22c55e" />
-                    </Pressable>
-                    <Pressable
-                      style={styles.soundActionButton}
-                      onPress={() => deleteCustomSound(sound.id)}
-                    >
-                      <Ionicons name="trash" size={24} color="#ef4444" />
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <Text style={styles.emptyMessage}>
@@ -391,6 +523,12 @@ export default function AudioSettingsScreen() {
             <Text style={styles.sectionDescription}>
               Назначьте разные звуки для каждого типа препятствия. Если не выбран свой звук - используется общая тема.
             </Text>
+            <View style={styles.usageHint}>
+              <Ionicons name="bulb" size={16} color="#fbbf24" />
+              <Text style={styles.usageHintText}>
+                Эти звуки используются в DynamicAudioAlertService при обнаружении препятствий конкретного типа
+              </Text>
+            </View>
 
             {[
               { key: 'pothole', icon: '🕳️', name: 'Яма' },
@@ -1081,11 +1219,33 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
+  soundInfoText: {
+    flex: 1,
+  },
   soundName: {
     fontSize: 15,
     color: '#fff',
     fontWeight: '500',
-    flex: 1,
+  },
+  soundUsageBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  usageBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 4,
+  },
+  usageBadgeText: {
+    fontSize: 10,
+    color: '#22c55e',
+    fontWeight: '600',
   },
   soundActions: {
     flexDirection: 'row',
@@ -1229,5 +1389,97 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  // Стили для информационных блоков
+  infoBox: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  infoItem: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#aaa',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  infoBold: {
+    fontWeight: '600',
+    color: '#00d4ff',
+  },
+  infoLocation: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  usageHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#fbbf24',
+    gap: 8,
+  },
+  usageHintText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#fbbf24',
+    lineHeight: 18,
+  },
+  // Стили для списка стандартных звуков
+  standardSoundsBox: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  standardSoundsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  standardSoundList: {
+    gap: 10,
+  },
+  standardSoundItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#00d4ff',
+  },
+  standardSoundName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#00d4ff',
+    marginBottom: 4,
+  },
+  standardSoundUsage: {
+    fontSize: 12,
+    color: '#aaa',
+    lineHeight: 16,
   },
 });
