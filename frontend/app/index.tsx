@@ -13,6 +13,8 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +23,9 @@ import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Battery from 'expo-battery';
+import * as Application from 'expo-application';
+import * as Device from 'expo-device';
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import SimpleToast, { showToast } from '../components/SimpleToast';
 
 // Сервисы
@@ -54,6 +59,9 @@ export default function HomeScreen() {
   const rawDataCollector = useRef<RawDataCollector | null>(null);
   const batterySubscription = useRef<any>(null);
   const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
+  const bluetoothCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const autostopCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const appStateSubscription = useRef<any>(null);
   
   // Буферы для сбора данных
   const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
@@ -80,9 +88,46 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Проверка автозапуска
+  // Проверка автозапуска при загрузке
   useEffect(() => {
     checkAutostart();
+    setupAutostartMonitoring();
+    
+    return () => {
+      if (bluetoothCheckInterval.current) {
+        clearInterval(bluetoothCheckInterval.current);
+        bluetoothCheckInterval.current = null;
+      }
+      if (autostopCheckInterval.current) {
+        clearInterval(autostopCheckInterval.current);
+        autostopCheckInterval.current = null;
+      }
+      if (appStateSubscription.current) {
+        appStateSubscription.current.remove();
+        appStateSubscription.current = null;
+      }
+    };
+  }, []);
+
+  // Проверка автозапуска при загрузке
+  useEffect(() => {
+    checkAutostart();
+    setupAutostartMonitoring();
+    
+    return () => {
+      if (bluetoothCheckInterval.current) {
+        clearInterval(bluetoothCheckInterval.current);
+        bluetoothCheckInterval.current = null;
+      }
+      if (autostopCheckInterval.current) {
+        clearInterval(autostopCheckInterval.current);
+        autostopCheckInterval.current = null;
+      }
+      if (appStateSubscription.current) {
+        appStateSubscription.current.remove();
+        appStateSubscription.current = null;
+      }
+    };
   }, []);
 
   // Предупреждение о разрядке батареи (параллельная функция)
@@ -161,10 +206,239 @@ export default function HomeScreen() {
           }, 1000);
         }
       }
-      // TODO: Добавить проверку для режимов withApps и onBluetooth
-      // Потребуется интеграция с нативными API для отслеживания запущенных приложений
+
+      // Проверка Bluetooth
+      if (mode === 'onBluetooth' && !isTracking) {
+        const shouldStart = await checkBluetoothConnection();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
+          setTimeout(() => {
+            startTracking();
+            setWasAutoStarted(true);
+          }, 1000);
+        }
+      }
+
+      // Проверка приложений (при запуске приложения)
+      if (mode === 'withApps' && !isTracking) {
+        const shouldStart = await checkTriggerApps();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - trigger app detected...');
+          setTimeout(() => {
+            startTracking();
+            setWasAutoStarted(true);
+          }, 1000);
+        }
+      }
     } catch (error) {
       console.error('Error checking autostart:', error);
+    }
+  };
+
+  // Настройка постоянного мониторинга для автозапуска
+  const setupAutostartMonitoring = async () => {
+    const mode = await AsyncStorage.getItem('autostart_mode');
+    
+    // Общий слушатель для всех режимов - проверяем при возврате приложения на передний план
+    appStateSubscription.current = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active' && !isTracking) {
+        const currentMode = await AsyncStorage.getItem('autostart_mode');
+        
+        if (currentMode === 'onBluetooth') {
+          // Проверяем Bluetooth при возврате приложения
+          const shouldStart = await checkBluetoothConnection();
+          if (shouldStart) {
+            console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
+            setTimeout(() => {
+              startTracking();
+              setWasAutoStarted(true);
+            }, 500);
+          }
+        } else if (currentMode === 'withApps') {
+          // Проверяем триггерные приложения при возврате
+          const shouldStart = await checkTriggerApps();
+          if (shouldStart) {
+            console.log('🚀 Auto-starting monitoring - trigger app detected on app resume...');
+            setTimeout(() => {
+              startTracking();
+              setWasAutoStarted(true);
+            }, 500);
+          }
+        }
+      }
+    });
+
+    // Для Bluetooth также проверяем периодически (каждые 10 секунд)
+    if (mode === 'onBluetooth') {
+      bluetoothCheckInterval.current = setInterval(async () => {
+        if (!isTracking) {
+          const shouldStart = await checkBluetoothConnection();
+          if (shouldStart) {
+            console.log('🚀 Auto-starting monitoring - Bluetooth device connected (periodic check)...');
+            startTracking();
+            setWasAutoStarted(true);
+          }
+        }
+      }, 10000); // Проверяем каждые 10 секунд
+    }
+
+    // Проверка автоматической остановки (каждые 5 секунд)
+    autostopCheckInterval.current = setInterval(async () => {
+      if (isTracking && wasAutoStarted) {
+        const autoStopEnabled = await AsyncStorage.getItem('autostart_auto_stop');
+        if (autoStopEnabled === 'true') {
+          const currentMode = await AsyncStorage.getItem('autostart_mode');
+          let shouldStop = false;
+
+          if (currentMode === 'onBluetooth') {
+            const isConnected = await checkBluetoothConnection();
+            if (!isConnected) {
+              shouldStop = true;
+              console.log('⏹️ Auto-stopping monitoring - Bluetooth device disconnected...');
+            }
+          } else if (currentMode === 'withApps') {
+            const isAppActive = await checkTriggerApps();
+            if (!isAppActive) {
+              shouldStop = true;
+              console.log('⏹️ Auto-stopping monitoring - trigger app closed...');
+            }
+          } else if (currentMode === 'onCharge') {
+            const batteryState = await Battery.getBatteryStateAsync();
+            const isCharging = batteryState === Battery.BatteryState.CHARGING;
+            if (!isCharging) {
+              shouldStop = true;
+              console.log('⏹️ Auto-stopping monitoring - device unplugged...');
+            }
+          }
+
+          if (shouldStop) {
+            stopTracking();
+          }
+        }
+      }
+    }, 5000); // Проверяем каждые 5 секунд
+  };
+
+  // Проверка подключения Bluetooth устройства
+  const checkBluetoothConnection = async (): Promise<boolean> => {
+    try {
+      const savedDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
+      if (!savedDevice) {
+        console.log('📱 No Bluetooth device configured');
+        return false;
+      }
+
+      const device: { name: string; address?: string } = JSON.parse(savedDevice);
+      console.log('📱 Checking Bluetooth connection for device:', device.name);
+      
+      // Проверяем, включен ли Bluetooth
+      const isEnabled = await RNBluetoothClassic.isBluetoothEnabled();
+      if (!isEnabled) {
+        console.log('📱 Bluetooth is disabled');
+        return false;
+      }
+      
+      // Если есть адрес устройства, используем более точную проверку
+      if (device.address) {
+        try {
+          // Сначала проверяем через getConnectedDevice (более эффективно)
+          try {
+            const connectedDevice = await RNBluetoothClassic.getConnectedDevice(device.address);
+            if (connectedDevice && connectedDevice.isConnected()) {
+              console.log('📱 Bluetooth device is connected:', device.name);
+              return true;
+            }
+          } catch (notConnectedError) {
+            // Устройство не подключено, продолжаем проверку
+          }
+          
+          // Если не подключено, проверяем среди всех подключенных устройств
+          const connectedDevices = await RNBluetoothClassic.getConnectedDevices();
+          const isConnected = connectedDevices.some(
+            connectedDevice => connectedDevice.address === device.address
+          );
+          
+          if (isConnected) {
+            console.log('📱 Bluetooth device is connected (from list):', device.name);
+            return true;
+          }
+          
+          console.log('📱 Bluetooth device is not connected:', device.name);
+          return false;
+        } catch (error) {
+          console.error('Error checking Bluetooth connection by address:', error);
+          return false;
+        }
+      }
+      
+      // Если адреса нет, проверяем по имени среди подключенных устройств
+      try {
+        const connectedDevices = await RNBluetoothClassic.getConnectedDevices();
+        const isConnected = connectedDevices.some(
+          connectedDevice => connectedDevice.name === device.name
+        );
+        
+        if (isConnected) {
+          console.log('📱 Bluetooth device is connected (by name):', device.name);
+          return true;
+        }
+        
+        console.log('📱 Bluetooth device is not connected (by name):', device.name);
+        return false;
+      } catch (error) {
+        console.error('Error checking Bluetooth connection by name:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking Bluetooth connection:', error);
+      return false;
+    }
+  };
+
+  // Проверка запущенных триггерных приложений
+  const checkTriggerApps = async (): Promise<boolean> => {
+    try {
+      const savedApps = await AsyncStorage.getItem('autostart_trigger_apps');
+      const savedCustomApps = await AsyncStorage.getItem('autostart_custom_apps');
+      
+      if (!savedApps || !savedCustomApps) {
+        console.log('📱 No trigger apps configured');
+        return false;
+      }
+
+      const selectedAppIds: string[] = JSON.parse(savedApps);
+      const customApps: Array<{ id: string; packageName: string; name: string }> = JSON.parse(savedCustomApps);
+      
+      if (selectedAppIds.length === 0) {
+        console.log('📱 No apps selected');
+        return false;
+      }
+
+      // Получаем информацию о текущем приложении
+      const currentAppId = Application.applicationId;
+      const currentAppName = Application.applicationName;
+      console.log('📱 Current app:', currentAppName, 'ID:', currentAppId);
+
+      // Получаем список выбранных приложений по их ID
+      const selectedApps = customApps.filter(app => selectedAppIds.includes(app.id));
+      console.log('📱 Selected trigger apps:', selectedApps.map(a => a.name).join(', '));
+
+      // ВАЖНО: Для полной функциональности нужен нативный модуль для получения списка запущенных приложений
+      // Текущая реализация упрощена - проверяем только когда GoodRoad возвращается на передний план
+      // Это означает что пользователь переключился с другого приложения, возможно одного из триггерных
+      
+      // Временное решение: если приложение активно и есть выбранные триггеры,
+      // предполагаем что пользователь мог использовать одно из них
+      // В продакшене здесь должна быть проверка через нативный модуль (например, UsageStatsManager на Android)
+      
+      // TODO: Интегрировать нативный модуль для проверки запущенных приложений
+      // Для MVP: возвращаем true если есть выбранные приложения и приложение активно
+      // Это работает когда пользователь возвращается в GoodRoad после использования другого приложения
+      console.log('📱 Trigger apps configured, assuming one might be active (requires native module for real check)');
+      return true; // Упрощенная версия - в реальности нужна проверка через нативный модуль
+    } catch (error) {
+      console.error('Error checking trigger apps:', error);
+      return false;
     }
   };
 
@@ -225,6 +499,18 @@ export default function HomeScreen() {
     }
     if (batterySubscription.current) {
       batterySubscription.current.remove();
+    }
+    if (bluetoothCheckInterval.current) {
+      clearInterval(bluetoothCheckInterval.current);
+      bluetoothCheckInterval.current = null;
+    }
+    if (autostopCheckInterval.current) {
+      clearInterval(autostopCheckInterval.current);
+      autostopCheckInterval.current = null;
+    }
+    if (appStateSubscription.current) {
+      appStateSubscription.current.remove();
+      appStateSubscription.current = null;
     }
   };
 

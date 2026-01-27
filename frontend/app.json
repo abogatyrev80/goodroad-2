@@ -20,6 +20,9 @@
         "UIBackgroundModes": [
           "location",
           "background-fetch",
+          "background-processing",
+          "location",
+          "background-fetch",
           "background-processing"
         ],
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Good Road needs location access to monitor road conditions while driving.",
@@ -41,7 +44,12 @@
         "WAKE_LOCK",
         "RECEIVE_BOOT_COMPLETED",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.QUERY_ALL_PACKAGES",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
       ]
     },
     "web": {
@@ -58,7 +66,8 @@
       ],
       "expo-location",
       "expo-sensors",
-      "expo-asset"
+      "expo-asset",
+      "with-rn-bluetooth-classic"
     ],
     "experiments": {
       "typedRoutes": true
@@ -71,6 +80,12 @@
       "eas": {
         "projectId": "8e9eb143-991a-49bb-b17f-0da2fa81bf71"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8e9eb143-991a-49bb-b17f-0da2fa81bf71"
     }
   }
 }
