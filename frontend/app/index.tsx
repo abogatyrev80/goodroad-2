@@ -15,6 +15,8 @@ import {
   ScrollView,
   AppState,
   AppStateStatus,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -341,12 +343,41 @@ export default function HomeScreen() {
     }, 5000); // Проверяем каждые 5 секунд
   };
 
+  // Проверка разрешений Bluetooth (без показа алертов для частых проверок)
+  const hasBluetoothPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    // Для Android 12+ (API 31+) требуется BLUETOOTH_CONNECT
+    if (Platform.Version >= 31) {
+      try {
+        const result = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+        );
+        return result === true;
+      } catch (error) {
+        console.error('Error checking BLUETOOTH_CONNECT permission:', error);
+        return false;
+      }
+    }
+
+    return true; // Для старых версий Android разрешения не требуются
+  };
+
   // Проверка подключения Bluetooth устройства
   const checkBluetoothConnection = async (): Promise<boolean> => {
     try {
       const savedDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
       if (!savedDevice) {
         console.log('📱 No Bluetooth device configured');
+        return false;
+      }
+
+      // Проверяем разрешения для Android 12+
+      const hasPermission = await hasBluetoothPermission();
+      if (!hasPermission) {
+        console.log('📱 BLUETOOTH_CONNECT permission not granted');
         return false;
       }
 

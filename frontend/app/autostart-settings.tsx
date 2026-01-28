@@ -15,6 +15,8 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -250,10 +252,59 @@ export default function AutostartSettingsScreen() {
   };
 
 
+  // Запрос разрешений Bluetooth для Android 12+
+  const requestBluetoothPermissions = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true; // iOS не требует runtime разрешений для Bluetooth
+    }
+
+    // Для Android 12+ (API 31+) требуется BLUETOOTH_CONNECT
+    if (Platform.Version >= 31) {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          {
+            title: 'Разрешение Bluetooth',
+            message: 'Приложению требуется разрешение на доступ к Bluetooth устройствам для автозапуска.',
+            buttonNeutral: 'Спросить позже',
+            buttonNegative: 'Отмена',
+            buttonPositive: 'OK',
+          }
+        );
+
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          console.log('✅ BLUETOOTH_CONNECT permission granted');
+          return true;
+        } else {
+          console.warn('⚠️ BLUETOOTH_CONNECT permission denied');
+          Alert.alert(
+            'Разрешение отклонено',
+            'Для загрузки списка Bluetooth устройств необходимо предоставить разрешение BLUETOOTH_CONNECT. Вы можете добавить устройство вручную по имени.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      } catch (error) {
+        console.error('Error requesting BLUETOOTH_CONNECT permission:', error);
+        return false;
+      }
+    }
+
+    return true; // Для старых версий Android разрешения не требуются
+  };
+
   // Загрузка всех сопряженных Bluetooth устройств
   const loadBluetoothDevices = async () => {
     try {
       setLoadingBluetoothDevices(true);
+      
+      // Запрашиваем разрешения для Android 12+
+      const hasPermission = await requestBluetoothPermissions();
+      if (!hasPermission) {
+        setAllBluetoothDevices([]);
+        setFilteredBluetoothDevices([]);
+        return;
+      }
       
       // Проверяем, включен ли Bluetooth
       const isEnabled = await RNBluetoothClassic.isBluetoothEnabled();
