@@ -1,6 +1,6 @@
 /**
- * AutostartSettings V3 - Продвинутые настройки с выбором любых приложений
- * Пользователь может выбрать из популярных приложений или добавить свое
+ * AutostartSettings V4 - Выбор любых установленных приложений
+ * Пользователь может выбрать любое приложение из установленных на устройстве
  */
 
 import React, { useState, useEffect } from 'react';
@@ -41,62 +41,92 @@ interface BluetoothDevice {
   address?: string;
 }
 
-// Популярные приложения с предзаполненными package names
-const POPULAR_APPS: TriggerApp[] = [
-  // Навигация
-  { id: 'google-maps', name: 'Google Maps', packageName: 'com.google.android.apps.maps', icon: '🗺️', category: 'Навигация' },
-  { id: 'yandex-maps', name: 'Яндекс.Карты', packageName: 'ru.yandex.yandexmaps', icon: '🗺️', category: 'Навигация' },
-  { id: 'yandex-navi', name: 'Яндекс.Навигатор', packageName: 'ru.yandex.yandexnavi', icon: '🧭', category: 'Навигация' },
-  { id: 'waze', name: 'Waze', packageName: 'com.waze', icon: '🗺️', category: 'Навигация' },
-  { id: '2gis', name: '2ГИС', packageName: 'ru.dublgis.dgismobile', icon: '🗺️', category: 'Навигация' },
-  // Такси
-  { id: 'yandex-taxi', name: 'Яндекс.Такси', packageName: 'ru.yandex.taxi', icon: '🚕', category: 'Такси' },
-  { id: 'uber', name: 'Uber', packageName: 'com.ubercab', icon: '🚗', category: 'Такси' },
-  { id: 'gett', name: 'Gett', packageName: 'com.gettaxi.android', icon: '🚖', category: 'Такси' },
-  // Музыка
-  { id: 'yandex-music', name: 'Яндекс.Музыка', packageName: 'ru.yandex.music', icon: '🎵', category: 'Музыка' },
-  { id: 'spotify', name: 'Spotify', packageName: 'com.spotify.music', icon: '🎵', category: 'Музыка' },
-  { id: 'apple-music', name: 'Apple Music', packageName: 'com.apple.android.music', icon: '🎵', category: 'Музыка' },
-];
 
 export default function AutostartSettingsScreen() {
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
-  const [customApps, setCustomApps] = useState<TriggerApp[]>([]);
-  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [selectedApps, setSelectedApps] = useState<string[]>([]); // Теперь храним packageName вместо id
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [autoStop, setAutoStop] = useState(false);
+  const [autoStopBluetooth, setAutoStopBluetooth] = useState(false);
+  const [autoStopApps, setAutoStopApps] = useState(false);
+  const [autoStopCharge, setAutoStopCharge] = useState(false);
   
-  // Модальные окна для добавления
-  const [showAppModal, setShowAppModal] = useState(false);
+  // Модальные окна
   const [showDeviceModal, setShowDeviceModal] = useState(false);
-  const [showPopularAppsModal, setShowPopularAppsModal] = useState(false);
-  const [showInstalledAppsModal, setShowInstalledAppsModal] = useState(false);
+  const [showAppsPickerModal, setShowAppsPickerModal] = useState(false);
   const [showBluetoothDevicesModal, setShowBluetoothDevicesModal] = useState(false);
-  const [appName, setAppName] = useState('');
-  const [packageName, setPackageName] = useState('');
   const [deviceName, setDeviceName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [bluetoothSearchQuery, setBluetoothSearchQuery] = useState('');
   
   // Списки реальных устройств и приложений
-  const [installedApps, setInstalledApps] = useState<TriggerApp[]>([]);
-  const [bluetoothDevices, setBluetoothDevices] = useState<BluetoothDevice[]>([]);
+  const [allInstalledApps, setAllInstalledApps] = useState<TriggerApp[]>([]);
+  const [filteredApps, setFilteredApps] = useState<TriggerApp[]>([]);
+  const [allBluetoothDevices, setAllBluetoothDevices] = useState<BluetoothDevice[]>([]);
+  const [filteredBluetoothDevices, setFilteredBluetoothDevices] = useState<BluetoothDevice[]>([]);
   const [loadingInstalledApps, setLoadingInstalledApps] = useState(false);
   const [loadingBluetoothDevices, setLoadingBluetoothDevices] = useState(false);
   
-  // Все доступные приложения (популярные + пользовательские)
-  // Используем useMemo для пересчета при изменении customApps
-  const allApps = React.useMemo(() => {
-    // Объединяем популярные приложения с пользовательскими
-    // Если популярное приложение уже добавлено пользователем, используем пользовательскую версию
-    const popularAppsNotAdded = POPULAR_APPS.filter(
-      popular => !customApps.some(custom => custom.packageName === popular.packageName)
-    );
-    return [...popularAppsNotAdded, ...customApps];
-  }, [customApps]);
+  // Выбранные приложения (для отображения)
+  const selectedAppsList = React.useMemo(() => {
+    return allInstalledApps.filter(app => selectedApps.includes(app.packageName));
+  }, [allInstalledApps, selectedApps]);
 
   useEffect(() => {
     loadSettings();
+    // Автоматически загружаем установленные приложения при загрузке
+    if (autostartMode === 'withApps') {
+      loadInstalledApps();
+    }
+    // Автоматически загружаем Bluetooth устройства при загрузке
+    if (autostartMode === 'onBluetooth') {
+      loadBluetoothDevices();
+    }
   }, []);
+
+  // Загружаем приложения при выборе режима "с приложениями"
+  useEffect(() => {
+    if (autostartMode === 'withApps' && allInstalledApps.length === 0) {
+      loadInstalledApps();
+    }
+  }, [autostartMode]);
+
+  // Загружаем Bluetooth устройства при выборе режима "Bluetooth"
+  useEffect(() => {
+    if (autostartMode === 'onBluetooth' && allBluetoothDevices.length === 0) {
+      loadBluetoothDevices();
+    }
+  }, [autostartMode]);
+
+  // Фильтрация приложений по поисковому запросу
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredApps(allInstalledApps);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredApps(
+        allInstalledApps.filter(app => 
+          app.name.toLowerCase().includes(query) || 
+          app.packageName.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [searchQuery, allInstalledApps]);
+
+  // Фильтрация Bluetooth устройств по поисковому запросу
+  useEffect(() => {
+    if (bluetoothSearchQuery.trim() === '') {
+      setFilteredBluetoothDevices(allBluetoothDevices);
+    } else {
+      const query = bluetoothSearchQuery.toLowerCase();
+      setFilteredBluetoothDevices(
+        allBluetoothDevices.filter(device => 
+          device.name.toLowerCase().includes(query) || 
+          (device.address && device.address.toLowerCase().includes(query))
+        )
+      );
+    }
+  }, [bluetoothSearchQuery, allBluetoothDevices]);
 
   const loadSettings = async () => {
     try {
@@ -105,14 +135,11 @@ export default function AutostartSettingsScreen() {
         setAutostartMode(saved as AutostartMode);
       }
 
+      // Загружаем выбранные приложения по packageName
       const savedApps = await AsyncStorage.getItem('autostart_trigger_apps');
       if (savedApps) {
-        setSelectedApps(JSON.parse(savedApps));
-      }
-
-      const savedCustomApps = await AsyncStorage.getItem('autostart_custom_apps');
-      if (savedCustomApps) {
-        setCustomApps(JSON.parse(savedCustomApps));
+        const savedPackageNames: string[] = JSON.parse(savedApps);
+        setSelectedApps(savedPackageNames);
       }
 
       const savedBtDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
@@ -120,14 +147,65 @@ export default function AutostartSettingsScreen() {
         setSelectedBluetoothDevice(JSON.parse(savedBtDevice));
       }
 
+      // Загружаем настройки автоостановки для каждого режима
+      const savedAutoStopBluetooth = await AsyncStorage.getItem('autostop_on_bluetooth_disconnect');
+      if (savedAutoStopBluetooth) {
+        setAutoStopBluetooth(JSON.parse(savedAutoStopBluetooth));
+      }
+      
+      const savedAutoStopApps = await AsyncStorage.getItem('autostop_on_app_close');
+      if (savedAutoStopApps) {
+        setAutoStopApps(JSON.parse(savedAutoStopApps));
+      }
+      
+      const savedAutoStopCharge = await AsyncStorage.getItem('autostop_on_charge_disconnect');
+      if (savedAutoStopCharge) {
+        setAutoStopCharge(JSON.parse(savedAutoStopCharge));
+      }
+      
+      // Для обратной совместимости загружаем старое значение
       const savedAutoStop = await AsyncStorage.getItem('autostart_auto_stop');
-      if (savedAutoStop) {
-        setAutoStop(JSON.parse(savedAutoStop));
+      if (savedAutoStop && savedAutoStop === 'true') {
+        // Если старое значение было включено, включаем для всех режимов
+        if (!savedAutoStopBluetooth) setAutoStopBluetooth(true);
+        if (!savedAutoStopApps) setAutoStopApps(true);
+        if (!savedAutoStopCharge) setAutoStopCharge(true);
       }
     } catch (error) {
       console.error('Error loading autostart settings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Загрузка всех установленных приложений
+  const loadInstalledApps = async () => {
+    try {
+      setLoadingInstalledApps(true);
+      const apps = await ExpoAndroidAppList.getAll();
+      
+      const appsList: TriggerApp[] = apps.map(app => ({
+        id: app.packageName,
+        name: app.appName || app.packageName,
+        packageName: app.packageName,
+        icon: '📱',
+        category: 'Установленные',
+      }));
+      
+      // Сортируем по имени
+      appsList.sort((a, b) => a.name.localeCompare(b.name));
+      
+      setAllInstalledApps(appsList);
+      setFilteredApps(appsList);
+      console.log(`✅ Loaded ${appsList.length} installed apps`);
+    } catch (error) {
+      console.error('Error loading installed apps:', error);
+      Alert.alert(
+        'Ошибка', 
+        'Не удалось загрузить список приложений. Убедитесь, что разрешение QUERY_ALL_PACKAGES предоставлено в настройках приложения.'
+      );
+    } finally {
+      setLoadingInstalledApps(false);
     }
   };
 
@@ -142,141 +220,38 @@ export default function AutostartSettingsScreen() {
     }
   };
 
-  const toggleApp = async (appId: string) => {
-    const newSelection = selectedApps.includes(appId)
-      ? selectedApps.filter(id => id !== appId)
-      : [...selectedApps, appId];
+  const toggleApp = async (packageName: string) => {
+    const newSelection = selectedApps.includes(packageName)
+      ? selectedApps.filter(pkg => pkg !== packageName)
+      : [...selectedApps, packageName];
     
     setSelectedApps(newSelection);
     await AsyncStorage.setItem('autostart_trigger_apps', JSON.stringify(newSelection));
   };
 
-  const addCustomApp = () => {
-    setAppName('');
-    setPackageName('');
-    setShowAppModal(true);
-  };
-
-  const detectCurrentApp = async () => {
-    try {
-      const appId = Application.applicationId;
-      const appName = Application.applicationName;
-      
-      if (appId && appName) {
-        setAppName(appName);
-        setPackageName(appId);
-        Alert.alert(
-          'Приложение определено ✅',
-          `Название: ${appName}\nPackage: ${appId}\n\nТеперь вы можете добавить его в список.`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Ошибка', 'Не удалось определить текущее приложение');
-      }
-    } catch (error) {
-      console.error('Error detecting current app:', error);
-      Alert.alert('Ошибка', 'Не удалось определить текущее приложение');
-    }
-  };
-
-  const addPopularApp = async (app: TriggerApp) => {
-    // Проверяем, не добавлено ли уже это приложение
-    const exists = customApps.find(a => a.packageName === app.packageName);
-    if (exists) {
-      Alert.alert('Внимание', 'Это приложение уже добавлено');
-      return;
-    }
-
-    // Добавляем популярное приложение в пользовательские (но помечаем что оно из популярных)
-    const newCustomApps = [...customApps, { ...app, isCustom: true }];
-    setCustomApps(newCustomApps);
-    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
-    
-    // Автоматически выбираем добавленное приложение
-    await toggleApp(app.id);
-    
-    setShowPopularAppsModal(false);
-    Alert.alert('Успех ✅', `Приложение "${app.name}" добавлено и выбрано`);
-  };
-  
-  const saveCustomApp = async () => {
-    if (!appName.trim() || !packageName.trim()) {
-      Alert.alert('Ошибка', 'Заполните все поля');
-      return;
-    }
-    
-    const customApp: TriggerApp = {
-      id: `custom-${Date.now()}`,
-      name: appName.trim(),
-      packageName: packageName.trim(),
-      icon: '📱',
-      category: 'Пользовательские',
-      isCustom: true,
-    };
-    
-    const newCustomApps = [...customApps, customApp];
-    setCustomApps(newCustomApps);
-    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
-    
-    // Автоматически выбираем добавленное приложение
-    await toggleApp(customApp.id);
-    
-    setShowAppModal(false);
-    Alert.alert('Успех ✅', `Приложение "${appName}" добавлено`);
-  };
-
-  const removeCustomApp = async (appId: string) => {
-    const app = customApps.find(a => a.id === appId);
+  const removeSelectedApp = async (packageName: string) => {
+    const app = allInstalledApps.find(a => a.packageName === packageName);
     if (!app) return;
 
     Alert.alert(
       'Удалить приложение?',
-      `Вы уверены что хотите удалить "${app.name}"?`,
+      `Вы уверены что хотите убрать "${app.name}" из списка триггеров?`,
       [
         { text: 'Отмена', style: 'cancel' },
         {
           text: 'Удалить',
           style: 'destructive',
           onPress: async () => {
-            const newCustomApps = customApps.filter(a => a.id !== appId);
-            setCustomApps(newCustomApps);
-            await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
-            
-            // Убираем из выбранных
-            const newSelection = selectedApps.filter(id => id !== appId);
-            setSelectedApps(newSelection);
-            await AsyncStorage.setItem('autostart_trigger_apps', JSON.stringify(newSelection));
+            await toggleApp(packageName);
           },
         },
       ]
     );
   };
 
-  // Получение списка установленных приложений
-  const getInstalledApps = async (): Promise<TriggerApp[]> => {
-    try {
-      setLoadingInstalledApps(true);
-      
-      const apps = await ExpoAndroidAppList.getAll();
-      
-      return apps.map(app => ({
-        id: app.packageName,
-        name: app.appName || app.packageName,
-        packageName: app.packageName,
-        icon: '📱',
-        category: 'Установленные',
-      }));
-    } catch (error) {
-      console.error('Error getting installed apps:', error);
-      Alert.alert('Ошибка', 'Не удалось получить список приложений. Убедитесь, что разрешение QUERY_ALL_PACKAGES предоставлено.');
-      return [];
-    } finally {
-      setLoadingInstalledApps(false);
-    }
-  };
 
-  // Получение списка Bluetooth устройств
-  const getBluetoothDevices = async (): Promise<BluetoothDevice[]> => {
+  // Загрузка всех сопряженных Bluetooth устройств
+  const loadBluetoothDevices = async () => {
     try {
       setLoadingBluetoothDevices(true);
       
@@ -285,48 +260,42 @@ export default function AutostartSettingsScreen() {
       if (!isEnabled) {
         Alert.alert(
           'Bluetooth выключен',
-          'Пожалуйста, включите Bluetooth в настройках устройства.',
+          'Пожалуйста, включите Bluetooth в настройках устройства для загрузки списка устройств.',
           [{ text: 'OK' }]
         );
-        return [];
+        setAllBluetoothDevices([]);
+        setFilteredBluetoothDevices([]);
+        return;
       }
       
       const devices = await RNBluetoothClassic.getBondedDevices();
       
-      return devices.map(device => ({
+      const devicesList: BluetoothDevice[] = devices.map(device => ({
         id: device.address,
         name: device.name || 'Неизвестное устройство',
         address: device.address,
       }));
+      
+      // Сортируем по имени
+      devicesList.sort((a, b) => a.name.localeCompare(b.name));
+      
+      setAllBluetoothDevices(devicesList);
+      setFilteredBluetoothDevices(devicesList);
+      console.log(`✅ Loaded ${devicesList.length} Bluetooth devices`);
     } catch (error: any) {
-      console.error('Error getting Bluetooth devices:', error);
+      console.error('Error loading Bluetooth devices:', error);
       const errorMessage = error?.message || 'Не удалось получить список устройств';
-      Alert.alert('Ошибка', `Не удалось получить список Bluetooth устройств: ${errorMessage}`);
-      return [];
+      Alert.alert(
+        'Ошибка', 
+        `Не удалось загрузить список Bluetooth устройств: ${errorMessage}\n\nВы можете добавить устройство вручную по имени.`
+      );
+      setAllBluetoothDevices([]);
+      setFilteredBluetoothDevices([]);
     } finally {
       setLoadingBluetoothDevices(false);
     }
   };
 
-  const scanBluetoothDevices = async () => {
-    const devices = await getBluetoothDevices();
-    if (devices.length > 0) {
-      setBluetoothDevices(devices);
-      setShowBluetoothDevicesModal(true);
-    } else {
-      // Если список пуст, показываем модальное окно для ввода вручную
-      setDeviceName('');
-      setShowDeviceModal(true);
-    }
-  };
-
-  const scanInstalledApps = async () => {
-    const apps = await getInstalledApps();
-    if (apps.length > 0) {
-      setInstalledApps(apps);
-      setShowInstalledAppsModal(true);
-    }
-  };
   
   const saveBluetoothDevice = async () => {
     if (!deviceName.trim()) {
@@ -367,33 +336,30 @@ export default function AutostartSettingsScreen() {
     setSelectedBluetoothDevice(device);
     await AsyncStorage.setItem('autostart_bluetooth_device', JSON.stringify(device));
     setShowBluetoothDevicesModal(false);
-    Alert.alert('Успех ✅', `Устройство "${device.name}" выбрано`);
+    setBluetoothSearchQuery('');
   };
 
-  const selectInstalledApp = async (app: TriggerApp) => {
-    // Проверяем, не добавлено ли уже это приложение
-    const exists = customApps.find(a => a.packageName === app.packageName);
-    if (exists) {
-      Alert.alert('Внимание', 'Это приложение уже добавлено');
-      return;
-    }
-
-    // Добавляем приложение в пользовательские
-    const newCustomApps = [...customApps, { ...app, isCustom: true }];
-    setCustomApps(newCustomApps);
-    await AsyncStorage.setItem('autostart_custom_apps', JSON.stringify(newCustomApps));
-    
-    // Автоматически выбираем добавленное приложение
-    await toggleApp(app.id);
-    
-    setShowInstalledAppsModal(false);
-    Alert.alert('Успех ✅', `Приложение "${app.name}" добавлено и выбрано`);
+  const selectAppFromPicker = async (app: TriggerApp) => {
+    await toggleApp(app.packageName);
+    // Не закрываем модальное окно, чтобы можно было выбрать несколько приложений
   };
 
-  const toggleAutoStop = async () => {
-    const newValue = !autoStop;
-    setAutoStop(newValue);
-    await AsyncStorage.setItem('autostart_auto_stop', JSON.stringify(newValue));
+  const toggleAutoStopBluetooth = async () => {
+    const newValue = !autoStopBluetooth;
+    setAutoStopBluetooth(newValue);
+    await AsyncStorage.setItem('autostop_on_bluetooth_disconnect', JSON.stringify(newValue));
+  };
+
+  const toggleAutoStopApps = async () => {
+    const newValue = !autoStopApps;
+    setAutoStopApps(newValue);
+    await AsyncStorage.setItem('autostop_on_app_close', JSON.stringify(newValue));
+  };
+
+  const toggleAutoStopCharge = async () => {
+    const newValue = !autoStopCharge;
+    setAutoStopCharge(newValue);
+    await AsyncStorage.setItem('autostop_on_charge_disconnect', JSON.stringify(newValue));
   };
 
   const getModeText = (mode: AutostartMode): string => {
@@ -455,7 +421,7 @@ export default function AutostartSettingsScreen() {
           <Ionicons name="information-circle" size={20} color="#00d4ff" />
           <Text style={styles.infoText}>
             Выберите когда мониторинг должен запускаться автоматически.
-            Можете выбрать популярные приложения или добавить свое.
+            Вы можете выбрать любое установленное приложение или Bluetooth устройство.
           </Text>
         </View>
 
@@ -524,69 +490,55 @@ export default function AutostartSettingsScreen() {
           {autostartMode === 'withApps' && (
             <View style={styles.subSettings}>
               <View style={styles.subSettingsHeader}>
-                <Text style={styles.subSettingsTitle}>Ваши приложения:</Text>
+                <Text style={styles.subSettingsTitle}>Выбранные приложения:</Text>
                 <Text style={styles.selectedCount}>
                   {selectedApps.length} выбрано
                 </Text>
               </View>
 
-              {/* Список добавленных приложений */}
-              {allApps.length > 0 ? (
-                allApps.map((app) => (
+              {/* Список выбранных приложений */}
+              {selectedAppsList.length > 0 ? (
+                selectedAppsList.map((app) => (
                   <Pressable
-                    key={app.id}
-                    style={[styles.appOption, selectedApps.includes(app.id) && styles.appOptionActive]}
-                    onPress={() => toggleApp(app.id)}
+                    key={app.packageName}
+                    style={styles.appOption}
                   >
                     <Text style={styles.appIcon}>{app.icon}</Text>
                     <View style={styles.appInfo}>
-                      <View style={styles.appNameRow}>
-                        <Text style={styles.appName}>{app.name}</Text>
-                        {POPULAR_APPS.some(pop => pop.packageName === app.packageName) && (
-                          <View style={styles.popularBadge}>
-                            <Text style={styles.popularBadgeText}>Популярное</Text>
-                          </View>
-                        )}
-                      </View>
+                      <Text style={styles.appName}>{app.name}</Text>
                       <Text style={styles.packageName}>{app.packageName}</Text>
                     </View>
-                    {customApps.some(ca => ca.id === app.id) && (
-                      <Pressable onPress={() => removeCustomApp(app.id)} style={styles.removeAppButton}>
-                        <Ionicons name="close-circle" size={20} color="#ff3b30" />
-                      </Pressable>
-                    )}
-                    {selectedApps.includes(app.id) && <Ionicons name="checkmark-circle" size={20} color="#00ff88" />}
+                    <Pressable onPress={() => removeSelectedApp(app.packageName)} style={styles.removeAppButton}>
+                      <Ionicons name="close-circle" size={20} color="#ff3b30" />
+                    </Pressable>
+                    <Ionicons name="checkmark-circle" size={20} color="#00ff88" />
                   </Pressable>
                 ))
               ) : (
                 <View style={styles.emptyState}>
                   <Ionicons name="apps-outline" size={48} color="#2d2d5f" />
-                  <Text style={styles.emptyText}>Нет добавленных приложений</Text>
-                  <Text style={styles.emptyHint}>Выберите из популярных или добавьте свое</Text>
+                  <Text style={styles.emptyText}>Нет выбранных приложений</Text>
+                  <Text style={styles.emptyHint}>Нажмите кнопку ниже для выбора</Text>
                 </View>
               )}
 
-              {/* Кнопки добавления приложений */}
-              <View style={styles.addAppButtonsContainer}>
-                <Pressable style={[styles.addAppButton, styles.addAppButtonPrimary]} onPress={() => setShowPopularAppsModal(true)}>
-                  <Ionicons name="star" size={24} color="#fbbf24" />
-                  <Text style={[styles.addAppText, styles.addAppTextPrimary]}>Выбрать из популярных</Text>
-                </Pressable>
-                <Pressable style={[styles.addAppButton, { borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)' }]} onPress={scanInstalledApps}>
-                  <Ionicons name="phone-portrait" size={24} color="#8b5cf6" />
-                  <Text style={[styles.addAppText, { color: '#8b5cf6' }]}>Выбрать из установленных</Text>
-                </Pressable>
-                <Pressable style={styles.addAppButton} onPress={addCustomApp}>
-                  <Ionicons name="add-circle" size={24} color="#00d4ff" />
-                  <Text style={styles.addAppText}>Добавить вручную</Text>
-                </Pressable>
-                <Pressable style={[styles.addAppButton, styles.addAppButtonSecondary]} onPress={detectCurrentApp}>
-                  <Ionicons name="scan" size={24} color="#00ff88" />
-                  <Text style={[styles.addAppText, styles.addAppTextSecondary]}>Определить текущее</Text>
-                </Pressable>
-              </View>
+              {/* Кнопка выбора приложений */}
+              <Pressable 
+                style={[styles.addAppButton, styles.addAppButtonPrimary]} 
+                onPress={() => {
+                  if (allInstalledApps.length === 0) {
+                    loadInstalledApps();
+                  }
+                  setShowAppsPickerModal(true);
+                }}
+              >
+                <Ionicons name="add-circle" size={24} color="#00d4ff" />
+                <Text style={styles.addAppText}>
+                  {selectedApps.length > 0 ? 'Добавить еще приложения' : 'Выбрать приложения'}
+                </Text>
+              </Pressable>
 
-              {customApps.length > 0 && selectedApps.length === 0 && (
+              {selectedApps.length === 0 && (
                 <Text style={styles.warningText}>⚠️ Выберите хотя бы одно приложение</Text>
               )}
             </View>
@@ -614,7 +566,7 @@ export default function AutostartSettingsScreen() {
           {/* Выбор Bluetooth устройства */}
           {autostartMode === 'onBluetooth' && (
             <View style={styles.subSettings}>
-              <Text style={styles.subSettingsTitle}>Устройство:</Text>
+              <Text style={styles.subSettingsTitle}>Выбранное устройство:</Text>
               {selectedBluetoothDevice ? (
                 <View style={styles.deviceCard}>
                   <Ionicons name="bluetooth" size={24} color="#00d4ff" />
@@ -629,57 +581,130 @@ export default function AutostartSettingsScreen() {
                   </Pressable>
                 </View>
               ) : (
-                <View>
-                  <View style={styles.addDeviceButtonsContainer}>
-                    <Pressable style={[styles.addDeviceButton, { borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)' }]} onPress={scanBluetoothDevices}>
-                      <Ionicons name="bluetooth" size={24} color="#8b5cf6" />
-                      <Text style={[styles.addDeviceText, { color: '#8b5cf6' }]}>Выбрать из устройств</Text>
-                    </Pressable>
-                    <Pressable style={styles.addDeviceButton} onPress={() => {
-                      setDeviceName('');
-                      setShowDeviceModal(true);
-                    }}>
-                      <Ionicons name="add-circle" size={24} color="#00d4ff" />
-                      <Text style={styles.addDeviceText}>Добавить по имени</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={styles.deviceHint}>
-                    💡 Подсказка: Выберите устройство из списка или введите имя вручную (например: "Car Audio", "Toyota Camry").
-                    Приложение будет запускать мониторинг при подключении к этому устройству.
-                  </Text>
+                <View style={styles.emptyState}>
+                  <Ionicons name="bluetooth-outline" size={48} color="#2d2d5f" />
+                  <Text style={styles.emptyText}>Устройство не выбрано</Text>
+                  <Text style={styles.emptyHint}>Нажмите кнопку ниже для выбора</Text>
                 </View>
               )}
+
+              {/* Кнопка выбора устройства */}
+              <Pressable 
+                style={[styles.addAppButton, styles.addAppButtonPrimary]} 
+                onPress={() => {
+                  if (allBluetoothDevices.length === 0) {
+                    loadBluetoothDevices();
+                  }
+                  setShowBluetoothDevicesModal(true);
+                }}
+              >
+                <Ionicons name="bluetooth" size={24} color="#00d4ff" />
+                <Text style={styles.addAppText}>
+                  {selectedBluetoothDevice ? 'Изменить устройство' : 'Выбрать устройство'}
+                </Text>
+              </Pressable>
+
+              {/* Кнопка добавления вручную (fallback) */}
+              {allBluetoothDevices.length === 0 && (
+                <Pressable 
+                  style={styles.addAppButton} 
+                  onPress={() => {
+                    setDeviceName('');
+                    setShowDeviceModal(true);
+                  }}
+                >
+                  <Ionicons name="add-circle" size={24} color="#00d4ff" />
+                  <Text style={styles.addAppText}>Добавить по имени вручную</Text>
+                </Pressable>
+              )}
+
               {!selectedBluetoothDevice && (
-                <Text style={styles.warningText}>⚠️ Добавьте Bluetooth устройство</Text>
+                <Text style={styles.warningText}>⚠️ Выберите Bluetooth устройство</Text>
               )}
             </View>
           )}
         </View>
 
-        {/* Автоматическая остановка */}
-        {(autostartMode === 'onBluetooth' || autostartMode === 'withApps' || autostartMode === 'onCharge') && (
+        {/* Автоматическая остановка для Bluetooth */}
+        {autostartMode === 'onBluetooth' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Автоматическая остановка</Text>
             <Pressable
-              style={[styles.modeOption, autoStop && styles.modeOptionActive]}
-              onPress={toggleAutoStop}
+              style={[styles.modeOption, autoStopBluetooth && styles.modeOptionActive]}
+              onPress={toggleAutoStopBluetooth}
             >
               <Ionicons
-                name={autoStop ? "stop-circle" : "stop-circle-outline"}
+                name={autoStopBluetooth ? "stop-circle" : "stop-circle-outline"}
                 size={32}
-                color={autoStop ? '#00d4ff' : '#8b94a8'}
+                color={autoStopBluetooth ? '#00d4ff' : '#8b94a8'}
               />
               <View style={styles.modeInfo}>
-                <Text style={[styles.modeTitle, autoStop && styles.modeTitleActive]}>
-                  Автоматическая остановка
+                <Text style={[styles.modeTitle, autoStopBluetooth && styles.modeTitleActive]}>
+                  Остановка при отключении Bluetooth
                 </Text>
                 <Text style={styles.modeDescription}>
-                  {autoStop 
-                    ? 'Мониторинг будет автоматически останавливаться при отключении триггера'
+                  {autoStopBluetooth 
+                    ? 'Мониторинг будет автоматически останавливаться при разрыве Bluetooth соединения'
                     : 'Мониторинг будет работать до ручной остановки'}
                 </Text>
               </View>
-              {autoStop && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
+              {autoStopBluetooth && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
+            </Pressable>
+          </View>
+        )}
+
+        {/* Автоматическая остановка для приложений */}
+        {autostartMode === 'withApps' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Автоматическая остановка</Text>
+            <Pressable
+              style={[styles.modeOption, autoStopApps && styles.modeOptionActive]}
+              onPress={toggleAutoStopApps}
+            >
+              <Ionicons
+                name={autoStopApps ? "stop-circle" : "stop-circle-outline"}
+                size={32}
+                color={autoStopApps ? '#00d4ff' : '#8b94a8'}
+              />
+              <View style={styles.modeInfo}>
+                <Text style={[styles.modeTitle, autoStopApps && styles.modeTitleActive]}>
+                  Остановка при закрытии приложения
+                </Text>
+                <Text style={styles.modeDescription}>
+                  {autoStopApps 
+                    ? 'Мониторинг будет автоматически останавливаться при закрытии всех триггерных приложений'
+                    : 'Мониторинг будет работать до ручной остановки'}
+                </Text>
+              </View>
+              {autoStopApps && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
+            </Pressable>
+          </View>
+        )}
+
+        {/* Автоматическая остановка для зарядки */}
+        {autostartMode === 'onCharge' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Автоматическая остановка</Text>
+            <Pressable
+              style={[styles.modeOption, autoStopCharge && styles.modeOptionActive]}
+              onPress={toggleAutoStopCharge}
+            >
+              <Ionicons
+                name={autoStopCharge ? "stop-circle" : "stop-circle-outline"}
+                size={32}
+                color={autoStopCharge ? '#00d4ff' : '#8b94a8'}
+              />
+              <View style={styles.modeInfo}>
+                <Text style={[styles.modeTitle, autoStopCharge && styles.modeTitleActive]}>
+                  Остановка при отключении зарядки
+                </Text>
+                <Text style={styles.modeDescription}>
+                  {autoStopCharge 
+                    ? 'Мониторинг будет автоматически останавливаться при отключении устройства от зарядки'
+                    : 'Мониторинг будет работать до ручной остановки'}
+                </Text>
+              </View>
+              {autoStopCharge && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
             </Pressable>
           </View>
         )}
@@ -689,23 +714,23 @@ export default function AutostartSettingsScreen() {
           <Text style={styles.tipsTitle}>💡 Советы</Text>
           
           <View style={styles.tipItem}>
-            <Ionicons name="star" size={16} color="#fbbf24" />
+            <Ionicons name="apps" size={16} color="#00d4ff" />
             <Text style={styles.tipText}>
-              Выберите из популярных приложений - Google Maps, Яндекс.Карты, Spotify и другие
+              Выберите любое установленное приложение из списка - навигация, музыка, такси и другие
             </Text>
           </View>
 
           <View style={styles.tipItem}>
-            <Ionicons name="scan" size={16} color="#00ff88" />
+            <Ionicons name="bluetooth" size={16} color="#00d4ff" />
             <Text style={styles.tipText}>
-              Используйте "Определить текущее" чтобы автоматически заполнить package name
+              Для Bluetooth выберите устройство из списка сопряженных устройств или добавьте по имени
             </Text>
           </View>
 
           <View style={styles.tipItem}>
-            <Ionicons name="add-circle" size={16} color="#00d4ff" />
+            <Ionicons name="search" size={16} color="#00ff88" />
             <Text style={styles.tipText}>
-              Или добавьте приложение вручную - введите название и package name
+              Используйте поиск для быстрого нахождения нужного приложения или устройства
             </Text>
           </View>
 
@@ -720,113 +745,104 @@ export default function AutostartSettingsScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Modal для добавления приложения */}
+      {/* Modal для выбора приложений из установленных */}
       <Modal
-        visible={showAppModal}
+        visible={showAppsPickerModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowAppModal(false)}
+        onRequestClose={() => {
+          setShowAppsPickerModal(false);
+          setSearchQuery('');
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Добавить приложение</Text>
+            <Text style={styles.modalTitle}>Выберите приложения</Text>
             <Text style={styles.modalSubtitle}>
-              Введите название приложения и имя пакета
+              Выберите приложения из списка установленных на устройстве
             </Text>
             
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Название приложения"
-              placeholderTextColor="#8b94a8"
-              value={appName}
-              onChangeText={setAppName}
-              autoFocus={true}
-            />
+            {/* Поиск */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#8b94a8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Поиск приложений..."
+                placeholderTextColor="#8b94a8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color="#8b94a8" />
+                </Pressable>
+              )}
+            </View>
             
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Имя пакета (Package Name)"
-              placeholderTextColor="#8b94a8"
-              value={packageName}
-              onChangeText={setPackageName}
-            />
-            
-            <Pressable style={styles.detectButton} onPress={detectCurrentApp}>
-              <Ionicons name="scan" size={20} color="#00ff88" />
-              <Text style={styles.detectButtonText}>Определить текущее приложение</Text>
-            </Pressable>
-            
-            <Text style={styles.modalHint}>
-              Например:{'\n'}
-              com.google.android.apps.maps{'\n'}
-              ru.yandex.yandexnavi
-            </Text>
+            {loadingInstalledApps ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#00d4ff" />
+                <Text style={styles.loadingText}>Загрузка приложений...</Text>
+              </View>
+            ) : filteredApps.length > 0 ? (
+              <ScrollView style={styles.popularAppsList} showsVerticalScrollIndicator={false}>
+                {filteredApps.map((app) => {
+                  const isSelected = selectedApps.includes(app.packageName);
+                  return (
+                    <Pressable
+                      key={app.packageName}
+                      style={[styles.popularAppItem, isSelected && styles.popularAppItemAdded]}
+                      onPress={() => selectAppFromPicker(app)}
+                    >
+                      <Text style={styles.popularAppIcon}>{app.icon}</Text>
+                      <View style={styles.popularAppInfo}>
+                        <Text style={styles.popularAppName}>{app.name}</Text>
+                        <Text style={styles.popularAppPackage}>{app.packageName}</Text>
+                      </View>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
+                      ) : (
+                        <Ionicons name="add-circle" size={24} color="#00d4ff" />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="apps-outline" size={48} color="#2d2d5f" />
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'Ничего не найдено' : 'Список приложений пуст'}
+                </Text>
+                {!searchQuery && (
+                  <Text style={styles.emptyHint}>
+                    Нажмите кнопку "Обновить" для загрузки списка
+                  </Text>
+                )}
+              </View>
+            )}
             
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowAppModal(false)}
+                onPress={() => {
+                  setShowAppsPickerModal(false);
+                  setSearchQuery('');
+                }}
               >
-                <Text style={styles.modalButtonTextCancel}>Отмена</Text>
+                <Text style={styles.modalButtonTextCancel}>Закрыть</Text>
               </Pressable>
-              
-              <Pressable
-                style={[styles.modalButton, styles.modalButtonSave]}
-                onPress={saveCustomApp}
-              >
-                <Text style={styles.modalButtonTextSave}>Добавить</Text>
-              </Pressable>
+              {allInstalledApps.length === 0 && (
+                <Pressable
+                  style={[styles.modalButton, styles.modalButtonSave]}
+                  onPress={loadInstalledApps}
+                >
+                  <Text style={styles.modalButtonTextSave}>Обновить</Text>
+                </Pressable>
+              )}
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal для выбора популярных приложений */}
-      <Modal
-        visible={showPopularAppsModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPopularAppsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Популярные приложения</Text>
-            <Text style={styles.modalSubtitle}>
-              Выберите приложение из списка. Package name будет заполнен автоматически.
-            </Text>
-            
-            <ScrollView style={styles.popularAppsList} showsVerticalScrollIndicator={false}>
-              {POPULAR_APPS.map((app) => {
-                const isAdded = customApps.some(a => a.packageName === app.packageName);
-                return (
-                  <Pressable
-                    key={app.id}
-                    style={[styles.popularAppItem, isAdded && styles.popularAppItemAdded]}
-                    onPress={() => !isAdded && addPopularApp(app)}
-                    disabled={isAdded}
-                  >
-                    <Text style={styles.popularAppIcon}>{app.icon}</Text>
-                    <View style={styles.popularAppInfo}>
-                      <Text style={styles.popularAppName}>{app.name}</Text>
-                      <Text style={styles.popularAppCategory}>{app.category}</Text>
-                      <Text style={styles.popularAppPackage}>{app.packageName}</Text>
-                    </View>
-                    {isAdded ? (
-                      <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-                    ) : (
-                      <Ionicons name="add-circle" size={24} color="#00d4ff" />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            
-            <Pressable
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              onPress={() => setShowPopularAppsModal(false)}
-            >
-              <Text style={styles.modalButtonTextCancel}>Закрыть</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -874,91 +890,51 @@ export default function AutostartSettingsScreen() {
         </View>
       </Modal>
 
-      {/* Modal для выбора из установленных приложений */}
-      <Modal
-        visible={showInstalledAppsModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowInstalledAppsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Установленные приложения</Text>
-            <Text style={styles.modalSubtitle}>
-              Выберите приложение из списка установленных на устройстве
-            </Text>
-            
-            {loadingInstalledApps ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#00d4ff" />
-                <Text style={styles.loadingText}>Загрузка приложений...</Text>
-              </View>
-            ) : installedApps.length > 0 ? (
-              <ScrollView style={styles.popularAppsList} showsVerticalScrollIndicator={false}>
-                {installedApps.map((app) => {
-                  const isAdded = customApps.some(a => a.packageName === app.packageName);
-                  return (
-                    <Pressable
-                      key={app.id}
-                      style={[styles.popularAppItem, isAdded && styles.popularAppItemAdded]}
-                      onPress={() => !isAdded && selectInstalledApp(app)}
-                      disabled={isAdded}
-                    >
-                      <Text style={styles.popularAppIcon}>{app.icon}</Text>
-                      <View style={styles.popularAppInfo}>
-                        <Text style={styles.popularAppName}>{app.name}</Text>
-                        <Text style={styles.popularAppCategory}>{app.category}</Text>
-                        <Text style={styles.popularAppPackage}>{app.packageName}</Text>
-                      </View>
-                      {isAdded ? (
-                        <Ionicons name="checkmark-circle" size={24} color="#00ff88" />
-                      ) : (
-                        <Ionicons name="add-circle" size={24} color="#00d4ff" />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="apps-outline" size={48} color="#2d2d5f" />
-                <Text style={styles.emptyText}>Список приложений пуст</Text>
-                <Text style={styles.emptyHint}>Для получения списка требуется нативный модуль</Text>
-              </View>
-            )}
-            
-            <Pressable
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              onPress={() => setShowInstalledAppsModal(false)}
-            >
-              <Text style={styles.modalButtonTextCancel}>Закрыть</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
-      {/* Modal для выбора из Bluetooth устройств */}
+      {/* Modal для выбора Bluetooth устройств */}
       <Modal
         visible={showBluetoothDevicesModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowBluetoothDevicesModal(false)}
+        onRequestClose={() => {
+          setShowBluetoothDevicesModal(false);
+          setBluetoothSearchQuery('');
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Bluetooth устройства</Text>
+            <Text style={styles.modalTitle}>Выберите Bluetooth устройство</Text>
             <Text style={styles.modalSubtitle}>
               Выберите устройство из списка сопряженных устройств
             </Text>
+            
+            {/* Поиск */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#8b94a8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Поиск устройств..."
+                placeholderTextColor="#8b94a8"
+                value={bluetoothSearchQuery}
+                onChangeText={setBluetoothSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {bluetoothSearchQuery.length > 0 && (
+                <Pressable onPress={() => setBluetoothSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color="#8b94a8" />
+                </Pressable>
+              )}
+            </View>
             
             {loadingBluetoothDevices ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#00d4ff" />
                 <Text style={styles.loadingText}>Загрузка устройств...</Text>
               </View>
-            ) : bluetoothDevices.length > 0 ? (
+            ) : filteredBluetoothDevices.length > 0 ? (
               <ScrollView style={styles.popularAppsList} showsVerticalScrollIndicator={false}>
-                {bluetoothDevices.map((device) => {
+                {filteredBluetoothDevices.map((device) => {
                   const isSelected = selectedBluetoothDevice?.address === device.address;
                   return (
                     <Pressable
@@ -981,28 +957,48 @@ export default function AutostartSettingsScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="bluetooth-outline" size={48} color="#2d2d5f" />
-                <Text style={styles.emptyText}>Список устройств пуст</Text>
-                <Text style={styles.emptyHint}>Для получения списка требуется нативный модуль</Text>
+                <Text style={styles.emptyText}>
+                  {bluetoothSearchQuery ? 'Ничего не найдено' : 'Список устройств пуст'}
+                </Text>
+                {!bluetoothSearchQuery && (
+                  <Text style={styles.emptyHint}>
+                    Убедитесь, что Bluetooth включен и устройства сопряжены. Нажмите "Обновить" для повторной загрузки.
+                  </Text>
+                )}
               </View>
             )}
             
             <View style={styles.modalButtons}>
               <Pressable
                 style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowBluetoothDevicesModal(false)}
+                onPress={() => {
+                  setShowBluetoothDevicesModal(false);
+                  setBluetoothSearchQuery('');
+                }}
               >
                 <Text style={styles.modalButtonTextCancel}>Закрыть</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: '#2d2d5f' }]}
-                onPress={() => {
-                  setShowBluetoothDevicesModal(false);
-                  setDeviceName('');
-                  setShowDeviceModal(true);
-                }}
-              >
-                <Text style={styles.modalButtonTextCancel}>Добавить вручную</Text>
-              </Pressable>
+              {allBluetoothDevices.length === 0 && (
+                <Pressable
+                  style={[styles.modalButton, styles.modalButtonSave]}
+                  onPress={loadBluetoothDevices}
+                >
+                  <Text style={styles.modalButtonTextSave}>Обновить</Text>
+                </Pressable>
+              )}
+              {allBluetoothDevices.length > 0 && (
+                <Pressable
+                  style={[styles.modalButton, { backgroundColor: '#2d2d5f' }]}
+                  onPress={() => {
+                    setShowBluetoothDevicesModal(false);
+                    setBluetoothSearchQuery('');
+                    setDeviceName('');
+                    setShowDeviceModal(true);
+                  }}
+                >
+                  <Text style={styles.modalButtonTextCancel}>Добавить вручную</Text>
+                </Pressable>
+              )}
             </View>
           </View>
         </View>
@@ -1446,6 +1442,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#c7cad9',
     marginBottom: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f0f23',
+    borderWidth: 2,
+    borderColor: '#2d2d5f',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#c7cad9',
   },
   popularAppCategory: {
     fontSize: 12,
