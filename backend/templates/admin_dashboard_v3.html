@@ -145,6 +145,11 @@
                         <input type="date" class="filter-input" id="date-from-filter" onchange="applyFilters()" title="Дата от">
                         <input type="date" class="filter-input" id="date-to-filter" onchange="applyFilters()" title="Дата до">
                     </div>
+                    <div class="filter-row">
+                        <input type="number" class="filter-input" id="limit-events" placeholder="Лимит событий" min="1" max="50000" value="5000" title="Макс. событий при загрузке (1–50000)">
+                        <input type="number" class="filter-input" id="limit-clusters" placeholder="Лимит кластеров" min="1" max="50000" value="5000" title="Макс. кластеров при загрузке (1–50000)">
+                        <input type="number" class="filter-input" id="min-reports" placeholder="Мин. отчётов" min="0" max="100" value="3" title="Для кластеров: минимум отчётов (0 = все)">
+                    </div>
                     <div class="select-all-row">
                         <input type="checkbox" id="select-all-checkbox" class="checkbox" onchange="selectAllFiltered(this.checked)">
                         <label for="select-all-checkbox">Выбрать все отфильтрованные (<span id="filtered-count">0</span>)</label>
@@ -249,9 +254,13 @@
 
         async function loadData() {
             try {
+                const limitEvents = Math.min(50000, Math.max(1, parseInt(document.getElementById('limit-events').value, 10) || 5000));
+                const limitClusters = Math.min(50000, Math.max(1, parseInt(document.getElementById('limit-clusters').value, 10) || 5000));
+                const minReports = Math.max(0, parseInt(document.getElementById('min-reports').value, 10) || 3);
+
                 const [eventsRes, clustersRes] = await Promise.all([
-                    fetch('/api/admin/v2/events?limit=1000'),
-                    fetch('/api/admin/v2/clusters?limit=1000&min_reports=3')  // 🆕 Показываем только подтверждённые кластеры (≥3 отчёта)
+                    fetch(`/api/admin/v2/events?limit=${limitEvents}`),
+                    fetch(`/api/admin/v2/clusters?limit=${limitClusters}&min_reports=${minReports}`)
                 ]);
                 const eventsData = await eventsRes.json();
                 const clustersData = await clustersRes.json();

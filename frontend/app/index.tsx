@@ -27,7 +27,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Battery from 'expo-battery';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
-import { ExpoAndroidAppList } from 'expo-android-app-list';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import SimpleToast, { showToast } from '../components/SimpleToast';
 
@@ -76,6 +75,7 @@ export default function HomeScreen() {
     accelerometerData: Array<{ x: number; y: number; z: number; timestamp: number }>;
   }>>([]);
   const currentLocationRef = useRef<any>(null);
+  const isTrackingRef = useRef(false);
 
   // Хук для препятствий
   const { obstacles, closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
@@ -92,6 +92,11 @@ export default function HomeScreen() {
       cleanup();
     };
   }, []);
+
+  // Держим ref в актуальном состоянии, чтобы интервалы не использовали устаревшее значение
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   // Проверка автозапуска при загрузке и настройка фонового мониторинга
   useEffect(() => {
@@ -130,39 +135,41 @@ export default function HomeScreen() {
       setAutostartMode(mode || 'disabled');
       console.log('🚀 Autostart mode:', mode);
 
-      if (mode === 'onCharge' && !isTracking) {
-        // Проверяем подключена ли зарядка
+      const alreadyTracking = await AsyncStorage.getItem('is_tracking_active') === 'true';
+      if (alreadyTracking) return;
+
+      if (mode === 'onCharge') {
         const batteryState = await Battery.getBatteryStateAsync();
-        const isCharging = batteryState === Battery.BatteryState.CHARGING;
-        
+        const isCharging = batteryState === Battery.BatteryState.CHARGING || 
+                          batteryState === Battery.BatteryState.FULL;
         if (isCharging) {
           console.log('🚀 Auto-starting monitoring - device is charging...');
           setTimeout(() => {
-            startTracking();
+            startTracking({ silent: true });
             setWasAutoStarted(true);
           }, 1000);
         }
       }
 
       // Проверка Bluetooth
-      if (mode === 'onBluetooth' && !isTracking) {
+      if (mode === 'onBluetooth') {
         const shouldStart = await checkBluetoothConnection();
         if (shouldStart) {
           console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
           setTimeout(() => {
-            startTracking();
+            startTracking({ silent: true });
             setWasAutoStarted(true);
           }, 1000);
         }
       }
 
       // Проверка приложений (при запуске приложения)
-      if (mode === 'withApps' && !isTracking) {
+      if (mode === 'withApps') {
         const shouldStart = await checkTriggerApps();
         if (shouldStart) {
           console.log('🚀 Auto-starting monitoring - trigger app detected...');
           setTimeout(() => {
-            startTracking();
+            startTracking({ silent: true });
             setWasAutoStarted(true);
           }, 1000);
         }
@@ -196,88 +203,91 @@ export default function HomeScreen() {
     }
     
     appStateSubscription.current = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && !isTracking) {
-        const currentMode = await AsyncStorage.getItem('autostart_mode');
-        
-        if (currentMode === 'onBluetooth') {
-          // Проверяем Bluetooth при возврате приложения
-          const shouldStart = await checkBluetoothConnection();
-          if (shouldStart) {
-            console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
-            setTimeout(() => {
-              startTracking();
-              setWasAutoStarted(true);
-            }, 500);
-          }
-        } else if (currentMode === 'withApps') {
-          // Проверяем триггерные приложения при возврате
-          const shouldStart = await checkTriggerApps();
-          if (shouldStart) {
-            console.log('🚀 Auto-starting monitoring - trigger app detected on app resume...');
-            setTimeout(() => {
-              startTracking();
-              setWasAutoStarted(true);
-            }, 500);
-          }
-        } else if (currentMode === 'onCharge') {
-          // Проверяем зарядку при возврате приложения
-          const batteryState = await Battery.getBatteryStateAsync();
-          const isCharging = batteryState === Battery.BatteryState.CHARGING || 
-                            batteryState === Battery.BatteryState.FULL;
-          if (isCharging) {
-            console.log('🚀 Auto-starting monitoring - device is charging...');
-            setTimeout(() => {
-              startTracking();
-              setWasAutoStarted(true);
-            }, 500);
-          }
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        lastBackgroundTimeRef.current = Date.now();
+      }
+      if (nextAppState !== 'active') return;
+      // Используем ref и AsyncStorage, чтобы не полагаться на устаревший closure
+      if (isTrackingRef.current) return;
+      const active = await AsyncStorage.getItem('is_tracking_active');
+      if (active === 'true') return;
+
+      const currentMode = await AsyncStorage.getItem('autostart_mode');
+      
+      if (currentMode === 'onBluetooth') {
+        const shouldStart = await checkBluetoothConnection();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
+          setTimeout(() => {
+            startTracking({ silent: true });
+            setWasAutoStarted(true);
+          }, 500);
+        }
+      } else if (currentMode === 'withApps') {
+        const shouldStart = await checkTriggerApps();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - trigger app detected on app resume...');
+          setTimeout(() => {
+            startTracking({ silent: true });
+            setWasAutoStarted(true);
+          }, 500);
+        }
+      } else if (currentMode === 'onCharge') {
+        const batteryState = await Battery.getBatteryStateAsync();
+        const isCharging = batteryState === Battery.BatteryState.CHARGING || 
+                          batteryState === Battery.BatteryState.FULL;
+        if (isCharging) {
+          console.log('🚀 Auto-starting monitoring - device is charging...');
+          setTimeout(() => {
+            startTracking({ silent: true });
+            setWasAutoStarted(true);
+          }, 500);
         }
       }
-      
     });
 
-    // Для Bluetooth проверяем периодически (каждые 10 секунд) - работает даже в фоне на Android
+    // Для Bluetooth проверяем периодически (каждые 5 секунд) — используем ref и AsyncStorage
     if (mode === 'onBluetooth') {
       bluetoothCheckInterval.current = setInterval(async () => {
-        if (!isTracking) {
-          const shouldStart = await checkBluetoothConnection();
-          if (shouldStart) {
-            console.log('🚀 Auto-starting monitoring - Bluetooth device connected (periodic check)...');
-            startTracking();
-            setWasAutoStarted(true);
-          }
+        if (isTrackingRef.current) return;
+        if (await AsyncStorage.getItem('is_tracking_active') === 'true') return;
+        const shouldStart = await checkBluetoothConnection();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - Bluetooth device connected (periodic check)...');
+          startTracking({ silent: true });
+          setWasAutoStarted(true);
         }
-      }, 10000); // Проверяем каждые 10 секунд
+      }, 5000);
     }
 
-    // Для зарядки проверяем периодически (каждые 10 секунд) - работает даже в фоне на Android
+    // Для зарядки проверяем периодически (каждые 5 секунд) — используем ref и AsyncStorage
     if (mode === 'onCharge') {
       chargeCheckInterval.current = setInterval(async () => {
-        if (!isTracking) {
-          const batteryState = await Battery.getBatteryStateAsync();
-          const isCharging = batteryState === Battery.BatteryState.CHARGING || 
-                            batteryState === Battery.BatteryState.FULL;
-          if (isCharging) {
-            console.log('🚀 Auto-starting monitoring - device is charging (periodic check)...');
-            startTracking();
-            setWasAutoStarted(true);
-          }
+        if (isTrackingRef.current) return;
+        if (await AsyncStorage.getItem('is_tracking_active') === 'true') return;
+        const batteryState = await Battery.getBatteryStateAsync();
+        const isCharging = batteryState === Battery.BatteryState.CHARGING || 
+                          batteryState === Battery.BatteryState.FULL;
+        if (isCharging) {
+          console.log('🚀 Auto-starting monitoring - device is charging (periodic check)...');
+          startTracking({ silent: true });
+          setWasAutoStarted(true);
         }
-      }, 10000); // Проверяем каждые 10 секунд
+      }, 5000);
     }
 
-    // Для приложений проверяем периодически (каждые 10 секунд) - работает даже в фоне на Android
+    // Для приложений проверяем периодически (каждые 5 секунд) — используем ref и AsyncStorage
     if (mode === 'withApps') {
       appsCheckInterval.current = setInterval(async () => {
-        if (!isTracking) {
-          const shouldStart = await checkTriggerApps();
-          if (shouldStart) {
-            console.log('🚀 Auto-starting monitoring - trigger app detected (periodic check)...');
-            startTracking();
-            setWasAutoStarted(true);
-          }
+        if (isTrackingRef.current) return;
+        if (await AsyncStorage.getItem('is_tracking_active') === 'true') return;
+        const shouldStart = await checkTriggerApps();
+        if (shouldStart) {
+          console.log('🚀 Auto-starting monitoring - trigger app detected (periodic check)...');
+          startTracking({ silent: true });
+          setWasAutoStarted(true);
         }
-      }, 10000); // Проверяем каждые 10 секунд
+      }, 5000);
     }
 
     // Проверка автоматической остановки (каждые 5 секунд)
@@ -343,26 +353,35 @@ export default function HomeScreen() {
     }, 5000); // Проверяем каждые 5 секунд
   };
 
-  // Проверка разрешений Bluetooth (без показа алертов для частых проверок)
-  const hasBluetoothPermission = async (): Promise<boolean> => {
+  // Проверка и при необходимости запрос разрешения Bluetooth (Android 12+)
+  const ensureBluetoothPermission = async (): Promise<boolean> => {
     if (Platform.OS !== 'android') {
       return true;
     }
-
-    // Для Android 12+ (API 31+) требуется BLUETOOTH_CONNECT
-    if (Platform.Version >= 31) {
+    const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 31;
+    if (apiLevel >= 31) {
       try {
-        const result = await PermissionsAndroid.check(
+        const status = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
         );
-        return result === true;
+        if (status) return true;
+        const result = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          {
+            title: 'Разрешение Bluetooth',
+            message: 'Нужен доступ к Bluetooth для автозапуска при подключении к устройству.',
+            buttonNeutral: 'Позже',
+            buttonNegative: 'Отмена',
+            buttonPositive: 'Разрешить',
+          }
+        );
+        return result === PermissionsAndroid.RESULTS.GRANTED;
       } catch (error) {
-        console.error('Error checking BLUETOOTH_CONNECT permission:', error);
+        console.error('Error requesting BLUETOOTH_CONNECT:', error);
         return false;
       }
     }
-
-    return true; // Для старых версий Android разрешения не требуются
+    return true;
   };
 
   // Проверка подключения Bluetooth устройства
@@ -374,8 +393,8 @@ export default function HomeScreen() {
         return false;
       }
 
-      // Проверяем разрешения для Android 12+
-      const hasPermission = await hasBluetoothPermission();
+      // Проверяем/запрашиваем разрешение для Android 12+
+      const hasPermission = await ensureBluetoothPermission();
       if (!hasPermission) {
         console.log('📱 BLUETOOTH_CONNECT permission not granted');
         return false;
@@ -394,28 +413,36 @@ export default function HomeScreen() {
       // Если есть адрес устройства, используем более точную проверку
       if (device.address) {
         try {
-          // Сначала проверяем через getConnectedDevice (более эффективно)
+          // 1) Проверяем, есть ли уже активное соединение (сокет) от нашего приложения
           try {
             const connectedDevice = await RNBluetoothClassic.getConnectedDevice(device.address);
             if (connectedDevice && connectedDevice.isConnected()) {
               console.log('📱 Bluetooth device is connected:', device.name);
               return true;
             }
-          } catch (notConnectedError) {
-            // Устройство не подключено, продолжаем проверку
+          } catch {
+            // Устройство не подключено через наше приложение
           }
-          
-          // Если не подключено, проверяем среди всех подключенных устройств
+
           const connectedDevices = await RNBluetoothClassic.getConnectedDevices();
           const isConnected = connectedDevices.some(
-            connectedDevice => connectedDevice.address === device.address
+            (d: { address: string }) => d.address === device.address
           );
-          
           if (isConnected) {
             console.log('📱 Bluetooth device is connected (from list):', device.name);
             return true;
           }
-          
+
+          // 2) Пытаемся подключиться к устройству (если оно в зоне и сопряжено)
+          try {
+            await RNBluetoothClassic.connectToDevice(device.address, {});
+            console.log('📱 Bluetooth device connected (just connected):', device.name);
+            return true;
+          } catch (connectError) {
+            // Устройство недоступно или не принимает соединение (например, только A2DP)
+            console.log('📱 Bluetooth connect attempt failed:', (connectError as Error)?.message || connectError);
+          }
+
           console.log('📱 Bluetooth device is not connected:', device.name);
           return false;
         } catch (error) {
@@ -448,58 +475,41 @@ export default function HomeScreen() {
     }
   };
 
-  // Проверка запущенных триггерных приложений
+  // Время ухода приложения в фон (для эвристики "вернулись из другого приложения")
+  const lastBackgroundTimeRef = useRef<number | null>(null);
+
+  // Проверка: нужно ли запустить мониторинг по триггерным приложениям.
+  // expo-android-app-list не даёт список запущенных приложений, только установленных (getAll).
+  // Используем эвристику: при возврате в приложение после 3+ сек в фоне считаем, что пользователь
+  // мог быть в одном из выбранных приложений — запускаем мониторинг.
   const checkTriggerApps = async (): Promise<boolean> => {
     try {
       const savedApps = await AsyncStorage.getItem('autostart_trigger_apps');
-      
       if (!savedApps) {
         console.log('📱 No trigger apps configured');
         return false;
       }
-
       const selectedPackageNames: string[] = JSON.parse(savedApps);
-      
       if (selectedPackageNames.length === 0) {
         console.log('📱 No apps selected');
         return false;
       }
-
       console.log('📱 Selected trigger apps (package names):', selectedPackageNames.join(', '));
 
-      // Пытаемся использовать expo-android-app-list для проверки запущенных приложений
-      if (Device.platformName === 'Android') {
-        try {
-          const runningApps = await ExpoAndroidAppList.getRunningApps();
-          console.log(`📱 Found ${runningApps.length} running apps`);
-          
-          // Проверяем, запущено ли хотя бы одно из выбранных приложений
-          const isAnyTriggerAppRunning = runningApps.some(runningApp => 
-            selectedPackageNames.includes(runningApp.packageName)
-          );
-          
-          if (isAnyTriggerAppRunning) {
-            const runningTriggerApps = runningApps.filter(app => 
-              selectedPackageNames.includes(app.packageName)
-            );
-            console.log('📱 Trigger app(s) running:', runningTriggerApps.map(a => a.appName || a.packageName).join(', '));
-            return true;
-          } else {
-            console.log('📱 No trigger apps currently running');
-            return false;
-          }
-        } catch (error) {
-          console.warn('⚠️ Could not check running apps (may need QUERY_ALL_PACKAGES permission):', error);
-          // Fallback: если не удалось проверить запущенные приложения,
-          // возвращаем false для периодической проверки, чтобы не запускать мониторинг постоянно
-          return false;
-        }
-      } else {
-        // Для iOS нет простого способа проверить запущенные приложения
-        // Возвращаем false для периодической проверки
-        console.log('📱 iOS: Cannot check running apps, returning false for periodic check');
+      if (Platform.OS !== 'android') {
+        console.log('📱 Trigger apps mode is Android-only');
         return false;
       }
+
+      // Эвристика: только что вернулись из фона после 3+ секунд — вероятно переключались на другое приложение
+      const now = Date.now();
+      const lastBg = lastBackgroundTimeRef.current;
+      if (lastBg != null && (now - lastBg) >= 3000) {
+        lastBackgroundTimeRef.current = null;
+        console.log('📱 User returned from background after', Math.round((now - lastBg) / 1000), 's — starting monitoring (trigger apps heuristic)');
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Error checking trigger apps:', error);
       return false;
@@ -595,9 +605,20 @@ export default function HomeScreen() {
     }
   };
 
-  const startTracking = async () => {
+  const startTracking = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     setIsLoading(true);
     try {
+      // Не запускаем повторно, если уже идёт мониторинг
+      if (isTrackingRef.current) {
+        setIsLoading(false);
+        return;
+      }
+      const alreadyActive = await AsyncStorage.getItem('is_tracking_active');
+      if (alreadyActive === 'true') {
+        setIsLoading(false);
+        return;
+      }
       // Сохраняем флаг активного мониторинга для фоновой задачи
       await AsyncStorage.setItem('is_tracking_active', 'true');
       
@@ -687,7 +708,10 @@ export default function HomeScreen() {
       dataCollectionInterval.current = setTimeout(collectSyncedPacket, 2000);
 
       setIsTracking(true);
-      showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
+      isTrackingRef.current = true;
+      if (!silent) {
+        showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
+      }
     } catch (error) {
       console.error('Error starting tracking:', error);
       showToast('error', '❌ Ошибка', 'Не удалось запустить мониторинг', 3000);
@@ -725,6 +749,7 @@ export default function HomeScreen() {
       currentLocationRef.current = null;
 
       setIsTracking(false);
+      isTrackingRef.current = false;
       setCurrentLocation(null);
       setWasAutoStarted(false); // Сбрасываем флаг автозапуска
       showToast('info', '⏹️ Мониторинг остановлен', 'Приложение больше не отслеживает дорогу', 3000);
