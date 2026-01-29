@@ -698,3 +698,4 @@ model.patch
 
 frontend/.metro-cache/
 frontend/.expo/
+*.hprof

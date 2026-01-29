@@ -2,7 +2,7 @@
   "expo": {
     "name": "Good Road",
     "slug": "good-road",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "goodroad",
@@ -67,7 +67,8 @@
       "expo-location",
       "expo-sensors",
       "expo-asset",
-      "with-rn-bluetooth-classic"
+      "with-rn-bluetooth-classic",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
