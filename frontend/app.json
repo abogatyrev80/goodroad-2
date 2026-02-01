@@ -58,6 +58,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/fixGradleJavaHome.js",
       [
         "expo-router",
         {
