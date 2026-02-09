@@ -26,6 +26,8 @@ import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Battery from 'expo-battery';
 import * as Application from 'expo-application';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import * as Brightness from 'expo-brightness';
 import * as Device from 'expo-device';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import SimpleToast, { showToast } from '../components/SimpleToast';
@@ -76,6 +78,7 @@ export default function HomeScreen() {
   }>>([]);
   const currentLocationRef = useRef<any>(null);
   const isTrackingRef = useRef(false);
+  const savedBrightnessRef = useRef<number | null>(null);
 
   // Хук для препятствий
   const { obstacles, closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
@@ -520,8 +523,11 @@ export default function HomeScreen() {
     try {
       // Проверяем разрешения
       const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-      
+      let bgStatus: string = 'granted';
+      if (Platform.OS !== 'web') {
+        const { status } = await Location.requestBackgroundPermissionsAsync();
+        bgStatus = status;
+      }
       if (locationStatus !== 'granted' || bgStatus !== 'granted') {
         showToast('error', '⚠️ Разрешения необходимы', 'Для работы приложения нужны разрешения на GPS и фоновую работу', 5000);
       }
@@ -616,12 +622,17 @@ export default function HomeScreen() {
       }
       const alreadyActive = await AsyncStorage.getItem('is_tracking_active');
       if (alreadyActive === 'true') {
-        setIsLoading(false);
-        return;
+        // Если нет активной подписки — флаг устарел (краш/закрытие приложения)
+        if (!locationSubscription.current) {
+          await AsyncStorage.removeItem('is_tracking_active');
+          // продолжаем запуск
+        } else {
+          setIsLoading(false);
+          return;
+        }
       }
       // Сохраняем флаг активного мониторинга для фоновой задачи
       await AsyncStorage.setItem('is_tracking_active', 'true');
-      
       // Запускаем GPS
       const subscription = await Location.watchPositionAsync(
         {
@@ -638,24 +649,25 @@ export default function HomeScreen() {
       locationSubscription.current = subscription;
       console.log('✅ GPS tracking started');
 
-      // Запускаем акселерометр (10 Hz)
-      Accelerometer.setUpdateInterval(100);
-      const accelSubscription = Accelerometer.addListener((data) => {
-        // Накапливаем данные в буфер с временной меткой
-        accelerometerBuffer.current.push({
-          x: data.x,
-          y: data.y,
-          z: data.z,
-          timestamp: Date.now()
+      // Запускаем акселерометр (10 Hz) — на web expo-sensors не поддерживается
+      if (Platform.OS !== 'web') {
+        Accelerometer.setUpdateInterval(100);
+        const accelSubscription = Accelerometer.addListener((data) => {
+          accelerometerBuffer.current.push({
+            x: data.x,
+            y: data.y,
+            z: data.z,
+            timestamp: Date.now()
+          });
+          if (accelerometerBuffer.current.length > 100) {
+            accelerometerBuffer.current.shift();
+          }
         });
-        
-        // Ограничиваем размер буфера (максимум 100 значений = 10 секунд при 10Hz)
-        if (accelerometerBuffer.current.length > 100) {
-          accelerometerBuffer.current.shift();
-        }
-      });
-      accelerometerSubscription.current = accelSubscription;
-      console.log('✅ Accelerometer started (10 Hz)');
+        accelerometerSubscription.current = accelSubscription;
+        console.log('✅ Accelerometer started (10 Hz)');
+      } else {
+        console.log('⚠️ Accelerometer skipped on web');
+      }
 
       // 🆕 Интервал для сбора и отправки синхронизированных пакетов данных
       const collectSyncedPacket = () => {
@@ -709,6 +721,40 @@ export default function HomeScreen() {
 
       setIsTracking(true);
       isTrackingRef.current = true;
+
+      // Не выключать экран и минимальная яркость во время мониторинга
+      if (Platform.OS !== 'web') {
+        try {
+          const keepScreenOn = await AsyncStorage.getItem('keep_screen_on');
+          if (keepScreenOn === 'true') {
+            await activateKeepAwakeAsync();
+            console.log('✅ Keep screen on enabled');
+
+            // Установить минимальную яркость (сохраняем текущую и восстанавливаем при остановке)
+            const available = await Brightness.isAvailableAsync();
+            if (available) {
+              try {
+                const { status } = await Brightness.requestPermissionsAsync();
+                if (status === 'granted') {
+                  const current = await Brightness.getBrightnessAsync();
+                  savedBrightnessRef.current = current;
+                  const minBrightnessStr = await AsyncStorage.getItem('min_brightness');
+                  const minBrightness = minBrightnessStr != null
+                    ? Math.max(0, Math.min(1, parseFloat(minBrightnessStr)))
+                    : 0.1;
+                  await Brightness.setBrightnessAsync(minBrightness);
+                  console.log('✅ Min brightness set to', Math.round(minBrightness * 100), '%');
+                }
+              } catch (brightnessErr) {
+                console.warn('Brightness error:', brightnessErr);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Keep awake error:', e);
+        }
+      }
+
       if (!silent) {
         showToast('success', '✅ Мониторинг запущен', 'Приложение отслеживает состояние дороги', 3000);
       }
@@ -752,6 +798,25 @@ export default function HomeScreen() {
       isTrackingRef.current = false;
       setCurrentLocation(null);
       setWasAutoStarted(false); // Сбрасываем флаг автозапуска
+
+      // Восстанавливаем яркость и отключаем keep screen on
+      if (Platform.OS !== 'web') {
+        try {
+          if (savedBrightnessRef.current != null) {
+            const available = await Brightness.isAvailableAsync();
+            if (available) {
+              await Brightness.setBrightnessAsync(savedBrightnessRef.current);
+              console.log('✅ Brightness restored');
+            }
+            savedBrightnessRef.current = null;
+          }
+          deactivateKeepAwake();
+          console.log('✅ Keep screen on disabled');
+        } catch {
+          savedBrightnessRef.current = null;
+        }
+      }
+
       showToast('info', '⏹️ Мониторинг остановлен', 'Приложение больше не отслеживает дорогу', 3000);
       console.log('✅ Tracking stopped and buffers cleared');
     } catch (error) {
@@ -942,14 +1007,16 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
-        {/* Админ панель */}
-        <Pressable
-          style={styles.button}
-          onPress={() => router.push('/admin-simple')}
-        >
-          <Ionicons name="analytics" size={34} color="#00d4ff" />
-          <Text style={styles.buttonText}>СТАТИСТИКА</Text>
-        </Pressable>
+        {/* Админ-панель — только для разработчиков (скрыта в production) */}
+        {__DEV__ && (
+          <Pressable
+            style={styles.button}
+            onPress={() => router.push('/admin-simple')}
+          >
+            <Ionicons name="analytics" size={34} color="#00d4ff" />
+            <Text style={styles.buttonText}>АДМИН-ПАНЕЛЬ</Text>
+          </Pressable>
+        )}
 
         {/* Информация внизу */}
         <View style={styles.footer}>

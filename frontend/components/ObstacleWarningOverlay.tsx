@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Obstacle } from '../services/ObstacleService';
 
@@ -28,9 +28,11 @@ export default function ObstacleWarningOverlay({
 }: ObstacleWarningOverlayProps) {
   const [pulseAnim] = useState(new Animated.Value(1));
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [displayedDistance, setDisplayedDistance] = useState(0); // 🆕 Плавное отображение расстояния
-  const [progressAnim] = useState(new Animated.Value(0)); // 🆕 Анимация прогресс-бара
-  const progressContainerWidth = useRef<number>(0); // 🆕 Ширина контейнера прогресс-бара
+  const [displayedDistance, setDisplayedDistance] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0); // Процент для прогресс-бара (без interpolate — избегаем чёрного экрана)
+  const [progressAnim] = useState(new Animated.Value(0));
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const mountedRef = useRef(true);
 
   // Размеры в зависимости от настройки
   const sizeConfig = {
@@ -49,54 +51,56 @@ export default function ObstacleWarningOverlay({
   const currentSize = sizeConfig[size];
   const currentPosition = positionStyle[position];
 
-  // 🆕 ПЛАВНАЯ ИНТЕРПОЛЯЦИЯ РАССТОЯНИЯ
+  // Отслеживание монтирования (чтобы не вызывать setState после unmount)
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Плавная интерполяция расстояния
   useEffect(() => {
     if (!obstacle) {
-      setDisplayedDistance(0);
+      if (mountedRef.current) setDisplayedDistance(0);
       return;
     }
-    
     const targetDistance = obstacle.distance;
     const currentDistance = displayedDistance || targetDistance;
-    
-    // Если расстояние изменилось значительно, плавно интерполируем
+
     if (Math.abs(targetDistance - currentDistance) > 2) {
-      // Используем анимацию для плавного перехода
       const animValue = new Animated.Value(currentDistance);
-      
       Animated.timing(animValue, {
         toValue: targetDistance,
-        duration: 150, // Быстрая анимация для отзывчивости
-        useNativeDriver: false, // Нужен для изменения значения
+        duration: 150,
+        useNativeDriver: false,
       }).start();
-      
-      // Обновляем отображаемое значение
+
       const listener = animValue.addListener(({ value }) => {
-        setDisplayedDistance(Math.round(value));
+        if (mountedRef.current) setDisplayedDistance(Math.round(value));
       });
-      
+
       return () => {
         animValue.removeListener(listener);
         animValue.stopAnimation();
       };
     } else {
-      // Небольшое изменение - обновляем сразу
-      setDisplayedDistance(Math.round(targetDistance));
+      if (mountedRef.current) setDisplayedDistance(Math.round(targetDistance));
     }
   }, [obstacle?.distance]);
 
+  // Fade + пульсация, с остановкой loop при размонтировании
   useEffect(() => {
     if (visible && obstacle) {
-      // Fade in
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start();
 
-      // Пульсация для критичных препятствий
       if (obstacle.distance < 300) {
-        Animated.loop(
+        if (pulseLoopRef.current) pulseLoopRef.current.stop();
+        pulseLoopRef.current = Animated.loop(
           Animated.sequence([
             Animated.timing(pulseAnim, {
               toValue: 1.1,
@@ -109,16 +113,27 @@ export default function ObstacleWarningOverlay({
               useNativeDriver: true,
             }),
           ])
-        ).start();
+        );
+        pulseLoopRef.current.start();
       }
     } else {
-      // Fade out
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+      pulseAnim.setValue(1);
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
     }
+    return () => {
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+    };
   }, [visible, obstacle]);
 
   if (!visible || !obstacle) {
@@ -218,21 +233,27 @@ export default function ObstacleWarningOverlay({
     return Math.round(adjustedPercentage);
   };
 
-  // 🆕 АНИМАЦИЯ ПРОГРЕСС-БАРА
+  // Анимация прогресс-бара: обновляем progressPercent через listener (без interpolate — стабильно на нативе)
   useEffect(() => {
     if (!obstacle) {
       progressAnim.setValue(0);
+      if (mountedRef.current) setProgressPercent(0);
       return;
     }
-    
     const targetProgress = getProgressPercentage(obstacle);
-    
     Animated.timing(progressAnim, {
       toValue: targetProgress,
-      duration: 200, // Плавное заполнение
-      useNativeDriver: false, // Нужен для изменения width
+      duration: 200,
+      useNativeDriver: false,
     }).start();
   }, [obstacle?.distance, obstacle?.type, obstacle?.confirmations]);
+
+  useEffect(() => {
+    const listener = progressAnim.addListener(({ value }) => {
+      if (mountedRef.current) setProgressPercent(Math.round(value));
+    });
+    return () => progressAnim.removeListener(listener);
+  }, []);
 
   return (
     <Animated.View
@@ -299,26 +320,17 @@ export default function ObstacleWarningOverlay({
         </View>
       </View>
 
-      {/* 🆕 УЛУЧШЕННЫЙ ИНДИКАТОР РАССТОЯНИЯ (прогресс бар с учетом типа препятствия) */}
-      <View 
-        style={styles.progressContainer}
-        onLayout={(event) => {
-          progressContainerWidth.current = event.nativeEvent.layout.width;
-        }}
-      >
-        <Animated.View 
+      {/* Индикатор расстояния: ширина в % без interpolate, чтобы избежать чёрного экрана на мобильном */}
+      <View style={styles.progressContainer}>
+        <View
           style={[
-            styles.progressBar, 
-            { 
+            styles.progressBar,
+            {
               backgroundColor: colors.bg,
-              width: progressAnim.interpolate({
-                inputRange: [0, 100],
-                outputRange: [0, progressContainerWidth.current || Dimensions.get('window').width - 32],
-              }),
-            }
-          ]} 
+              width: `${Math.max(0, Math.min(100, progressPercent))}%`,
+            },
+          ]}
         />
-        {/* 🆕 Визуальные метки на шкале */}
         <View style={styles.progressMarkers}>
           <View style={[styles.marker, styles.marker25]} />
           <View style={[styles.marker, styles.marker50]} />
@@ -328,8 +340,6 @@ export default function ObstacleWarningOverlay({
     </Animated.View>
   );
 }
-
-const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   overlay: {

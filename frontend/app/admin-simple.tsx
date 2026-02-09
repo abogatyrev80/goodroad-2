@@ -3,198 +3,69 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Pressable,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
+import { syncService } from '../services/SyncService';
 
-// Простые типы данных без зависимостей от offline модулей
-interface SensorDataPoint {
-  id: string;
-  latitude: number;
-  longitude: number;
-  timestamp: string;
-  speed: number;
-  accuracy: number;
-  accelerometer: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  roadQuality: number;
-  hazardType?: string;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
-  isVerified: boolean;
-  adminNotes?: string;
+// Локальная статистика устройства
+interface LocalStats {
+  totalSensorData: number;
+  totalWarnings: number;
+  unsyncedData: number;
 }
 
-interface AdminStats {
-  totalPoints: number;
-  verifiedPoints: number;
-  hazardPoints: number;
-  avgRoadQuality: number;
+interface SyncStatus {
+  lastSyncTime: string;
+  pendingSensorData: number;
+  downloadedRegions: string[];
+  isOnline: boolean;
 }
 
 export default function AdminPanelSimple() {
-  // Состояние данных
-  const [sensorData, setSensorData] = useState<SensorDataPoint[]>([]);
-  const [stats, setStats] = useState<AdminStats>({
-    totalPoints: 0,
-    verifiedPoints: 0,
-    hazardPoints: 0,
-    avgRoadQuality: 0
-  });
-  const [selectedPoint, setSelectedPoint] = useState<SensorDataPoint | null>(null);
-  
-  // UI состояние
+  const [localStats, setLocalStats] = useState<LocalStats | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
+    // Админка только для разработчиков — в production перенаправляем на главную
+    if (!__DEV__) {
+      router.replace('/');
+      return;
+    }
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading admin data...');
+      console.log('🔄 Loading local admin data...');
 
-      // Try to load real data from backend first
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
-                        Constants.expoConfig?.extra?.backendUrl || 
-                        'https://goodroad.su';
-      console.log('🌐 Backend URL:', backendUrl);
-      console.log('🔧 Backend URL source:', process.env.EXPO_PUBLIC_BACKEND_URL ? 'env' : 'app.json');
-      console.log('🔗 Полный URL для запроса данных:', `${backendUrl}/api/admin/sensor-data`);
-      console.log('🔗 Полный URL для запроса статистики:', `${backendUrl}/api/admin/analytics`);
-      
-      // 🆕 Загружаем данные и статистику параллельно (V2 endpoints)
-      const [sensorResponse, statsResponse] = await Promise.all([
-        fetch(`${backendUrl}/api/admin/v2/raw-data?limit=100`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        }),
-        fetch(`${backendUrl}/api/admin/v2/analytics`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        })
+      // Инициализируем sync service (если ещё не инициализирован)
+      await syncService.initialize();
+
+      // Загружаем локальную статистику и статус синхронизации
+      const [stats, status] = await Promise.all([
+        syncService.getDatabaseStats(),
+        syncService.getSyncStatus(),
       ]);
 
-      console.log('📊 Sensor response status:', sensorResponse.status);
-      console.log('📈 Stats response status:', statsResponse.status);
-
-      if (sensorResponse.ok) {
-        const result = await sensorResponse.json();
-        console.log('✅ Raw data response:', result);
-        console.log('✅ Sensor data loaded:', result.data?.length || 0, 'points');
-        
-        // V2 API возвращает {total, limit, skip, returned, data: [...]}
-        if (result.data && Array.isArray(result.data)) {
-          const formattedData: SensorDataPoint[] = result.data.map((point: any) => ({
-            id: point._id || String(Math.random()),
-            latitude: point.latitude || 0,
-            longitude: point.longitude || 0,
-            timestamp: point.timestamp,
-            speed: point.speed || 0,
-            accuracy: point.accuracy || 0,
-            accelerometer: {
-              x: point.accelerometer_x || 0,
-              y: point.accelerometer_y || 0,
-              z: point.accelerometer_z || 0
-            },
-            roadQuality: 50, // В raw_sensor_data нет road_quality_score
-            hazardType: undefined,
-            severity: 'medium',
-            isVerified: false,
-            adminNotes: ''
-          }));
-          
-          setSensorData(formattedData);
-          console.log('✅ Formatted sensor data set:', formattedData.length, 'points');
-        }
-      } else {
-        console.error('❌ Sensor data request failed:', sensorResponse.status);
-      }
-
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        console.log('✅ Stats loaded:', statsData);
-        
-        // V2 API возвращает {summary: {raw_data_points, processed_events, active_warnings}, ...}
-        setStats({
-          totalPoints: statsData.summary?.raw_data_points || 0,
-          verifiedPoints: 0, // raw_sensor_data не имеет верификации
-          hazardPoints: statsData.summary?.processed_events || 0,
-          avgRoadQuality: 0 // raw_sensor_data не имеет road quality score
-        });
-      } else {
-        console.error('❌ Stats request failed:', statsResponse.status);
-      }
-
+      setLocalStats(stats || null);
+      setSyncStatus(status);
     } catch (error: any) {
       console.error('❌ Admin data loading error:', error);
-      console.error('❌ Детали ошибки:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      
-      // Show fallback demo data if API fails
-      console.log('🌐 Loading demo data due to API error...');
-      console.log('⚠️ ВНИМАНИЕ: Показываются ДЕМО-данные, не реальные данные с сервера!');
-        
-      const demoData: SensorDataPoint[] = [
-        {
-          id: 'demo_1',
-          latitude: 55.7558,
-          longitude: 37.6176,
-          timestamp: new Date().toISOString(),
-          speed: 45.2,
-          accuracy: 3.5,
-          accelerometer: { x: 0.1, y: 0.2, z: 9.8 },
-          roadQuality: 85,
-          hazardType: undefined,
-          severity: 'medium',
-          isVerified: true,
-          adminNotes: 'Demo data point'
-        },
-        {
-          id: 'demo_2', 
-          latitude: 55.7568,
-          longitude: 37.6186,
-          timestamp: new Date(Date.now() - 300000).toISOString(),
-          speed: 32.1,
-          accuracy: 5.2,
-          accelerometer: { x: 0.3, y: -0.1, z: 9.7 },
-          roadQuality: 42,
-          hazardType: 'pothole',
-          severity: 'high',
-          isVerified: false,
-          adminNotes: 'Requires verification'
-        }
-      ];
-        
-      setSensorData(demoData);
-      setStats({
-        totalPoints: 22,
-        verifiedPoints: 4,
-        hazardPoints: 3,
-        avgRoadQuality: 76.5
-      });
+      setLocalStats(null);
+      setSyncStatus(null);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -206,63 +77,52 @@ export default function AdminPanelSimple() {
     await loadData();
   };
 
-  // Верификация недоступна для raw_sensor_data (это просто сырые данные без классификации)
-  // Верификация работает только с processed_events
-  const updatePointVerification = async (pointId: string, verified: boolean) => {
-    Alert.alert(
-      'Недоступно', 
-      'Верификация недоступна для сырых данных. Эти данные не классифицированы и не содержат информации о событиях.'
-    );
-  };
-
-  const getPointColor = (point: SensorDataPoint): string => {
-    if (!point.isVerified) return '#FFC107'; // Желтый - неверифицированные
-    
-    if (point.hazardType) {
-      switch (point.severity) {
-        case 'critical': return '#F44336'; // Красный
-        case 'high': return '#FF5722';     // Темно-оранжевый  
-        case 'medium': return '#FF9800';   // Оранжевый
-        default: return '#4CAF50';         // Зеленый
-      }
+  const handleForceSync = async () => {
+    if (!syncStatus?.isOnline) {
+      Alert.alert('Нет соединения', 'Проверьте подключение к интернету для синхронизации.');
+      return;
     }
-    
-    // Цвет по качеству дороги
-    if (point.roadQuality < 30) return '#F44336';      // Красный - плохо
-    if (point.roadQuality < 60) return '#FF9800';      // Оранжевый - средне  
-    return '#4CAF50';                                   // Зеленый - хорошо
+    setIsSyncing(true);
+    try {
+      const success = await syncService.forceFullSync();
+      await loadData();
+      Alert.alert(success ? 'Готово' : 'Ошибка', success ? 'Синхронизация завершена' : 'Не удалось синхронизировать данные');
+    } catch (error) {
+      Alert.alert('Ошибка', 'Ошибка при синхронизации');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const renderDataPoint = (point: SensorDataPoint) => (
-    <Pressable
-      key={point.id}
-      style={[styles.dataPointCard, { borderLeftColor: '#4CAF50' }]}
-      onPress={() => {
-        setSelectedPoint(point);
-        setShowDetails(true);
-      }}
-    >
-      <View style={styles.dataPointHeader}>
-        <Text style={styles.dataPointTime}>
-          {new Date(point.timestamp).toLocaleDateString('ru-RU')} {' '}
-          {new Date(point.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: '#2196F3' }]}>
-          <Text style={styles.statusText}>Сырые данные</Text>
-        </View>
-      </View>
-      
-      <Text style={styles.dataPointLocation}>
-        📍 {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}
-      </Text>
-      
-      <View style={styles.dataPointStats}>
-        <Text style={styles.statItem}>🚗 {point.speed.toFixed(1)} км/ч</Text>
-        <Text style={styles.statItem}>📡 ±{point.accuracy.toFixed(1)}м</Text>
-        <Text style={styles.statItem}>📊 ({point.accelerometer.x.toFixed(2)}, {point.accelerometer.y.toFixed(2)}, {point.accelerometer.z.toFixed(2)})</Text>
-      </View>
-    </Pressable>
-  );
+  const handleOpenWebAdmin = async () => {
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ||
+      Constants.expoConfig?.extra?.backendUrl ||
+      'https://goodroad.su';
+    const adminUrl = backendUrl.endsWith('/')
+      ? `${backendUrl}api/admin/dashboard/v3`
+      : `${backendUrl}/api/admin/dashboard/v3`;
+
+    try {
+      const supported = await Linking.canOpenURL(adminUrl);
+      if (supported) {
+        await Linking.openURL(adminUrl);
+      } else {
+        Alert.alert('Ошибка', 'Не удалось открыть веб-админку');
+      }
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось открыть веб-админку');
+    }
+  };
+
+  const formatLastSync = (time: string) => {
+    if (!time || time === 'Never') return 'Никогда';
+    try {
+      const date = new Date(time);
+      return date.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+    } catch {
+      return time;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -275,35 +135,30 @@ export default function AdminPanelSimple() {
     );
   }
 
+  const isWeb = Platform.OS === 'web';
+  const hasLocalDb = localStats !== null;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable 
+        <Pressable
           onPress={() => {
             try {
-              console.log('🔙 Попытка выхода из админ панели...');
               if (router.canGoBack()) {
                 router.back();
               } else {
-                console.log('📍 История пуста, переход на главную...');
                 router.push('/');
               }
-            } catch (error) {
-              console.error('❌ Ошибка при выходе:', error);
-              // Fallback: попытка перейти на главную страницу
-              try {
-                router.push('/');
-              } catch (fallbackError) {
-                console.error('❌ Fallback не сработал:', fallbackError);
-              }
+            } catch {
+              router.push('/');
             }
           }}
           style={styles.headerButton}
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Административная панель</Text>
+        <Text style={styles.headerTitle}>Админ-панель</Text>
         <Pressable onPress={handleRefresh} disabled={isRefreshing} style={styles.headerButton}>
           {isRefreshing ? (
             <ActivityIndicator size={20} color="#4CAF50" />
@@ -314,112 +169,104 @@ export default function AdminPanelSimple() {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Statistics */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.totalPoints}</Text>
-            <Text style={styles.statLabel}>Сырых данных</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.hazardPoints}</Text>
-            <Text style={styles.statLabel}>Событий</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{sensorData.length}</Text>
-            <Text style={styles.statLabel}>Загружено</Text>
-          </View>
-        </View>
+        {/* Локальная статистика устройства */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📱 Локальные данные устройства</Text>
 
-        {/* Data Points List */}
-        <View style={styles.dataSection}>
-          <Text style={styles.sectionTitle}>
-            📊 Данные датчиков ({sensorData.length})
-          </Text>
-          
-          {sensorData.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Нет данных для отображения</Text>
+          {isWeb ? (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                Локальная база данных недоступна в веб-версии.{'\n'}
+                Используйте полную админ-панель на сервере для просмотра всех данных.
+              </Text>
+            </View>
+          ) : hasLocalDb ? (
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{localStats.totalSensorData}</Text>
+                <Text style={styles.statLabel}>Данных датчиков</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{localStats.totalWarnings}</Text>
+                <Text style={styles.statLabel}>Предупреждений</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={[styles.statNumber, localStats.unsyncedData > 0 && styles.statNumberWarning]}>
+                  {localStats.unsyncedData}
+                </Text>
+                <Text style={styles.statLabel}>Ожидают синхронизации</Text>
+              </View>
             </View>
           ) : (
-            sensorData.slice(0, 50).map(renderDataPoint)
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>База данных не инициализирована</Text>
+            </View>
           )}
         </View>
+
+        {/* Статус синхронизации */}
+        {syncStatus && !isWeb && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🔄 Синхронизация</Text>
+            <View style={styles.syncStatusCard}>
+              <View style={styles.syncStatusRow}>
+                <Text style={styles.syncLabel}>Последняя синхронизация:</Text>
+                <Text style={styles.syncValue}>{formatLastSync(syncStatus.lastSyncTime)}</Text>
+              </View>
+              <View style={styles.syncStatusRow}>
+                <Text style={styles.syncLabel}>Сеть:</Text>
+                <View style={[styles.statusDot, { backgroundColor: syncStatus.isOnline ? '#4CAF50' : '#F44336' }]} />
+                <Text style={styles.syncValue}>{syncStatus.isOnline ? 'Онлайн' : 'Офлайн'}</Text>
+              </View>
+              {syncStatus.downloadedRegions.length > 0 && (
+                <View style={styles.syncStatusRow}>
+                  <Text style={styles.syncLabel}>Регионы:</Text>
+                  <Text style={styles.syncValue}>{syncStatus.downloadedRegions.join(', ')}</Text>
+                </View>
+              )}
+            </View>
+
+            <Pressable
+              style={[styles.actionButton, isSyncing && styles.actionButtonDisabled]}
+              onPress={handleForceSync}
+              disabled={isSyncing || !syncStatus.isOnline}
+            >
+              {isSyncing ? (
+                <ActivityIndicator size="small" color="#1a1a1a" />
+              ) : (
+                <Ionicons name="sync" size={20} color="#1a1a1a" />
+              )}
+              <Text style={styles.actionButtonText}>
+                {isSyncing ? 'Синхронизация...' : 'Принудительная синхронизация'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Ссылка на веб-админку */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🌐 Полная аналитика</Text>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              Сырые данные, события и карты доступны в веб-админке на сервере.
+            </Text>
+          </View>
+          <Pressable style={[styles.actionButton, styles.actionButtonSecondary]} onPress={handleOpenWebAdmin}>
+            <Ionicons name="open-outline" size={20} color="#4CAF50" />
+            <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
+              Открыть веб-админку
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
-      
-      {/* Version Info Footer */}
+
+      {/* Footer */}
       <View style={styles.versionInfo}>
         <Text style={styles.versionText}>Good Road v2.0.0</Text>
         <Text style={styles.versionSubtext}>
-          Build: {new Date().toLocaleDateString('ru-RU')} | 
-          Platform: {Platform.OS === 'web' ? 'Web' : 'Mobile'}
+          {Platform.OS === 'web' ? 'Web' : 'Mobile'} • Только обработанные данные на устройстве
         </Text>
       </View>
-
-      {/* Details Modal */}
-      {selectedPoint && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Детали точки данных</Text>
-              <Pressable onPress={() => setShowDetails(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </Pressable>
-            </View>
-            
-            <ScrollView style={styles.modalScroll}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Координаты:</Text>
-                <Text style={styles.detailValue}>
-                  {selectedPoint.latitude.toFixed(6)}, {selectedPoint.longitude.toFixed(6)}
-                </Text>
-              </View>
-              
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Время записи:</Text>
-                <Text style={styles.detailValue}>
-                  {new Date(selectedPoint.timestamp).toLocaleString('ru-RU')}
-                </Text>
-              </View>
-              
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Скорость:</Text>
-                <Text style={styles.detailValue}>
-                  {selectedPoint.speed.toFixed(1)} км/ч
-                </Text>
-              </View>
-              
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Точность GPS:</Text>
-                <Text style={styles.detailValue}>
-                  ±{selectedPoint.accuracy.toFixed(1)} метров
-                </Text>
-              </View>
-              
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Акселерометр (x, y, z):</Text>
-                <Text style={styles.detailValue}>
-                  X: {selectedPoint.accelerometer.x.toFixed(3)} м/с²{'\n'}
-                  Y: {selectedPoint.accelerometer.y.toFixed(3)} м/с²{'\n'}
-                  Z: {selectedPoint.accelerometer.z.toFixed(3)} м/с²
-                </Text>
-              </View>
-              
-              <View style={[styles.infoBox, { backgroundColor: '#2196F3' }]}>
-                <Text style={styles.infoText}>
-                  ℹ️ Это сырые данные без классификации событий
-                </Text>
-              </View>
-            </ScrollView>
-            
-            <Pressable 
-              style={styles.closeButton}
-              onPress={() => setShowDetails(false)}
-            >
-              <Text style={styles.closeButtonText}>Закрыть</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -444,10 +291,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   headerButton: {
     marginLeft: 12,
     padding: 4,
@@ -468,165 +311,92 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
   statsContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
+    flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
+    minWidth: 90,
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 16,
-    marginHorizontal: 4,
+    margin: 4,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginBottom: 4,
   },
+  statNumberWarning: {
+    color: '#FF9800',
+  },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#888',
     textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  dataSection: {
-    marginBottom: 80,
-  },
-  dataPointCard: {
+  syncStatusCard: {
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
-    borderLeftWidth: 4,
   },
-  dataPointHeader: {
+  syncStatusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  dataPointTime: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    color: '#1a1a1a',
-    fontWeight: '600',
-  },
-  dataPointLocation: {
-    fontSize: 13,
-    color: '#888',
-    marginBottom: 8,
-  },
-  dataPointStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    fontSize: 12,
-    color: '#666',
-  },
-  hazardType: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: 8,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#888',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  modalScroll: {
-    padding: 20,
-    maxHeight: 300,
-  },
-  detailSection: {
-    marginBottom: 16,
-  },
-  detailLabel: {
+  syncLabel: {
     fontSize: 14,
     color: '#888',
-    marginBottom: 4,
+    flex: 1,
   },
-  detailValue: {
-    fontSize: 15,
+  syncValue: {
+    fontSize: 14,
     color: '#ffffff',
-    lineHeight: 20,
   },
-  verifyButton: {
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    padding: 14,
+    gap: 8,
+  },
+  actionButtonSecondary: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
   },
-  verifyButtonActive: {
-    backgroundColor: '#4CAF50',
+  actionButtonDisabled: {
+    opacity: 0.6,
   },
-  verifyButtonText: {
-    marginLeft: 8,
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#4CAF50',
-  },
-  closeButton: {
-    backgroundColor: '#2a2a2a',
-    padding: 16,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#ffffff',
+  actionButtonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  actionButtonTextSecondary: {
+    color: '#4CAF50',
   },
   versionInfo: {
     backgroundColor: '#2a2a2a',
@@ -648,13 +418,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   infoBox: {
-    padding: 12,
+    backgroundColor: '#2a2a2a',
+    padding: 14,
     borderRadius: 8,
-    marginTop: 16,
+    marginBottom: 12,
   },
   infoText: {
-    color: '#ffffff',
+    color: '#aaaaaa',
     fontSize: 13,
     textAlign: 'center',
+    lineHeight: 20,
   },
 });

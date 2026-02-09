@@ -18,6 +18,7 @@ import {
   Platform,
   PermissionsAndroid,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -52,6 +53,8 @@ export default function AutostartSettingsScreen() {
   const [autoStopBluetooth, setAutoStopBluetooth] = useState(false);
   const [autoStopApps, setAutoStopApps] = useState(false);
   const [autoStopCharge, setAutoStopCharge] = useState(false);
+  const [keepScreenOn, setKeepScreenOn] = useState(false);
+  const [minBrightness, setMinBrightness] = useState(0.1); // 0–1, по умолчанию 10%
   
   // Модальные окна
   const [showDeviceModal, setShowDeviceModal] = useState(false);
@@ -172,6 +175,21 @@ export default function AutostartSettingsScreen() {
         if (!savedAutoStopBluetooth) setAutoStopBluetooth(true);
         if (!savedAutoStopApps) setAutoStopApps(true);
         if (!savedAutoStopCharge) setAutoStopCharge(true);
+      }
+
+      // Не выключать экран во время мониторинга
+      const savedKeepScreenOn = await AsyncStorage.getItem('keep_screen_on');
+      if (savedKeepScreenOn === 'true') {
+        setKeepScreenOn(true);
+      }
+
+      // Минимальная яркость при мониторинге (0–1)
+      const savedMinBrightness = await AsyncStorage.getItem('min_brightness');
+      if (savedMinBrightness != null) {
+        const value = parseFloat(savedMinBrightness);
+        if (!Number.isNaN(value) && value >= 0 && value <= 1) {
+          setMinBrightness(value);
+        }
       }
     } catch (error) {
       console.error('Error loading autostart settings:', error);
@@ -411,6 +429,17 @@ export default function AutostartSettingsScreen() {
     const newValue = !autoStopCharge;
     setAutoStopCharge(newValue);
     await AsyncStorage.setItem('autostop_on_charge_disconnect', JSON.stringify(newValue));
+  };
+
+  const toggleKeepScreenOn = async () => {
+    const newValue = !keepScreenOn;
+    setKeepScreenOn(newValue);
+    await AsyncStorage.setItem('keep_screen_on', JSON.stringify(newValue));
+  };
+
+  const saveMinBrightness = async (value: number) => {
+    setMinBrightness(value);
+    await AsyncStorage.setItem('min_brightness', String(value));
   };
 
   const getModeText = (mode: AutostartMode): string => {
@@ -759,6 +788,54 @@ export default function AutostartSettingsScreen() {
             </Pressable>
           </View>
         )}
+
+        {/* Не выключать экран во время мониторинга */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Во время мониторинга</Text>
+          <Pressable
+            style={[styles.modeOption, keepScreenOn && styles.modeOptionActive]}
+            onPress={toggleKeepScreenOn}
+          >
+            <Ionicons
+              name={keepScreenOn ? 'sunny' : 'sunny-outline'}
+              size={32}
+              color={keepScreenOn ? '#00d4ff' : '#8b94a8'}
+            />
+            <View style={styles.modeInfo}>
+              <Text style={[styles.modeTitle, keepScreenOn && styles.modeTitleActive]}>
+                Не выключать экран
+              </Text>
+              <Text style={styles.modeDescription}>
+                {keepScreenOn
+                  ? 'Экран остаётся включённым — акселерометр работает при Android Auto'
+                  : 'Экран может гаснуть — акселерометр не работает при выключенном экране'}
+              </Text>
+            </View>
+            {keepScreenOn && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
+          </Pressable>
+
+          {/* Минимальная яркость при мониторинге */}
+          <View style={styles.brightnessRow}>
+            <Ionicons name="sunny" size={20} color="#8b94a8" />
+            <Text style={styles.brightnessLabel}>
+              Минимальная яркость: {Math.round(minBrightness * 100)}%
+            </Text>
+          </View>
+          <Slider
+            style={styles.brightnessSlider}
+            minimumValue={0}
+            maximumValue={1}
+            step={0.05}
+            value={minBrightness}
+            onValueChange={saveMinBrightness}
+            minimumTrackTintColor="#00d4ff"
+            maximumTrackTintColor="#2d2d5f"
+            thumbTintColor="#00d4ff"
+          />
+          <Text style={styles.brightnessHint}>
+            При включённом «Не выключать экран» яркость снизится до этого значения во время мониторинга
+          </Text>
+        </View>
 
         {/* Советы */}
         <View style={styles.tipsSection}>
@@ -1153,6 +1230,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8b94a8',
     lineHeight: 20,
+  },
+  brightnessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  brightnessLabel: {
+    fontSize: 14,
+    color: '#c7cad9',
+    flex: 1,
+  },
+  brightnessSlider: {
+    width: '100%',
+    height: 40,
+  },
+  brightnessHint: {
+    fontSize: 12,
+    color: '#8b94a8',
+    marginTop: 4,
+    marginBottom: 8,
+    lineHeight: 18,
   },
   subSettings: {
     marginLeft: 16,
