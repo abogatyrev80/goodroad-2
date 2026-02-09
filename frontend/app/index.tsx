@@ -769,7 +769,13 @@ export default function HomeScreen() {
   const stopTracking = async () => {
     setIsLoading(true);
     try {
-      // Удаляем флаг активного мониторинга
+      // Пытаемся отправить накопленные и офлайн-данные при остановке (если появилась сеть)
+      try {
+        await rawDataCollector.current?.forceSend();
+      } catch (e) {
+        console.warn('forceSend при остановке:', e);
+      }
+
       await AsyncStorage.removeItem('is_tracking_active');
       
       if (locationSubscription.current) {
@@ -993,6 +999,15 @@ export default function HomeScreen() {
         >
           <Ionicons name="eye" size={24} color="#00d4ff" />
           <Text style={styles.compactButtonText}>ВИЗУАЛЬНЫЕ КАРТОЧКИ</Text>
+        </Pressable>
+
+        {/* Статистика отправки данных */}
+        <Pressable
+          style={styles.compactButton}
+          onPress={() => router.push('/data-stats')}
+        >
+          <Ionicons name="stats-chart" size={24} color="#00d4ff" />
+          <Text style={styles.compactButtonText}>ОТПРАВКА ДАННЫХ</Text>
         </Pressable>
 
         {/* Ручная отметка препятствия */}

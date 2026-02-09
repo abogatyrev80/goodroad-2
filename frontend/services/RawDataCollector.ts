@@ -4,11 +4,15 @@
  * Новый сервис для избыточного сбора данных
  * Отправляет ВСЕ сырые данные GPS + акселерометр на сервер
  * Сервер анализирует и возвращает предупреждения
+ * 
+ * Офлайн: данные сохраняются в AsyncStorage и отправляются при появлении сети.
  */
 
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
+import { Platform } from 'react-native';
 
 export interface RawSensorDataPoint {
   deviceId: string;
@@ -55,16 +59,24 @@ export interface RawDataResponse {
   warnings: Warning[];
 }
 
+const MAX_OFFLINE_BATCHES = 50; // Максимум батчей в офлайн-очереди (на трассах без сети)
+const OFFLINE_STORAGE_KEY = 'raw_data_offline_queue';
+
 class RawDataCollector {
+  /** Текущий экземпляр (для экрана статистики) */
+  static currentInstance: RawDataCollector | null = null;
+
   private deviceId: string;
   private backendUrl: string;
   private dataBuffer: RawSensorDataPoint[] = [];
   private isOnline: boolean = false;
-  
+  private networkUnsubscribe: (() => void) | null = null;
+  private isProcessingQueue = false;
+
   // Настройки
   private readonly BATCH_SIZE = 1; // Отправлять каждую точку немедленно (для production)
   private readonly MAX_BUFFER_SIZE = 50; // Максимум в буфере
-  private readonly OFFLINE_STORAGE_KEY = 'raw_data_offline_queue';
+  private readonly OFFLINE_STORAGE_KEY = OFFLINE_STORAGE_KEY;
   
   // Динамическая частота сбора в зависимости от скорости
   // 🆕 УВЕЛИЧЕНО для анализа паттернов (нужно 40-50 точек акселерометра)
@@ -86,12 +98,39 @@ class RawDataCollector {
     onWarningsReceived?: (warnings: Warning[]) => void
   ) {
     this.deviceId = deviceId;
-    this.backendUrl = backendUrl;
+    this.backendUrl = backendUrl.endsWith('/') ? backendUrl : backendUrl + '/';
     this.onWarningsReceived = onWarningsReceived;
-    
-    console.log('✅ RawDataCollector инициализирован');
+
+    // Подписка на восстановление сети — сразу отправляем накопленные данные
+    if (Platform.OS !== 'web') {
+      const sub = Network.addNetworkStateListener((state) => {
+        if (state.isConnected) {
+          this.isOnline = true;
+          console.log('📡 Сеть восстановлена — отправка офлайн-очереди');
+          this.processOfflineQueue();
+        } else {
+          this.isOnline = false;
+        }
+      });
+      this.networkUnsubscribe = () => sub.remove();
+    }
+
+    RawDataCollector.currentInstance = this;
+    console.log('✅ RawDataCollector инициализирован (офлайн-очередь при отсутствии сети)');
     console.log(`   Device ID: ${this.deviceId}`);
     console.log(`   Backend URL: ${this.backendUrl}`);
+  }
+
+  /** Количество батчей в офлайн-очереди (для экрана статистики) */
+  static async getOfflineQueueLength(): Promise<number> {
+    try {
+      const json = await AsyncStorage.getItem(OFFLINE_STORAGE_KEY);
+      if (!json) return 0;
+      const queue: RawDataBatch[] = JSON.parse(json);
+      return Array.isArray(queue) ? queue.length : 0;
+    } catch {
+      return 0;
+    }
   }
   
   /**
@@ -132,22 +171,39 @@ class RawDataCollector {
   }
   
   /**
-   * Отправить батч данных на сервер
+   * Отправить батч данных на сервер.
+   * Если сети нет — батч сохраняется в офлайн-очередь и отправится при появлении интернета.
    */
   private async sendBatch(): Promise<void> {
     if (this.dataBuffer.length === 0) {
       return;
     }
-    
+
     const batch: RawDataBatch = {
       deviceId: this.deviceId,
       data: [...this.dataBuffer],
     };
-    
+    this.dataBuffer = []; // Освобождаем буфер сразу
+
+    // Проверяем сеть до запроса — без сети сразу в очередь, не теряем данные
+    try {
+      const networkState = await Network.getNetworkStateAsync();
+      if (!networkState.isConnected) {
+        console.log('📴 Нет сети — батч сохранён в офлайн-очередь');
+        this.isOnline = false;
+        await this.saveToOfflineQueue(batch);
+        return;
+      }
+    } catch {
+      this.isOnline = false;
+      await this.saveToOfflineQueue(batch);
+      return;
+    }
+
     try {
       console.log(`📤 Отправка батча: ${batch.data.length} точек`);
       
-      const response = await fetch(`${this.backendUrl}/api/raw-data`, {
+      const response = await fetch(`${this.backendUrl}api/raw-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -166,9 +222,6 @@ class RawDataCollector {
       console.log(`   Обнаружено событий: ${result.eventsDetected}`);
       console.log(`   Предупреждений: ${result.warningsGenerated}`);
       
-      // Очищаем буфер после успешной отправки
-      this.dataBuffer = [];
-      
       // Обрабатываем предупреждения
       if (result.warnings && result.warnings.length > 0) {
         console.log(`⚠️  Получены предупреждения: ${result.warnings.length}`);
@@ -186,8 +239,6 @@ class RawDataCollector {
     } catch (error) {
       console.error('❌ Ошибка отправки батча:', error);
       this.isOnline = false;
-      
-      // Сохраняем в offline очередь
       await this.saveToOfflineQueue(batch);
     }
   }
@@ -208,73 +259,83 @@ class RawDataCollector {
   }
   
   /**
-   * Сохранить батч в offline очередь
+   * Сохранить батч в offline очередь (при отсутствии сети или ошибке отправки)
    */
   private async saveToOfflineQueue(batch: RawDataBatch): Promise<void> {
     try {
       const queueJson = await AsyncStorage.getItem(this.OFFLINE_STORAGE_KEY);
       const queue: RawDataBatch[] = queueJson ? JSON.parse(queueJson) : [];
-      
       queue.push(batch);
-      
-      // Ограничиваем размер очереди (последние 10 батчей)
-      if (queue.length > 10) {
-        queue.shift();
+      if (queue.length > MAX_OFFLINE_BATCHES) {
+        queue.splice(0, queue.length - MAX_OFFLINE_BATCHES);
       }
-      
       await AsyncStorage.setItem(this.OFFLINE_STORAGE_KEY, JSON.stringify(queue));
-      console.log(`💾 Батч сохранен в offline очередь (всего: ${queue.length})`);
-      
+      console.log(`💾 Батч сохранён в офлайн-очередь (всего: ${queue.length}/${MAX_OFFLINE_BATCHES})`);
     } catch (error) {
-      console.error('❌ Ошибка сохранения в offline очередь:', error);
+      console.error('❌ Ошибка сохранения в офлайн-очередь:', error);
     }
   }
   
   /**
-   * Обработать offline очередь
+   * Обработать офлайн-очередь при появлении сети. Отправляет по одному батчу,
+   * удаляет из очереди только успешно отправленные.
    */
   private async processOfflineQueue(): Promise<void> {
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
     try {
       const queueJson = await AsyncStorage.getItem(this.OFFLINE_STORAGE_KEY);
       if (!queueJson) {
+        this.isProcessingQueue = false;
         return;
       }
-      
-      const queue: RawDataBatch[] = JSON.parse(queueJson);
-      
+      let queue: RawDataBatch[] = JSON.parse(queueJson);
       if (queue.length === 0) {
+        this.isProcessingQueue = false;
         return;
       }
-      
-      console.log(`📦 Обработка offline очереди: ${queue.length} батчей`);
-      
+      console.log(`📦 Отправка офлайн-очереди: ${queue.length} батчей`);
+      const stillPending: RawDataBatch[] = [];
       for (const batch of queue) {
         try {
-          const response = await fetch(`${this.backendUrl}/api/raw-data`, {
+          const networkState = await Network.getNetworkStateAsync();
+          if (!networkState.isConnected) {
+            stillPending.push(batch);
+            continue;
+          }
+          const response = await fetch(`${this.backendUrl}api/raw-data`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(batch),
           });
-          
           if (response.ok) {
-            console.log(`✅ Offline батч отправлен (${batch.data.length} точек)`);
+            console.log(`✅ Офлайн-батч отправлен (${batch.data.length} точек)`);
+            try {
+              const result = await response.json();
+              if (this.onWarningsReceived && result.warnings?.length) {
+                this.onWarningsReceived(result.warnings);
+              }
+            } catch {}
+          } else {
+            stillPending.push(batch);
           }
-          
         } catch (error) {
-          console.error('❌ Ошибка отправки offline батча:', error);
-          // Прерываем обработку если нет соединения
-          break;
+          console.error('❌ Ошибка отправки офлайн-батча:', error);
+          stillPending.push(batch);
+          break; // Сеть снова пропала — выходим, остальное отправим при следующем восстановлении
         }
       }
-      
-      // Очищаем очередь после успешной отправки
-      await AsyncStorage.removeItem(this.OFFLINE_STORAGE_KEY);
-      console.log('✅ Offline очередь очищена');
-      
+      if (stillPending.length === 0) {
+        await AsyncStorage.removeItem(this.OFFLINE_STORAGE_KEY);
+        console.log('✅ Офлайн-очередь полностью отправлена');
+      } else {
+        await AsyncStorage.setItem(this.OFFLINE_STORAGE_KEY, JSON.stringify(stillPending));
+        console.log(`📋 В очереди осталось ${stillPending.length} батчей`);
+      }
     } catch (error) {
-      console.error('❌ Ошибка обработки offline очереди:', error);
+      console.error('❌ Ошибка обработки офлайн-очереди:', error);
+    } finally {
+      this.isProcessingQueue = false;
     }
   }
   

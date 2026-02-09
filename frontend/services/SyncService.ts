@@ -1,5 +1,6 @@
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { localDB, LocalSensorData, LocalWarning, SyncStatus } from './LocalDatabase';
 
 interface RegionData {
@@ -18,6 +19,7 @@ export class SyncService {
   private backendUrl: string;
   private syncInterval: NodeJS.Timeout | null = null;
   private isInitialized = false;
+  private networkUnsubscribe: (() => void) | null = null;
 
   constructor() {
     // Убедимся что URL всегда заканчивается на /
@@ -32,18 +34,25 @@ export class SyncService {
     try {
       await localDB.initialize();
       
-      // Only start periodic sync if database is available
       if (localDB.getDatabaseStats) {
         this.startPeriodicSync();
+        if (Platform.OS !== 'web') {
+          const sub = Network.addNetworkStateListener((state) => {
+            if (state.isConnected) {
+              console.log('📡 Сеть восстановлена — синхронизация с сервером');
+              this.syncWithServer();
+            }
+          });
+          this.networkUnsubscribe = () => sub.remove();
+        }
       }
       
       this.isInitialized = true;
-      
-      console.log('✅ Sync service initialized');
+      console.log('✅ Sync service initialized (офлайн-данные синхронизируются при появлении сети)');
     } catch (error) {
       console.error('❌ Sync service initialization error:', error);
       console.warn('⚠️ Sync service continuing without local database');
-      this.isInitialized = true; // Allow service to continue without local DB
+      this.isInitialized = true;
     }
   }
 
@@ -62,6 +71,10 @@ export class SyncService {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
+    }
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
     }
   }
 

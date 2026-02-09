@@ -91,10 +91,8 @@ class BatchOfflineManager {
         console.log('✅ Offline очередь очищена после обновления формата');
       }
       
-      // Проверить состояние сети
       await this.checkNetworkStatus();
-      
-      // Подписаться на изменения сети
+      this.setupNetworkListener(); // Мгновенная отправка при появлении сети
       this.startNetworkMonitoring();
       
       console.log('✅ BatchOfflineManager инициализирован');
@@ -148,17 +146,18 @@ class BatchOfflineManager {
   }
   
   /**
-   * Проверить статус сети
+   * Проверить статус сети.
+   * isInternetReachable может быть undefined на части устройств — считаем это "попробовать отправить".
    */
   private async checkNetworkStatus() {
     try {
       const networkState = await Network.getNetworkStateAsync();
-      this.isOnline = networkState.isConnected === true && networkState.isInternetReachable === true;
+      const connected = networkState.isConnected === true;
+      const reachable = networkState.isInternetReachable !== false; // undefined = не проверяли, считаем ок
+      this.isOnline = connected && reachable;
       console.log(`📡 Статус сети: ${this.isOnline ? 'Online' : 'Offline'}`);
-      
-      // Если онлайн и есть данные в очереди - отправить
       if (this.isOnline && this.offlineQueue.length > 0) {
-        console.log('🔄 Сеть восстановлена, запуск синхронизации...');
+        console.log('🔄 Сеть доступна, запуск синхронизации офлайн-очереди...');
         this.processOfflineQueue();
       }
     } catch (error) {
@@ -166,15 +165,35 @@ class BatchOfflineManager {
       this.isOnline = false;
     }
   }
+
+  /**
+   * Подписка на восстановление сети — сразу отправляем очередь (важно на трассах без интернета)
+   */
+  private setupNetworkListener() {
+    if (IS_WEB) return;
+    try {
+      Network.addNetworkStateListener((state) => {
+        const connected = state.isConnected === true;
+        const reachable = state.isInternetReachable !== false;
+        const nowOnline = connected && reachable;
+        if (nowOnline && !this.isOnline && this.offlineQueue.length > 0) {
+          this.isOnline = true;
+          console.log('📡 Сеть восстановлена — немедленная отправка офлайн-очереди');
+          this.processOfflineQueue();
+        } else {
+          this.isOnline = nowOnline;
+        }
+      });
+    } catch (e) {
+      console.warn('BatchOfflineManager: addNetworkStateListener недоступен', e);
+    }
+  }
   
   /**
-   * Мониторинг состояния сети
+   * Мониторинг состояния сети (периодическая проверка раз в 30 сек)
    */
   private startNetworkMonitoring() {
-    // Проверка каждые 30 секунд
-    setInterval(() => {
-      this.checkNetworkStatus();
-    }, 30000);
+    setInterval(() => this.checkNetworkStatus(), 30000);
   }
   
   /**
