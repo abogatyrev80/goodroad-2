@@ -600,6 +600,27 @@ export default function HomeScreen() {
       appStateSubscription.current.remove();
       appStateSubscription.current = null;
     }
+
+    // Восстановить яркость и keep-awake при размонтировании (если закрыли приложение во время мониторинга)
+    if (Platform.OS !== 'web' && savedBrightnessRef.current != null) {
+      const brightnessToRestore = savedBrightnessRef.current;
+      savedBrightnessRef.current = null;
+      (async () => {
+        try {
+          const available = await Brightness.isAvailableAsync();
+          if (available) {
+            await Brightness.setBrightnessAsync(brightnessToRestore);
+          }
+        } catch {
+          // Игнорируем ошибки при размонтировании
+        }
+        try {
+          deactivateKeepAwake();
+        } catch {
+          // Игнорируем
+        }
+      })();
+    }
   };
 
   // Начать/остановить мониторинг
@@ -739,9 +760,13 @@ export default function HomeScreen() {
                   const current = await Brightness.getBrightnessAsync();
                   savedBrightnessRef.current = current;
                   const minBrightnessStr = await AsyncStorage.getItem('min_brightness');
-                  const minBrightness = minBrightnessStr != null
-                    ? Math.max(0, Math.min(1, parseFloat(minBrightnessStr)))
-                    : 0.1;
+                  let minBrightness = 0.1;
+                  if (minBrightnessStr != null) {
+                    const parsed = parseFloat(minBrightnessStr);
+                    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+                      minBrightness = parsed;
+                    }
+                  }
                   await Brightness.setBrightnessAsync(minBrightness);
                   console.log('✅ Min brightness set to', Math.round(minBrightness * 100), '%');
                 }
