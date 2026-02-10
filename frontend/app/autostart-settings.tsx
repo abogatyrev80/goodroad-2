@@ -19,7 +19,7 @@ import {
   PermissionsAndroid,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -46,6 +46,7 @@ interface BluetoothDevice {
 
 
 export default function AutostartSettingsScreen() {
+  const insets = useSafeAreaInsets();
   const [autostartMode, setAutostartMode] = useState<AutostartMode>('disabled');
   const [selectedApps, setSelectedApps] = useState<string[]>([]); // Теперь храним packageName вместо id
   const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<BluetoothDevice | null>(null);
@@ -472,7 +473,7 @@ export default function AutostartSettingsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#00d4ff" />
@@ -483,7 +484,7 @@ export default function AutostartSettingsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
@@ -495,7 +496,11 @@ export default function AutostartSettingsScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        showsVerticalScrollIndicator={true}
+      >
         {/* Информация */}
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={20} color="#00d4ff" />
@@ -1471,7 +1476,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bottomSpacer: {
-    height: 32,
+    height: 24,
   },
   modalOverlay: {
     flex: 1,
