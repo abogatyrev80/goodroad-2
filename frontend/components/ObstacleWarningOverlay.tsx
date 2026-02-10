@@ -59,7 +59,7 @@ export default function ObstacleWarningOverlay({
     };
   }, []);
 
-  // Плавная интерполяция расстояния
+  // Быстрая реакция расстояния: при большом изменении — сразу, иначе короткая анимация
   useEffect(() => {
     if (!obstacle) {
       if (mountedRef.current) setDisplayedDistance(0);
@@ -67,26 +67,29 @@ export default function ObstacleWarningOverlay({
     }
     const targetDistance = obstacle.distance;
     const currentDistance = displayedDistance || targetDistance;
+    const diff = Math.abs(targetDistance - currentDistance);
 
-    if (Math.abs(targetDistance - currentDistance) > 2) {
-      const animValue = new Animated.Value(currentDistance);
-      Animated.timing(animValue, {
-        toValue: targetDistance,
-        duration: 150,
-        useNativeDriver: false,
-      }).start();
-
-      const listener = animValue.addListener(({ value }) => {
-        if (mountedRef.current) setDisplayedDistance(Math.round(value));
-      });
-
-      return () => {
-        animValue.removeListener(listener);
-        animValue.stopAnimation();
-      };
-    } else {
+    if (diff > 15) {
       if (mountedRef.current) setDisplayedDistance(Math.round(targetDistance));
+      return;
     }
+    if (diff <= 1) {
+      if (mountedRef.current) setDisplayedDistance(Math.round(targetDistance));
+      return;
+    }
+    const animValue = new Animated.Value(currentDistance);
+    Animated.timing(animValue, {
+      toValue: targetDistance,
+      duration: 80,
+      useNativeDriver: false,
+    }).start();
+    const listener = animValue.addListener(({ value }) => {
+      if (mountedRef.current) setDisplayedDistance(Math.round(value));
+    });
+    return () => {
+      animValue.removeListener(listener);
+      animValue.stopAnimation();
+    };
   }, [obstacle?.distance]);
 
   // Fade + пульсация, с остановкой loop при размонтировании

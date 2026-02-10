@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -84,7 +85,8 @@ export default function HomeScreen() {
   const { obstacles, closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
     isTracking,
     currentLocation,
-    currentSpeed
+    currentSpeed,
+    currentLocationRef
   );
 
   // Инициализация при загрузке
@@ -129,6 +131,26 @@ export default function HomeScreen() {
       }
     };
   }, []);
+
+  // Синхронизация настроек при возврате на экран (из настроек автозапуска, предупреждений и др.)
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const mode = await AsyncStorage.getItem('autostart_mode');
+        if (!cancelled && mode !== null) {
+          setAutostartMode(mode);
+        }
+        if (!cancelled) {
+          await loadWarningSettings();
+        }
+        if (!cancelled) {
+          await setupAutostartMonitoring();
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   // Убрано предупреждение о зарядке - пользователь сам контролирует мониторинг
 
@@ -658,7 +680,7 @@ export default function HomeScreen() {
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
+          timeInterval: 500,
           distanceInterval: 0,
         },
         (location) => {
@@ -912,10 +934,11 @@ export default function HomeScreen() {
       <ObstacleWarningOverlay
         obstacle={closestObstacle}
         visible={
-          isTracking && 
-          closestObstacle !== null && 
-          closestObstacle.distance < 1000 && 
-          currentSpeed > 1 // 🆕 Показываем только если движемся (>1 м/с ≈ 3.6 км/ч)
+          isTracking &&
+          closestObstacle !== null &&
+          closestObstacle.distance < 1000 &&
+          closestObstacle.distance >= 50 &&
+          currentSpeed > 1
         }
         size={warningSize}
         position={warningPosition}

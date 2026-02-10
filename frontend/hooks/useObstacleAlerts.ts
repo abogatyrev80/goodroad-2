@@ -4,15 +4,18 @@
  * Интегрирует ObstacleService и DynamicAudioAlertService
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, MutableRefObject } from 'react';
 import obstacleService, { Obstacle } from '../services/ObstacleService';
 import dynamicAudioService from '../services/DynamicAudioAlertService';
 import alertSettingsService from '../services/AlertSettingsService';
 
+const PASSED_DISTANCE_M = 50;
+
 export function useObstacleAlerts(
   isTracking: boolean,
   currentLocation: any,
-  currentSpeed: number
+  currentSpeed: number,
+  currentLocationRef?: MutableRefObject<{ coords: { latitude: number; longitude: number; heading?: number } } | null>
 ) {
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [closestObstacle, setClosestObstacle] = useState<Obstacle | null>(null);
@@ -20,15 +23,16 @@ export function useObstacleAlerts(
   const lastAlertedObstacles = useRef<Set<string>>(new Set());
   const previousSpeed = useRef<number>(0);
   const alertedObstaclesForReaction = useRef<Map<string, { obstacle: Obstacle; alerted: boolean }>>(new Map());
+  const lastPositionRef = useRef<{ lat: number; lon: number } | null>(null);
 
   // Загрузка препятствий каждые 30 секунд
   useEffect(() => {
     if (!isTracking || !currentLocation) {
-      // 🆕 ОЧИСТКА при остановке мониторинга
       setObstacles([]);
       setClosestObstacle(null);
       lastAlertedObstacles.current.clear();
       alertedObstaclesForReaction.current.clear();
+      lastPositionRef.current = null;
       return;
     }
 
@@ -70,80 +74,75 @@ export function useObstacleAlerts(
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
   
-  // 🆕 ОБНОВЛЕНИЕ РАССТОЯНИЯ в реальном времени с учетом ВЕКТОРА ДВИЖЕНИЯ
-  // 🆕 ДИНАМИЧЕСКИЙ ИНТЕРВАЛ в зависимости от скорости
+  // Обновление расстояний в реальном времени: направление движения, сразу скрывать проеханные
   useEffect(() => {
-    if (!isTracking || !currentLocation || obstacles.length === 0) {
+    if (!isTracking || obstacles.length === 0) {
       return;
     }
-    
+
     const updateDistances = () => {
       try {
-        const lat = currentLocation.coords.latitude;
-        const lon = currentLocation.coords.longitude;
-        const bearing = currentLocation.coords.heading; // 🆕 Направление движения из GPS
-        
-        // Пересчитываем расстояния для всех препятствий с учетом вектора
+        const loc = currentLocationRef?.current ?? currentLocation;
+        if (!loc?.coords) return;
+
+        const lat = loc.coords.latitude;
+        const lon = loc.coords.longitude;
+
+        let effectiveBearing: number | null = null;
+        const rawHeading = loc.coords.heading;
+        if (typeof rawHeading === 'number' && rawHeading >= 0 && rawHeading <= 360) {
+          effectiveBearing = rawHeading;
+        } else if (lastPositionRef.current) {
+          effectiveBearing = obstacleService.calculateBearing(
+            lastPositionRef.current.lat,
+            lastPositionRef.current.lon,
+            lat,
+            lon
+          );
+        }
+        lastPositionRef.current = { lat, lon };
+
+        const passedDistance = obstacleService.getPassedDistance();
+
         const updatedObstacles = obstacles
           .map(obstacle => {
-            // 🆕 Используем новую логику с проверкой направления
             const relevantDistance = obstacleService.getRelevantDistance(
               lat,
               lon,
-              bearing,
+              effectiveBearing,
               obstacle.latitude,
               obstacle.longitude
             );
-            
-            // Если препятствие не на пути (relevantDistance === null), возвращаем с большим расстоянием
+
+            if (relevantDistance !== null && relevantDistance < passedDistance) {
+              obstacleService.markAsPassed(obstacle.id);
+              return { ...obstacle, distance: 999999 };
+            }
             return {
               ...obstacle,
-              distance: relevantDistance !== null ? relevantDistance : 999999 // Большое число = игнорируем
+              distance: relevantDistance !== null ? relevantDistance : 999999,
             };
           })
-          .filter(obstacle => obstacle.distance < 999999); // Фильтруем препятствия не на пути
-        
+          .filter(o => o.distance < 999999);
+
         setObstacles(updatedObstacles);
-        
-        // Обновляем ближайшее
         const closest = obstacleService.getClosestObstacle(updatedObstacles);
         setClosestObstacle(closest);
       } catch (error) {
         console.error('❌ Error updating distances:', error);
       }
     };
-    
-    // 🆕 ДИНАМИЧЕСКИЙ ИНТЕРВАЛ на основе скорости
-    // При высокой скорости обновляем чаще для точности
-    // Формула: чем выше скорость, тем чаще обновления
-    // Минимум 200мс (5 раз в секунду), максимум 2000мс (0.5 раз в секунду)
-    const speedKmh = currentSpeed; // уже в км/ч
-    const speedMs = speedKmh / 3.6; // м/с
-    
-    // Базовый интервал: 2000мс при 0 км/ч, уменьшается до 200мс при 120+ км/ч
-    // Интерполяция: interval = 2000 - (speedKmh / 120) * 1800
-    // Но делаем более агрессивно: при 60 км/ч уже 500мс, при 100+ км/ч = 200мс
+
+    const speedKmh = currentSpeed;
     let updateInterval: number;
-    if (speedKmh < 20) {
-      updateInterval = 2000; // Медленно - обновляем реже
-    } else if (speedKmh < 40) {
-      updateInterval = 1000; // Средняя скорость
-    } else if (speedKmh < 60) {
-      updateInterval = 500; // Быстро
-    } else if (speedKmh < 80) {
-      updateInterval = 300; // Очень быстро
-    } else {
-      updateInterval = 200; // Максимальная частота при высокой скорости
-    }
-    
-    // Первое обновление сразу
+    if (speedKmh < 20) updateInterval = 1500;
+    else if (speedKmh < 40) updateInterval = 600;
+    else if (speedKmh < 60) updateInterval = 400;
+    else if (speedKmh < 80) updateInterval = 250;
+    else updateInterval = 200;
+
     updateDistances();
-    
-    // Затем с динамическим интервалом
     const distanceUpdateInterval = setInterval(updateDistances, updateInterval);
-    
-    console.log(`⚡ Distance update interval: ${updateInterval}ms (speed: ${speedKmh.toFixed(1)} km/h)`);
-    
     return () => clearInterval(distanceUpdateInterval);
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading, currentSpeed, obstacles.length]);
 
@@ -239,6 +238,7 @@ export function useObstacleAlerts(
   // Очистка при остановке
   useEffect(() => {
     if (!isTracking) {
+      lastPositionRef.current = null;
       dynamicAudioService.clearActiveObstacle();
       obstacleService.clearPassedObstacles();
       lastAlertedObstacles.current.clear();
