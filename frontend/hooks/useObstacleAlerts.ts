@@ -133,13 +133,14 @@ export function useObstacleAlerts(
       }
     };
 
+    // Частота пересчёта расстояния до препятствий (мс): чаще = быстрее реакция на экране
     const speedKmh = currentSpeed;
     let updateInterval: number;
-    if (speedKmh < 20) updateInterval = 1500;
-    else if (speedKmh < 40) updateInterval = 600;
-    else if (speedKmh < 60) updateInterval = 400;
-    else if (speedKmh < 80) updateInterval = 250;
-    else updateInterval = 200;
+    if (speedKmh < 20) updateInterval = 700;   // было 1500 — ускорено
+    else if (speedKmh < 40) updateInterval = 350; // было 600
+    else if (speedKmh < 60) updateInterval = 200; // было 400
+    else if (speedKmh < 80) updateInterval = 150; // было 250
+    else updateInterval = 100;                    // было 200
 
     updateDistances();
     const distanceUpdateInterval = setInterval(updateDistances, updateInterval);

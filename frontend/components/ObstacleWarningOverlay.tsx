@@ -59,7 +59,7 @@ export default function ObstacleWarningOverlay({
     };
   }, []);
 
-  // Быстрая реакция расстояния: при большом изменении — сразу, иначе короткая анимация
+  // Быстрая реакция расстояния: при заметном изменении — сразу, иначе короткая анимация (частота обновлений задаётся в useObstacleAlerts)
   useEffect(() => {
     if (!obstacle) {
       if (mountedRef.current) setDisplayedDistance(0);
@@ -69,18 +69,15 @@ export default function ObstacleWarningOverlay({
     const currentDistance = displayedDistance || targetDistance;
     const diff = Math.abs(targetDistance - currentDistance);
 
-    if (diff > 15) {
-      if (mountedRef.current) setDisplayedDistance(Math.round(targetDistance));
-      return;
-    }
-    if (diff <= 1) {
+    // Сразу показываем при смене >5 м или при расхождении ≤1 м (чтобы не тянуть анимацию)
+    if (diff > 5 || diff <= 1) {
       if (mountedRef.current) setDisplayedDistance(Math.round(targetDistance));
       return;
     }
     const animValue = new Animated.Value(currentDistance);
     Animated.timing(animValue, {
       toValue: targetDistance,
-      duration: 80,
+      duration: 40,
       useNativeDriver: false,
     }).start();
     const listener = animValue.addListener(({ value }) => {
@@ -246,7 +243,7 @@ export default function ObstacleWarningOverlay({
     const targetProgress = getProgressPercentage(obstacle);
     Animated.timing(progressAnim, {
       toValue: targetProgress,
-      duration: 200,
+      duration: 100,
       useNativeDriver: false,
     }).start();
   }, [obstacle?.distance, obstacle?.type, obstacle?.confirmations]);
@@ -268,6 +265,8 @@ export default function ObstacleWarningOverlay({
           transform: [{ scale: pulseAnim }],
         },
       ]}
+      collapsable={false}
+      pointerEvents="box-none"
     >
       <View style={[
         styles.container, 
@@ -352,6 +351,8 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 9999,
     elevation: 10,
+    // Явно прозрачный фон — на части устройств Animated.View с useNativeDriver без фона даёт чёрный экран
+    backgroundColor: 'transparent',
   },
   container: {
     flexDirection: 'row',
