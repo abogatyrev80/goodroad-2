@@ -59,6 +59,7 @@
     },
     "plugins": [
       "./plugins/fixGradleJavaHome.js",
+      "./plugins/fixAgpVersion.js",
       [
         "expo-router",
         {

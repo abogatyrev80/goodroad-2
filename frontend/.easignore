@@ -1,0 +1,26 @@
+# Уменьшение размера архива для EAS Build (по умолчанию .gitignore учтен, но явные исключения помогают)
+# Документация: https://docs.expo.dev/build-reference/easignore/
+
+node_modules/
+.expo/
+.git/
+*.log
+.env
+.env.*
+!.env.example
+
+# Локальные нативные папки (на EAS генерируются через prebuild)
+android/
+ios/
+
+# Бэкапы и билды для веба — не нужны для мобильной сборки
+backups/
+dist-final/
+dist-deployment-ready/
+*.tsbuildinfo
+
+# Прочее
+.DS_Store
+*.orig
+*.bak
+.thumbs.db
