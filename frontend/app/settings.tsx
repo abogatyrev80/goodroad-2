@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import { useAudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 
 const SETTINGS_KEY = 'good_road_settings';
 
@@ -286,9 +287,49 @@ export default function SettingsScreen() {
           ], volume);
       }
     } else {
-      // На мобильном устройстве - используем базовые звуки
-      // TODO: Implement mobile audio playback with expo-audio
-      console.log(`🔊 Playing sound on mobile: ${soundId}`);
+      // На мобильном устройстве — разные звуки через TTS и expo-av
+      await playMobileBuiltInSound(soundId, volume);
+    }
+  };
+
+  const playMobileBuiltInSound = async (soundId: string, volume: number) => {
+    try {
+      if (soundId === 'voice_male' || soundId === 'voice_female') {
+        Speech.stop();
+        const text = soundId === 'voice_male'
+          ? 'Внимание! Препятствие впереди!'
+          : 'Осторожно! Впереди препятствие!';
+        Speech.speak(text, {
+          language: 'ru-RU',
+          pitch: soundId === 'voice_male' ? 0.85 : 1.2,
+          rate: 0.9,
+          volume: Math.max(0.1, Math.min(1, volume)),
+        });
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      const soundFiles: Record<string, { file: number; rate: number }> = {
+        beep_classic: { file: require('../assets/sounds/info.mp3'), rate: 1.0 },
+        chime_soft: { file: require('../assets/sounds/info.mp3'), rate: 1.35 },
+        horn_urgent: { file: require('../assets/sounds/emergency.mp3'), rate: 0.8 },
+      };
+      const cfg = soundFiles[soundId] || soundFiles.beep_classic;
+      const { sound } = await Audio.Sound.createAsync(cfg.file, { shouldPlay: false });
+      await sound.setVolumeAsync(volume);
+      await sound.setRateAsync(cfg.rate, false);
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (e) {
+      console.error('Error playing mobile sound:', e);
+      Alert.alert('Ошибка', 'Не удалось воспроизвести звук');
     }
   };
   

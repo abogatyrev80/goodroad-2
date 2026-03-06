@@ -184,21 +184,21 @@ export default function SoundManager({ onSave, hideTitle = false }: Props) {
     Alert.alert('Сброшено', 'Восстановлен стандартный звук');
   };
 
-  // Маппинг звуков для стандартных звуков
-  const getSoundSource = (soundId: string): any => {
-    const soundMap: Record<string, any> = {
-      'pothole_warning': require('../assets/sounds/warning.mp3'),
-      'braking_alert': require('../assets/sounds/info.mp3'),
-      'vibration_beep': require('../assets/sounds/info.mp3'),
-      'bump_notification': require('../assets/sounds/warning.mp3'),
-      'general_beep': require('../assets/sounds/info.mp3'),
-      'beep_short': require('../assets/sounds/info.mp3'),
-      'beep_long': require('../assets/sounds/warning.mp3'),
-      'ding': require('../assets/sounds/info.mp3'),
-      'alert_soft': require('../assets/sounds/info.mp3'),
-      'alert_loud': require('../assets/sounds/warning.mp3'),
+  // Маппинг звуков: разные файлы и скорость воспроизведения, чтобы звуки отличались
+  const getSoundSource = (soundId: string): { source: any; rate: number } => {
+    const soundMap: Record<string, { source: any; rate: number }> = {
+      'pothole_warning': { source: require('../assets/sounds/emergency.mp3'), rate: 1.0 },
+      'braking_alert': { source: require('../assets/sounds/warning.mp3'), rate: 0.9 },
+      'vibration_beep': { source: require('../assets/sounds/info.mp3'), rate: 1.4 },
+      'bump_notification': { source: require('../assets/sounds/critical.mp3'), rate: 1.0 },
+      'general_beep': { source: require('../assets/sounds/info.mp3'), rate: 1.0 },
+      'beep_short': { source: require('../assets/sounds/info.mp3'), rate: 1.35 },
+      'beep_long': { source: require('../assets/sounds/warning.mp3'), rate: 0.7 },
+      'ding': { source: require('../assets/sounds/info.mp3'), rate: 1.15 },
+      'alert_soft': { source: require('../assets/sounds/info.mp3'), rate: 1.05 },
+      'alert_loud': { source: require('../assets/sounds/warning.mp3'), rate: 1.2 },
     };
-    return soundMap[soundId] || require('../assets/sounds/info.mp3');
+    return soundMap[soundId] || { source: require('../assets/sounds/info.mp3'), rate: 1.0 };
   };
 
   // Воспроизвести звук
@@ -225,13 +225,14 @@ export default function SoundManager({ onSave, hideTitle = false }: Props) {
 
       let soundSource: any;
       
+      let rate = 1.0;
       if (config.isCustom && config.uri) {
-        // Пользовательский звук
         soundSource = { uri: config.uri };
       } else {
-        // Стандартный звук
         try {
-          soundSource = getSoundSource(config.soundId);
+          const resolved = getSoundSource(config.soundId);
+          soundSource = resolved.source;
+          rate = resolved.rate;
         } catch (error) {
           console.error('❌ Error getting sound source:', error);
           Alert.alert('❌ Ошибка', `Не удалось загрузить звук: ${config.soundId}`);
@@ -246,10 +247,11 @@ export default function SoundManager({ onSave, hideTitle = false }: Props) {
       
       playingSoundRef.current = sound;
       
-      // Устанавливаем громкость
       await sound.setVolumeAsync(1.0);
+      try {
+        await sound.setRateAsync(rate, false); // false = меняем высоту тона, чтобы звуки отличались
+      } catch (_) {}
       
-      // Воспроизводим звук
       await sound.playAsync();
 
       // Автоматически выгружаем после завершения
