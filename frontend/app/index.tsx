@@ -41,6 +41,9 @@ import alertSettingsService from '../services/AlertSettingsService';
 
 // Константы
 const LOCATION_TASK_NAME = 'background-location-task';
+// Для сбора логов: эмулятор Android → 10.0.2.2, симулятор iOS / устройство → укажите IP ПК в DEBUG_LOG_HOST
+const DEBUG_LOG_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+const DEBUG_LOG_URL = `http://${DEBUG_LOG_HOST}:7242/ingest/2d55966e-6eaf-4e5e-a957-213921ca07de`;
 
 export default function HomeScreen() {
   // Основные состояния
@@ -931,6 +934,13 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" />
 
       {/* Плавающее предупреждение о препятствии */}
+      {/* #region agent log */}
+      {(()=>{
+        const overlayVisible = isTracking && closestObstacle !== null && closestObstacle.distance < 1000 && closestObstacle.distance >= 50 && currentSpeed > 1;
+        if (closestObstacle !== null || overlayVisible) (()=>{const p={sessionId:'c27951',location:'index.tsx:ObstacleWarningOverlay-props',message:'Overlay props',data:{isTracking,hasClosestObstacle:!!closestObstacle,distance:closestObstacle?.distance,speed:currentSpeed,overlayVisible,containerBg:'#0f0f23'},hypothesisId:'H-B,H-E',timestamp:Date.now()};fetch(DEBUG_LOG_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if (typeof __DEV__!=='undefined'&&__DEV__) console.log('[DEBUG c27951]',p);})();
+        return null;
+      })()}
+      {/* #endregion */}
       <ObstacleWarningOverlay
         obstacle={closestObstacle}
         visible={

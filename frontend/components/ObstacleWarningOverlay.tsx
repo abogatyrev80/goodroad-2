@@ -6,7 +6,10 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
+
+const _debugHost = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+const _debugLogUrl = `http://${_debugHost}:7242/ingest/2d55966e-6eaf-4e5e-a957-213921ca07de`;
 import { Ionicons } from '@expo/vector-icons';
 import { Obstacle } from '../services/ObstacleService';
 
@@ -92,10 +95,13 @@ export default function ObstacleWarningOverlay({
   // Fade + пульсация, с остановкой loop при размонтировании
   useEffect(() => {
     if (visible && obstacle) {
+      // #region agent log
+      (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:fade-start',message:'Starting fade-in useNativeDriver:true',data:{distance:obstacle.distance},hypothesisId:'H-A',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
+      // #endregion
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false, // true давало чёрный экран на части устройств при появлении оверлея
       }).start();
 
       if (obstacle.distance < 300) {
@@ -125,7 +131,7 @@ export default function ObstacleWarningOverlay({
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false, // в паре с fade-in для единообразия и избежания артефактов
       }).start();
     }
     return () => {
@@ -136,9 +142,13 @@ export default function ObstacleWarningOverlay({
     };
   }, [visible, obstacle]);
 
+  // #region agent log
   if (!visible || !obstacle) {
+    (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:early-return',message:'Overlay returns null',data:{visible,hasObstacle:!!obstacle,reason:!visible?'not visible':!obstacle?'no obstacle':''},hypothesisId:'H-D',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
     return null;
   }
+  (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:render',message:'Overlay rendering Animated.View',data:{visible,distance:obstacle.distance,position,size,overlayStyle:['absolute','left:16 right:16','backgroundColor:transparent']},hypothesisId:'H-A,H-C',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
+  // #endregion
 
   const getUrgencyLevel = (): 'critical' | 'warning' | 'caution' => {
     const distance = obstacle.distance;
