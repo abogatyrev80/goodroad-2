@@ -1,0 +1,74 @@
+# EAS Build: только то, что нужно для сборки frontend (Expo).
+# Файл в корне репо — при его наличии .gitignore не используется.
+# Документация: https://docs.expo.dev/build-reference/easignore/
+
+# Git и зависимости
+.git/
+**/node_modules/
+
+# Всё, что не относится к frontend-сборке (монорепо)
+backend/
+k8s/
+docs/
+.emergent/
+agenthub/
+
+# Frontend: кэши и сгенерированные папки
+frontend/.expo/
+frontend/.metro-cache/
+frontend/android/
+frontend/ios/
+
+# Frontend: веб-билды и бэкапы — не нужны для мобильной сборки
+frontend/dist-final/
+frontend/dist-deployment-ready/
+frontend/backups/
+
+# Сборки, кэши, артефакты
+**/dist/
+**/.next/
+**/out/
+**/build/
+**/*.tsbuildinfo
+.cache/
+
+# IDE и окружение
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+*token.json*
+*credentials.json*
+
+# Python (корень репо)
+**/__pycache__/
+**/*.pyc
+**/venv/
+**/.venv/
+
+# Логи и системное
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.orig
+*.bak
+.thumbs.db
+*.pem
+*.hprof
+
+# Прочее из корня (опционально, уменьшает архив)
+*.md
+*.py
+Makefile
+docker-compose.yml
+.dockerignore
+.vercel
+.chainlit
+.ipynb_checkpoints/
+**/*.zip
+**/*.tar.gz
+**/*.tar
+**/*.tgz
