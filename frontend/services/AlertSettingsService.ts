@@ -75,7 +75,10 @@ class AlertSettingsService {
     try {
       const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored);
+        if (typeof parsed === 'object' && parsed !== null) {
+          this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+        }
       }
     } catch (error) {
       console.error('Error loading alert settings:', error);

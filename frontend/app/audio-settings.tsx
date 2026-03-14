@@ -46,7 +46,10 @@ export default function AudioSettingsScreen() {
     try {
       const stored = await AsyncStorage.getItem('custom_sounds');
       if (stored) {
-        setCustomSounds(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setCustomSounds(parsed);
+        }
       }
     } catch (error) {
       console.error('Error loading custom sounds:', error);

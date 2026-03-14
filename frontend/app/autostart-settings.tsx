@@ -24,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
-import { ExpoAndroidAppList } from 'expo-android-app-list';
+import { AndroidAppList } from '../services/AndroidAppList';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
 type AutostartMode = 'disabled' | 'onCharge' | 'withApps' | 'onBluetooth';
@@ -134,6 +134,16 @@ export default function AutostartSettingsScreen() {
     }
   }, [bluetoothSearchQuery, allBluetoothDevices]);
 
+  const safeParseJson = <T,>(value: string | null, fallback: T): T => {
+    if (value == null) return fallback;
+    try {
+      const parsed = JSON.parse(value);
+      return parsed != null ? (parsed as T) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const loadSettings = async () => {
     try {
       const saved = await AsyncStorage.getItem('autostart_mode');
@@ -141,41 +151,32 @@ export default function AutostartSettingsScreen() {
         setAutostartMode(saved as AutostartMode);
       }
 
-      // Загружаем выбранные приложения по packageName
       const savedApps = await AsyncStorage.getItem('autostart_trigger_apps');
-      if (savedApps) {
-        const savedPackageNames: string[] = JSON.parse(savedApps);
+      const savedPackageNames = safeParseJson<string[]>(savedApps, []);
+      if (Array.isArray(savedPackageNames)) {
         setSelectedApps(savedPackageNames);
       }
 
       const savedBtDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
-      if (savedBtDevice) {
-        setSelectedBluetoothDevice(JSON.parse(savedBtDevice));
+      const btDevice = safeParseJson<{ name: string; address: string } | null>(savedBtDevice, null);
+      if (btDevice && typeof btDevice.name === 'string') {
+        setSelectedBluetoothDevice(btDevice);
       }
 
-      // Загружаем настройки автоостановки для каждого режима
       const savedAutoStopBluetooth = await AsyncStorage.getItem('autostop_on_bluetooth_disconnect');
-      if (savedAutoStopBluetooth) {
-        setAutoStopBluetooth(JSON.parse(savedAutoStopBluetooth));
-      }
-      
+      setAutoStopBluetooth(safeParseJson<boolean>(savedAutoStopBluetooth, false));
+
       const savedAutoStopApps = await AsyncStorage.getItem('autostop_on_app_close');
-      if (savedAutoStopApps) {
-        setAutoStopApps(JSON.parse(savedAutoStopApps));
-      }
-      
+      setAutoStopApps(safeParseJson<boolean>(savedAutoStopApps, false));
+
       const savedAutoStopCharge = await AsyncStorage.getItem('autostop_on_charge_disconnect');
-      if (savedAutoStopCharge) {
-        setAutoStopCharge(JSON.parse(savedAutoStopCharge));
-      }
+      setAutoStopCharge(safeParseJson<boolean>(savedAutoStopCharge, false));
       
-      // Для обратной совместимости загружаем старое значение
       const savedAutoStop = await AsyncStorage.getItem('autostart_auto_stop');
-      if (savedAutoStop && savedAutoStop === 'true') {
-        // Если старое значение было включено, включаем для всех режимов
-        if (!savedAutoStopBluetooth) setAutoStopBluetooth(true);
-        if (!savedAutoStopApps) setAutoStopApps(true);
-        if (!savedAutoStopCharge) setAutoStopCharge(true);
+      if (savedAutoStop === 'true') {
+        setAutoStopBluetooth(true);
+        setAutoStopApps(true);
+        setAutoStopCharge(true);
       }
 
       // Не выключать экран во время мониторинга
@@ -203,7 +204,7 @@ export default function AutostartSettingsScreen() {
   const loadInstalledApps = async () => {
     try {
       setLoadingInstalledApps(true);
-      const apps = await ExpoAndroidAppList.getAll();
+      const apps = await AndroidAppList.getAll();
       
       const appsList: TriggerApp[] = apps.map(app => ({
         id: app.packageName,

@@ -124,7 +124,12 @@ export default function SettingsScreen() {
       const storedSettings = await AsyncStorage.getItem(SETTINGS_KEY);
       if (storedSettings) {
         const parsed = JSON.parse(storedSettings);
-        setSettings({ ...defaultSettings, ...parsed });
+        if (typeof parsed !== 'object' || parsed === null) return;
+        const merged = { ...defaultSettings, ...parsed };
+        if (!Array.isArray(merged.hazardTypes)) {
+          merged.hazardTypes = defaultSettings.hazardTypes;
+        }
+        setSettings(merged);
       }
     } catch (error) {
       console.error('Error loading settings:', error);

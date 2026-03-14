@@ -39,9 +39,11 @@ export default function WarningSettingsScreen() {
     try {
       const saved = await AsyncStorage.getItem('warning_settings');
       if (saved) {
-        const settings: WarningSettings = JSON.parse(saved);
-        setSize(settings.size);
-        setPosition(settings.position);
+        const parsed = JSON.parse(saved);
+        const validSizes: WarningSize[] = ['small', 'medium', 'large'];
+        const validPositions: WarningPosition[] = ['top', 'center', 'bottom'];
+        setSize(validSizes.includes(parsed.size) ? parsed.size : 'medium');
+        setPosition(validPositions.includes(parsed.position) ? parsed.position : 'top');
       }
     } catch (error) {
       console.error('Error loading warning settings:', error);

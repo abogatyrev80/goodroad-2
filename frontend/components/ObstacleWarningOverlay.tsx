@@ -6,10 +6,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
-
-const _debugHost = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
-const _debugLogUrl = `http://${_debugHost}:7242/ingest/2d55966e-6eaf-4e5e-a957-213921ca07de`;
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Obstacle } from '../services/ObstacleService';
 
@@ -29,12 +26,9 @@ export default function ObstacleWarningOverlay({
   size = 'medium',
   position = 'top',
 }: ObstacleWarningOverlayProps) {
-  const [pulseAnim] = useState(new Animated.Value(1));
-  const [fadeAnim] = useState(new Animated.Value(0));
   const [displayedDistance, setDisplayedDistance] = useState(0);
   const [progressPercent, setProgressPercent] = useState(0); // Процент для прогресс-бара (без interpolate — избегаем чёрного экрана)
   const [progressAnim] = useState(new Animated.Value(0));
-  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const mountedRef = useRef(true);
 
   // Размеры в зависимости от настройки
@@ -92,63 +86,43 @@ export default function ObstacleWarningOverlay({
     };
   }, [obstacle?.distance]);
 
-  // Fade + пульсация, с остановкой loop при размонтировании
-  useEffect(() => {
-    if (visible && obstacle) {
-      // #region agent log
-      (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:fade-start',message:'Starting fade-in useNativeDriver:true',data:{distance:obstacle.distance},hypothesisId:'H-A',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
-      // #endregion
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: false, // true давало чёрный экран на части устройств при появлении оверлея
-      }).start();
-
-      if (obstacle.distance < 300) {
-        if (pulseLoopRef.current) pulseLoopRef.current.stop();
-        pulseLoopRef.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-        pulseLoopRef.current.start();
-      }
-    } else {
-      if (pulseLoopRef.current) {
-        pulseLoopRef.current.stop();
-        pulseLoopRef.current = null;
-      }
-      pulseAnim.setValue(1);
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false, // в паре с fade-in для единообразия и избежания артефактов
-      }).start();
-    }
-    return () => {
-      if (pulseLoopRef.current) {
-        pulseLoopRef.current.stop();
-        pulseLoopRef.current = null;
-      }
+  // УЛУЧШЕННЫЙ РАСЧЕТ ПРОГРЕССА — объявление функции до любого return (для использования в useEffect)
+  const getProgressPercentage = (obst: Obstacle): number => {
+    const distance = obst.distance;
+    const maxWarningDistance: Record<string, number> = {
+      accident: 1000, braking: 800, pothole: 600, speed_bump: 500, bump: 500, vibration: 400,
     };
-  }, [visible, obstacle]);
+    const maxDistance = maxWarningDistance[obst.type] || 600;
+    const percentage = Math.max(0, Math.min(100, ((maxDistance - distance) / maxDistance) * 100));
+    const confirmationsMultiplier = Math.min(1.2, 1 + (obst.confirmations - 1) * 0.1);
+    return Math.round(Math.min(100, percentage * confirmationsMultiplier));
+  };
 
-  // #region agent log
+  // Анимация прогресс-бара — ВСЕГДА вызываем один и тот же набор хуков (до любого return)
+  useEffect(() => {
+    if (!obstacle) {
+      progressAnim.setValue(0);
+      if (mountedRef.current) setProgressPercent(0);
+      return;
+    }
+    const targetProgress = getProgressPercentage(obstacle);
+    Animated.timing(progressAnim, {
+      toValue: targetProgress,
+      duration: 100,
+      useNativeDriver: false,
+    }).start();
+  }, [obstacle?.distance, obstacle?.type, obstacle?.confirmations]);
+
+  useEffect(() => {
+    const listener = progressAnim.addListener(({ value }) => {
+      if (mountedRef.current) setProgressPercent(Math.round(value));
+    });
+    return () => progressAnim.removeListener(listener);
+  }, []);
+
   if (!visible || !obstacle) {
-    (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:early-return',message:'Overlay returns null',data:{visible,hasObstacle:!!obstacle,reason:!visible?'not visible':!obstacle?'no obstacle':''},hypothesisId:'H-D',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
     return null;
   }
-  (()=>{const p={sessionId:'c27951',location:'ObstacleWarningOverlay.tsx:render',message:'Overlay rendering Animated.View',data:{visible,distance:obstacle.distance,position,size,overlayStyle:['absolute','left:16 right:16','backgroundColor:transparent']},hypothesisId:'H-A,H-C',timestamp:Date.now()};fetch(_debugLogUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if(__DEV__)console.log('[DEBUG c27951]',p);})();
-  // #endregion
 
   const getUrgencyLevel = (): 'critical' | 'warning' | 'caution' => {
     const distance = obstacle.distance;
@@ -214,66 +188,12 @@ export default function ObstacleWarningOverlay({
   const colors = getColors();
   const urgency = getUrgencyLevel();
 
-  // 🆕 УЛУЧШЕННЫЙ РАСЧЕТ ПРОГРЕССА с учетом типа препятствия и расстояния
-  const getProgressPercentage = (obstacle: Obstacle): number => {
-    const distance = obstacle.distance;
-    
-    // Определяем максимальное расстояние предупреждения в зависимости от типа
-    // Более опасные препятствия показываются дальше
-    const maxWarningDistance: Record<string, number> = {
-      accident: 1000,      // Авария - очень далеко
-      braking: 800,        // Торможение - далеко
-      pothole: 600,        // Яма - среднее
-      speed_bump: 500,     // Лежачий полицейский - среднее
-      bump: 500,           // Неровность - среднее
-      vibration: 400,      // Вибрация - близко
-    };
-    
-    const maxDistance = maxWarningDistance[obstacle.type] || 600;
-    const minDistance = 0; // При 0 метрах = 100%
-    
-    // Обратная пропорция: чем ближе, тем больше заполнение
-    // Формула: процент = (maxDistance - distance) / maxDistance * 100
-    const percentage = Math.max(0, Math.min(100, ((maxDistance - distance) / maxDistance) * 100));
-    
-    // Учитываем подтверждения - больше подтверждений = более заметный прогресс
-    const confirmationsMultiplier = Math.min(1.2, 1 + (obstacle.confirmations - 1) * 0.1);
-    const adjustedPercentage = Math.min(100, percentage * confirmationsMultiplier);
-    
-    return Math.round(adjustedPercentage);
-  };
-
-  // Анимация прогресс-бара: обновляем progressPercent через listener (без interpolate — стабильно на нативе)
-  useEffect(() => {
-    if (!obstacle) {
-      progressAnim.setValue(0);
-      if (mountedRef.current) setProgressPercent(0);
-      return;
-    }
-    const targetProgress = getProgressPercentage(obstacle);
-    Animated.timing(progressAnim, {
-      toValue: targetProgress,
-      duration: 100,
-      useNativeDriver: false,
-    }).start();
-  }, [obstacle?.distance, obstacle?.type, obstacle?.confirmations]);
-
-  useEffect(() => {
-    const listener = progressAnim.addListener(({ value }) => {
-      if (mountedRef.current) setProgressPercent(Math.round(value));
-    });
-    return () => progressAnim.removeListener(listener);
-  }, []);
-
+  // Корень — обычный View без анимации, чтобы исключить чёрный экран от Animated.View на нативном слое
   return (
-    <Animated.View
+    <View
       style={[
         styles.overlay,
         currentPosition,
-        {
-          opacity: fadeAnim,
-          transform: [{ scale: pulseAnim }],
-        },
       ]}
       collapsable={false}
       pointerEvents="box-none"
@@ -349,7 +269,7 @@ export default function ObstacleWarningOverlay({
           <View style={[styles.marker, styles.marker75]} />
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 

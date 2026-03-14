@@ -26,10 +26,9 @@ import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Battery from 'expo-battery';
-import * as Application from 'expo-application';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Brightness from 'expo-brightness';
-import * as Device from 'expo-device';
+import * as SplashScreen from 'expo-splash-screen';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import SimpleToast, { showToast } from '../components/SimpleToast';
 
@@ -38,12 +37,6 @@ import RawDataCollector from '../services/RawDataCollector';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
-
-// Константы
-const LOCATION_TASK_NAME = 'background-location-task';
-// Для сбора логов: эмулятор Android → 10.0.2.2, симулятор iOS / устройство → укажите IP ПК в DEBUG_LOG_HOST
-const DEBUG_LOG_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
-const DEBUG_LOG_URL = `http://${DEBUG_LOG_HOST}:7242/ingest/2d55966e-6eaf-4e5e-a957-213921ca07de`;
 
 export default function HomeScreen() {
   // Основные состояния
@@ -56,7 +49,10 @@ export default function HomeScreen() {
   // Настройки предупреждений
   const [warningSize, setWarningSize] = useState<WarningSize>('medium');
   const [warningPosition, setWarningPosition] = useState<WarningPosition>('top');
-  
+
+  // Симуляция предупреждения (только для отладки чёрного экрана)
+  const [simulateWarningOverlay, setSimulateWarningOverlay] = useState(false);
+
   // Автозапуск/автоотключение
   const [autostartMode, setAutostartMode] = useState<string>('disabled');
   const [wasAutoStarted, setWasAutoStarted] = useState(false); // Флаг что мониторинг был запущен автоматически
@@ -85,12 +81,17 @@ export default function HomeScreen() {
   const savedBrightnessRef = useRef<number | null>(null);
 
   // Хук для препятствий
-  const { obstacles, closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
+  const { closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
     isTracking,
     currentLocation,
     currentSpeed,
     currentLocationRef
   );
+
+  // Скрываем заставку, когда главный экран смонтирован и отрисован (убирает долгий «Loading»)
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   // Инициализация при загрузке
   useEffect(() => {
@@ -583,9 +584,10 @@ export default function HomeScreen() {
       const saved = await AsyncStorage.getItem('warning_settings');
       if (saved) {
         const settings = JSON.parse(saved);
-        setWarningSize(settings.size || 'medium');
-        setWarningPosition(settings.position || 'top');
-        console.log('📐 Loaded warning settings:', settings);
+        const validSizes: WarningSize[] = ['small', 'medium', 'large'];
+        const validPositions: WarningPosition[] = ['top', 'center', 'bottom'];
+        setWarningSize(validSizes.includes(settings.size) ? settings.size : 'medium');
+        setWarningPosition(validPositions.includes(settings.position) ? settings.position : 'top');
       }
     } catch (error) {
       console.error('Error loading warning settings:', error);
@@ -934,21 +936,31 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" />
 
       {/* Плавающее предупреждение о препятствии */}
-      {/* #region agent log */}
-      {(()=>{
-        const overlayVisible = isTracking && closestObstacle !== null && closestObstacle.distance < 1000 && closestObstacle.distance >= 50 && currentSpeed > 1;
-        if (closestObstacle !== null || overlayVisible) (()=>{const p={sessionId:'c27951',location:'index.tsx:ObstacleWarningOverlay-props',message:'Overlay props',data:{isTracking,hasClosestObstacle:!!closestObstacle,distance:closestObstacle?.distance,speed:currentSpeed,overlayVisible,containerBg:'#0f0f23'},hypothesisId:'H-B,H-E',timestamp:Date.now()};fetch(DEBUG_LOG_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c27951'},body:JSON.stringify(p)}).catch(()=>{});if (typeof __DEV__!=='undefined'&&__DEV__) console.log('[DEBUG c27951]',p);})();
-        return null;
-      })()}
-      {/* #endregion */}
       <ObstacleWarningOverlay
-        obstacle={closestObstacle}
+        obstacle={
+          simulateWarningOverlay
+            ? {
+                id: 'sim',
+                type: 'pothole',
+                latitude: 0,
+                longitude: 0,
+                distance: 120,
+                severity: { average: 0.7, max: 1 },
+                confidence: 0.9,
+                confirmations: 5,
+                avgSpeed: 40,
+                lastReported: new Date().toISOString(),
+                priority: 1,
+              }
+            : closestObstacle
+        }
         visible={
-          isTracking &&
-          closestObstacle !== null &&
-          closestObstacle.distance < 1000 &&
-          closestObstacle.distance >= 50 &&
-          currentSpeed > 1
+          simulateWarningOverlay ||
+          (isTracking &&
+            closestObstacle !== null &&
+            closestObstacle.distance < 1000 &&
+            closestObstacle.distance >= 50 &&
+            currentSpeed > 1)
         }
         size={warningSize}
         position={warningPosition}
@@ -958,6 +970,20 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>GOOD ROAD</Text>
         <Text style={styles.subtitle}>Мониторинг качества дорог</Text>
+        {typeof __DEV__ !== 'undefined' && __DEV__ && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.simulateWarningBtn,
+              pressed && styles.simulateWarningBtnPressed,
+              simulateWarningOverlay && styles.simulateWarningBtnActive,
+            ]}
+            onPress={() => setSimulateWarningOverlay((v) => !v)}
+          >
+            <Text style={styles.simulateWarningBtnText}>
+              {simulateWarningOverlay ? 'Выкл симуляцию предупреждения' : 'Симуляция предупреждения'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Статус */}
@@ -1128,6 +1154,26 @@ const styles = StyleSheet.create({
     color: '#8b94a8',
     marginTop: 4,
     fontWeight: '500',
+  },
+  simulateWarningBtn: {
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#1a1a3e',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3b3b6b',
+  },
+  simulateWarningBtnPressed: {
+    opacity: 0.8,
+  },
+  simulateWarningBtnActive: {
+    borderColor: '#fbbf24',
+    backgroundColor: '#2d2a14',
+  },
+  simulateWarningBtnText: {
+    fontSize: 12,
+    color: '#8b94a8',
   },
   statusContainer: {
     flexDirection: 'row',

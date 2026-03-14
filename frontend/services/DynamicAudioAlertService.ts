@@ -123,8 +123,11 @@ class DynamicAudioAlertService {
     try {
       const saved = await AsyncStorage.getItem('dynamic_audio_settings');
       if (saved) {
-        this.settings = { ...this.settings, ...JSON.parse(saved) };
-        console.log('🔊 Dynamic audio settings loaded:', this.settings);
+        const parsed = JSON.parse(saved);
+        if (typeof parsed === 'object' && parsed !== null) {
+          this.settings = { ...this.settings, ...parsed };
+          console.log('🔊 Dynamic audio settings loaded:', this.settings);
+        }
       }
     } catch (error) {
       console.error('❌ Error loading dynamic audio settings:', error);

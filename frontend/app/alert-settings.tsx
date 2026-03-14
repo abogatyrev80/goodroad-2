@@ -58,6 +58,7 @@ export default function AlertSettingsScreen() {
     if (confirm('Сбросить все настройки на значения по умолчанию?')) {
       alertSettingsService.saveSettings({
         speedThresholdExcess: 20,
+        alertMode: 'full',
         recommendedSpeeds: {
           pothole: 40,
           speed_bump: 20,
@@ -72,13 +73,10 @@ export default function AlertSettingsScreen() {
           vibration: 'Плохое покрытие через',
           braking: 'Место торможения через',
         },
-        soundSettings: {
-          voiceEnabled: true,
-          sirenEnabled: true,
-          sirenTheme: 'moderate',
-          sirenIntensity: 0.7,
-          voiceSpeed: 1.0,
-          repeatVoice: false,
+        alertDistances: {
+          earlyWarning: 200,
+          mainWarning: 100,
+          urgentWarning: 50,
         },
       });
       loadSettings();
