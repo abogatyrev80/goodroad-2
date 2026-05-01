@@ -6,6 +6,7 @@ ML Processor для анализа сырых данных и классифик
 import math
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
+import os
 
 
 class EventClassifier:
@@ -74,6 +75,10 @@ class EventClassifier:
         # История для расчета дельт и вариации
         self.history_size = 10
         self.device_history: Dict[str, List[Dict]] = {}
+        self.neural_classifier = NeuralEventClassifier(
+            enabled=True,
+            model_path=os.getenv('NEURAL_MODEL_PATH')
+        )
     
     def analyze_data_point(
         self,
@@ -266,8 +271,14 @@ class EventClassifier:
         patterns = self._analyze_patterns(x_values, y_values, z_values)
         stats['patterns'] = patterns  # Добавляем результаты анализа паттернов в stats
         
-        # Определяем тип события на основе статистики + паттернов
-        event = self._classify_from_stats(stats, speed)
+        # Пробуем нейросетевую классификацию, если доступна модель.
+        event = None
+        if self.neural_classifier.is_available():
+            event = self.neural_classifier.classify_with_neural_network(accelerometer_data, speed)
+        
+        # Fallback на текущую эвристическую логику.
+        if event is None:
+            event = self._classify_from_stats(stats, speed)
         
         if event:
             event['device_id'] = device_id
@@ -275,6 +286,10 @@ class EventClassifier:
             event['duration_ms'] = accelerometer_data[-1]['timestamp'] - accelerometer_data[0]['timestamp']
         
         return event
+
+    def has_neural_network(self) -> bool:
+        """Проверяет наличие загруженной нейросетевой модели."""
+        return self.neural_classifier.is_available()
     
     def _compute_accelerometer_stats(
         self,
@@ -769,6 +784,78 @@ class EventClassifier:
             if event_type in self.thresholds:
                 self.thresholds[event_type].update(thresholds)
         print(f"✅ Пороги обновлены: {self.thresholds}")
+
+class NeuralEventClassifier:
+    """
+    Класс для интеграции нейросетевого анализа с текущим EventClassifier
+    """
+    
+    def __init__(self, enabled: bool = True, model_path: Optional[str] = None):
+        self.enabled = enabled
+        self.model_path = model_path
+        self.nn_classifier = None
+        self._load_error = None
+        
+        if self.enabled:
+            self.initialize_neural_network()
+        
+    def initialize_neural_network(self):
+        """Инициализация нейросети"""
+        if not self.enabled:
+            return
+        
+        try:
+            from neural_classifier import NeuralAccelerometerClassifier
+            
+            classifier = NeuralAccelerometerClassifier()
+            if self.model_path and os.path.exists(self.model_path):
+                classifier.load_model(self.model_path)
+                self.nn_classifier = classifier
+            else:
+                self.nn_classifier = None
+                self._load_error = 'Neural model path is not configured or file does not exist'
+        except Exception as exc:
+            self.nn_classifier = None
+            self._load_error = str(exc)
+    
+    def classify_with_neural_network(self, accelerometer_data: List[Dict], speed: float) -> Optional[Dict]:
+        """
+        Классификация с использованием нейронной сети
+        Возвращает словарь с результатами классификации
+        """
+        if not self.is_available():
+            return None
+        
+        try:
+            event_type, confidence = self.nn_classifier.predict(accelerometer_data)
+        except Exception:
+            return None
+        
+        if event_type in ('unknown', 'normal'):
+            return None
+        
+        if confidence >= 0.90:
+            severity = 1
+        elif confidence >= 0.80:
+            severity = 2
+        elif confidence >= 0.70:
+            severity = 3
+        else:
+            severity = 4
+        
+        return {
+            'eventType': event_type,
+            'severity': severity,
+            'confidence': float(confidence),
+            'speed': speed,
+            'detection_method': 'neural_network',
+            'note': f'Neural classifier detected {event_type} (confidence={confidence:.2f})'
+        }
+
+    def is_available(self) -> bool:
+        """Возвращает True, если нейросетевая модель успешно загружена."""
+        return self.nn_classifier is not None and getattr(self.nn_classifier, 'model', None) is not None
+
 
 
 class WarningGenerator:
