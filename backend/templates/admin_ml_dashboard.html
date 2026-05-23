@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Dashboard — Good Road</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .header { background: #1e293b; padding: 1rem 2rem; border-bottom: 2px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .header h1 { font-size: 1.5rem; color: #a78bfa; }
+        .nav a { color: #60a5fa; text-decoration: none; margin-left: 1rem; font-size: 0.875rem; }
+        .nav a:hover { text-decoration: underline; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; }
+        .card h3 { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .card .value { font-size: 1.75rem; font-weight: 700; color: #60a5fa; }
+        .card .sub { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
+        .status-ok { color: #34d399; }
+        .status-err { color: #f87171; }
+        .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+        .panel { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; }
+        .panel h2 { font-size: 1rem; color: #a78bfa; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { color: #94a3b8; font-weight: 600; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600; background: #3b82f6; color: white; }
+        .btn:hover { background: #2563eb; }
+        .btn-secondary { background: #475569; }
+        textarea { width: 100%; min-height: 120px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 0.5rem; padding: 0.75rem; font-family: monospace; font-size: 0.75rem; }
+        .test-result { margin-top: 1rem; padding: 1rem; background: #0f172a; border-radius: 0.5rem; font-size: 0.875rem; }
+        .chart-wrap { height: 260px; position: relative; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🧠 ML Dashboard</h1>
+            <div class="nav">
+                <a href="/api/admin/dashboard/v3">← Карта v3</a>
+                <a href="/api/admin">Админ</a>
+                <a href="/api/admin/ml-settings">Пороги ML</a>
+            </div>
+        </div>
+        <button class="btn" onclick="refreshAll()">🔄 Обновить</button>
+    </div>
+
+    <div class="container">
+        <div class="grid" id="kpi-cards">
+            <div class="card"><h3>Модель</h3><div class="value" id="model-status">—</div><div class="sub" id="model-path">—</div></div>
+            <div class="card"><h3>Предсказаний (сессия)</h3><div class="value" id="total-inferences">0</div></div>
+            <div class="card"><h3>Использовано как результат</h3><div class="value" id="total-used">0</div><div class="sub" id="used-pct">—</div></div>
+            <div class="card"><h3>Согласие с эвристикой</h3><div class="value" id="agreement">—</div></div>
+            <div class="card"><h3>Средняя уверенность</h3><div class="value" id="avg-conf">—</div></div>
+            <div class="card"><h3>Задержка инференса</h3><div class="value" id="avg-latency">—</div></div>
+        </div>
+
+        <div class="panels">
+            <div class="panel">
+                <h2>Распределение предсказаний модели</h2>
+                <div class="chart-wrap"><canvas id="chart-predicted"></canvas></div>
+            </div>
+            <div class="panel">
+                <h2>Метод детекции (итог)</h2>
+                <div class="chart-wrap"><canvas id="chart-method"></canvas></div>
+            </div>
+        </div>
+
+        <div class="panels" style="margin-top: 1.5rem;">
+            <div class="panel">
+                <h2>Последние предсказания</h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Устройство</th>
+                                <th>NN</th>
+                                <th>Conf</th>
+                                <th>Эвристика</th>
+                                <th>Итог</th>
+                                <th>Метод</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Тест модели</h2>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">
+                    JSON-массив точек <code>[{"x":0.1,"y":0.2,"z":9.8}, ...]</code> (минимум 8 точек)
+                </p>
+                <textarea id="test-input">[{"x":-0.34,"y":0.91,"z":0.36},{"x":-0.35,"y":0.90,"z":0.37},{"x":-0.33,"y":0.92,"z":0.35},{"x":-0.36,"y":0.89,"z":0.38},{"x":-0.34,"y":0.91,"z":0.36},{"x":-0.35,"y":0.90,"z":0.37},{"x":-0.33,"y":0.92,"z":0.35},{"x":-0.36,"y":0.89,"z":0.38}]</textarea>
+                <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                    <button class="btn" onclick="runTest()">▶ Предсказать</button>
+                </div>
+                <div class="test-result" id="test-result">Нажмите «Предсказать»</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/admin/v2/ml-model';
+        let chartPredicted, chartMethod;
+
+        async function fetchJson(url, opts) {
+            const r = await fetch(url, opts);
+            if (!r.ok) throw new Error(await r.text());
+            return r.json();
+        }
+
+        function fmtPct(v) {
+            if (v == null) return '—';
+            return (v * 100).toFixed(1) + '%';
+        }
+
+        async function refreshAll() {
+            try {
+                const [status, stats, recent] = await Promise.all([
+                    fetchJson(API + '/status'),
+                    fetchJson(API + '/stats'),
+                    fetchJson(API + '/recent?limit=30'),
+                ]);
+
+                const ok = status.available;
+                document.getElementById('model-status').innerHTML = ok
+                    ? '<span class="status-ok">Загружена</span>'
+                    : '<span class="status-err">Не загружена</span>';
+                document.getElementById('model-path').textContent =
+                    (status.path || '—') + (status.backend ? ' · ' + status.backend : '') +
+                    (status.load_error ? ' · ' + status.load_error : '');
+
+                const s = stats.runtime || stats;
+                document.getElementById('total-inferences').textContent = s.total_inferences ?? 0;
+                document.getElementById('total-used').textContent = s.total_used_as_result ?? 0;
+                const usedPct = s.total_inferences
+                    ? ((s.total_used_as_result / s.total_inferences) * 100).toFixed(1) + '% от предсказаний'
+                    : '—';
+                document.getElementById('used-pct').textContent = usedPct;
+                document.getElementById('agreement').textContent = fmtPct(s.agreement_rate);
+                document.getElementById('avg-conf').textContent = s.avg_confidence != null
+                    ? (s.avg_confidence * 100).toFixed(1) + '%' : '—';
+                document.getElementById('avg-latency').textContent = s.avg_latency_ms != null
+                    ? s.avg_latency_ms.toFixed(1) + ' ms' : '—';
+
+                updateChart('chart-predicted', chartPredicted, c => chartPredicted = c, s.by_predicted || {}, 'Предсказания');
+                updateChart('chart-method', chartMethod, c => chartMethod = c, s.by_method || {}, 'Метод');
+
+                const tbody = document.getElementById('recent-body');
+                tbody.innerHTML = '';
+                (recent.items || []).forEach(row => {
+                    const tr = document.createElement('tr');
+                    const t = row.timestamp ? new Date(row.timestamp).toLocaleString('ru-RU') : '—';
+                    tr.innerHTML = `
+                        <td>${t}</td>
+                        <td>${(row.deviceId || '').slice(-8)}</td>
+                        <td>${row.neuralType || '—'}</td>
+                        <td>${row.neuralConfidence != null ? (row.neuralConfidence * 100).toFixed(0) + '%' : '—'}</td>
+                        <td>${row.heuristicType || '—'}</td>
+                        <td>${row.finalType || '—'}</td>
+                        <td>${row.finalMethod || '—'}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка загрузки: ' + e.message);
+            }
+        }
+
+        function updateChart(canvasId, chartRef, setRef, data, label) {
+            const labels = Object.keys(data);
+            const values = Object.values(data);
+            const colors = ['#60a5fa','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c'];
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (chartRef) chartRef.destroy();
+            setRef(new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.length ? labels : ['нет данных'],
+                    datasets: [{ data: values.length ? values : [1], backgroundColor: colors }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+            }));
+        }
+
+        async function runTest() {
+            const el = document.getElementById('test-result');
+            try {
+                const acc = JSON.parse(document.getElementById('test-input').value);
+                const res = await fetchJson(API + '/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accelerometer: acc, speed: 10 }),
+                });
+                el.innerHTML = `<strong>Нейросеть:</strong> ${res.neural?.eventType || '—'} 
+                    (${res.neural?.confidence != null ? (res.neural.confidence * 100).toFixed(1) + '%' : '—'})<br>
+                    <strong>Эвристика:</strong> ${res.heuristic?.eventType || '—'}<br>
+                    <strong>Итог:</strong> ${res.final?.eventType || 'нет события'} 
+                    <em>(${res.final?.detection_method || '—'})</em>
+                    <br><small>Задержка: ${res.latency_ms?.toFixed(1)} ms</small>`;
+            } catch (e) {
+                el.textContent = 'Ошибка: ' + e.message;
+            }
+        }
+
+        refreshAll();
+        setInterval(refreshAll, 15000);
+    </script>
+</body>
+</html>

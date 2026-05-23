@@ -1,6 +1,6 @@
 # Makefile для Road Monitor System
 
-.PHONY: help setup start stop restart logs clean build test
+.PHONY: help setup start stop restart logs clean build test ml-setup ml-train ml-check-gpu
 
 # Цвета для вывода
 RED=\033[0;31m
@@ -140,3 +140,18 @@ update: ## Обновить проект
 dev: setup start-dev ## Быстрый старт для разработки
 
 prod: setup build start ## Быстрый старт для production
+
+ml-setup: ## Создать venv и установить PyTorch (ROCm) для обучения
+	@bash scripts/setup-ml-env.sh
+
+ml-check-gpu: ## Проверить ROCm и PyTorch GPU
+	@bash -c 'source backend/.venv-ml/bin/activate && python3 -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\")"'
+
+ml-train: ## Обучить модель (синтетика, 10 эпох — smoke test)
+	@bash -c 'source backend/.venv-ml/bin/activate && cd backend && python train_model.py --synthetic --epochs 10 --output models/accel_lstm.pt'
+
+ml-train-db: ## Обучить модель из MongoDB
+	@bash -c 'source backend/.venv-ml/bin/activate && cd backend && python train_model.py --mongo --output models/accel_lstm.pt'
+
+ml-train-prod: ## Обучить модель с production API (goodroad.su)
+	@bash -c 'source backend/.venv-ml/bin/activate && pip install -q requests && cd backend && python train_model.py --api-url https://goodroad.su --epochs 30 --api-max-events 20000 --api-max-raw 30000 --output models/accel_lstm.pt'

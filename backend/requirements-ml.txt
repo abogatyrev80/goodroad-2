@@ -1,0 +1,15 @@
+# ML training stack (local RX 6800 XT + ROCm). Not used in production Docker image.
+numpy>=1.26,<3
+scikit-learn>=1.4,<2
+pandas>=2.1,<3
+motor>=3.3,<4
+pymongo>=4.5,<5
+python-dotenv>=1.0,<2
+tqdm>=4.66,<5
+requests>=2.31,<3
+
+# PyTorch with ROCm — install via scripts/setup-ml-env.sh (separate index URL)
+# torch
+
+# Optional: legacy TensorFlow/Keras inference (.keras models)
+# tensorflow>=2.15,<2.19

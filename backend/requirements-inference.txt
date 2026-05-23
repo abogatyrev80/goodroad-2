@@ -1,0 +1,6 @@
+# Inference-only deps for neural model (.pt) on backend server
+# Install: pip install -r requirements-inference.txt
+numpy>=1.26,<3
+scikit-learn>=1.4,<2
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2,<3

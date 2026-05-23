@@ -11,3 +11,5 @@ data:
   LOG_LEVEL: "INFO"
   DEBUG: "False"
   CLUSTER_RADIUS: "1.0"
+  NEURAL_MODEL_PATH: "/app/models/accel_lstm.pt"
+  NEURAL_MIN_CONFIDENCE: "0.35"

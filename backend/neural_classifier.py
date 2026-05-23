@@ -123,23 +123,14 @@ class NeuralAccelerometerClassifier:
         """Загружает модель"""
         self.model = keras.models.load_model(filepath)
 
-# Пример использования
 if __name__ == "__main__":
-    # Создаем экземпляр классификатора
     classifier = NeuralAccelerometerClassifier()
-    
-    # Подготовим тестовые данные (пример)
     test_data = [
-        {'x': 0.1, 'y': 0.2, 'z': 9.8}, 
-        {'x': 0.3, 'y': -0.5, 'z': 9.6},
-        {'x': -0.1, 'y': 0.8, 'z': 10.2}
+        {"x": 0.1, "y": 0.2, "z": 9.8},
+        {"x": 0.3, "y": -0.5, "z": 9.6},
+        {"x": -0.1, "y": 0.8, "z": 10.2},
     ]
-    
-    # Проверим работу классификатора
     try:
-        result = classifier.predict(test_data)
-        print(f"Результат: {result}")
+        print(classifier.predict(test_data))
     except Exception as e:
         print(f"Ошибка: {e}")
-
-print("Нейросетевой классификатор готов к интеграции");

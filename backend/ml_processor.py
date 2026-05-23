@@ -4,9 +4,12 @@ ML Processor для анализа сырых данных и классифик
 """
 
 import math
+import os
+import time
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
-import os
+
+from ml_stats import get_ml_stats_tracker
 
 
 class EventClassifier:
@@ -271,15 +274,56 @@ class EventClassifier:
         patterns = self._analyze_patterns(x_values, y_values, z_values)
         stats['patterns'] = patterns  # Добавляем результаты анализа паттернов в stats
         
-        # Пробуем нейросетевую классификацию, если доступна модель.
-        event = None
+        min_neural_conf = float(os.getenv("NEURAL_MIN_CONFIDENCE", "0.35"))
+
+        neural_raw = None
+        neural_latency_ms = 0.0
         if self.neural_classifier.is_available():
-            event = self.neural_classifier.classify_with_neural_network(accelerometer_data, speed)
-        
-        # Fallback на текущую эвристическую логику.
-        if event is None:
-            event = self._classify_from_stats(stats, speed)
-        
+            t0 = time.perf_counter()
+            neural_raw = self.neural_classifier.classify_with_neural_network(
+                accelerometer_data, speed
+            )
+            neural_latency_ms = (time.perf_counter() - t0) * 1000
+
+        neural_event = neural_raw
+        if (
+            neural_event
+            and neural_event.get("confidence", 0) < min_neural_conf
+        ):
+            neural_event = None
+
+        heuristic_event = self._classify_from_stats(stats, speed)
+        heuristic_type = (
+            heuristic_event.get("eventType") if heuristic_event else None
+        )
+
+        event = neural_event if neural_event else heuristic_event
+        final_method = (
+            "neural_network"
+            if neural_event
+            else (
+                heuristic_event.get("detection_method", "heuristic")
+                if heuristic_event
+                else "none"
+            )
+        )
+
+        tracker = get_ml_stats_tracker()
+        if tracker and self.neural_classifier.is_available():
+            tracker.record_sync(
+                device_id=device_id,
+                neural_type=neural_raw.get("eventType") if neural_raw else None,
+                neural_confidence=(
+                    neural_raw.get("confidence") if neural_raw else None
+                ),
+                heuristic_type=heuristic_type,
+                final_type=event.get("eventType") if event else None,
+                final_method=final_method,
+                speed=speed,
+                sample_count=len(accelerometer_data),
+                latency_ms=neural_latency_ms,
+            )
+
         if event:
             event['device_id'] = device_id
             event['sample_count'] = len(accelerometer_data)
@@ -800,20 +844,35 @@ class NeuralEventClassifier:
             self.initialize_neural_network()
         
     def initialize_neural_network(self):
-        """Инициализация нейросети"""
+        """Инициализация нейросети (.pt PyTorch или .keras TensorFlow)."""
         if not self.enabled:
             return
         
+        if not self.model_path or not os.path.exists(self.model_path):
+            self.nn_classifier = None
+            self._load_error = 'Neural model path is not configured or file does not exist'
+            return
+
+        path = self.model_path
         try:
-            from neural_classifier import NeuralAccelerometerClassifier
-            
-            classifier = NeuralAccelerometerClassifier()
-            if self.model_path and os.path.exists(self.model_path):
-                classifier.load_model(self.model_path)
+            if path.endswith('.pt'):
+                from accel_nn import AccelClassifier
+
+                classifier = AccelClassifier()
+                classifier.load(path)
                 self.nn_classifier = classifier
-            else:
-                self.nn_classifier = None
-                self._load_error = 'Neural model path is not configured or file does not exist'
+                self._backend = 'pytorch'
+                return
+            if path.endswith('.keras') or os.path.isdir(path):
+                from neural_classifier import NeuralAccelerometerClassifier
+
+                classifier = NeuralAccelerometerClassifier()
+                classifier.load_model(path)
+                self.nn_classifier = classifier
+                self._backend = 'keras'
+                return
+            self.nn_classifier = None
+            self._load_error = f'Unsupported model format: {path}'
         except Exception as exc:
             self.nn_classifier = None
             self._load_error = str(exc)
@@ -854,7 +913,33 @@ class NeuralEventClassifier:
 
     def is_available(self) -> bool:
         """Возвращает True, если нейросетевая модель успешно загружена."""
-        return self.nn_classifier is not None and getattr(self.nn_classifier, 'model', None) is not None
+        if self.nn_classifier is None:
+            return False
+        if getattr(self, '_backend', None) == 'pytorch':
+            return getattr(self.nn_classifier, 'model', None) is not None
+        return getattr(self.nn_classifier, 'model', None) is not None
+
+    def get_model_info(self) -> Dict:
+        info = {
+            "enabled": self.enabled,
+            "available": self.is_available(),
+            "path": self.model_path,
+            "backend": getattr(self, "_backend", None),
+            "load_error": self._load_error,
+            "min_confidence": float(os.getenv("NEURAL_MIN_CONFIDENCE", "0.35")),
+        }
+        if self.is_available() and getattr(self, "_backend", None) == "pytorch":
+            info["window_size"] = getattr(self.nn_classifier, "window_size", None)
+        return info
+
+    def reload(self, model_path: Optional[str] = None) -> Dict:
+        if model_path:
+            self.model_path = model_path
+        self.nn_classifier = None
+        self._load_error = None
+        self._backend = None
+        self.initialize_neural_network()
+        return self.get_model_info()
 
 
 
@@ -903,6 +988,8 @@ class WarningGenerator:
             'vibration': 'ПЛОХОЕ ПОКРЫТИЕ'
         }.get(event_type, 'ОПАСНОСТЬ')
         
+        if distance < 1:
+            return f"{severity_text}: {event_text} рядом с вами"
         return f"{severity_text}: {event_text} через {int(distance)}м"
     
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:

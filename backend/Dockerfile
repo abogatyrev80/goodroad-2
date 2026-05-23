@@ -5,7 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY requirements-inference.txt .
+RUN pip install --no-cache-dir -r requirements-inference.txt
+
 COPY . .
+
+ENV NEURAL_MODEL_PATH=/app/models/accel_lstm.pt
+ENV NEURAL_MIN_CONFIDENCE=0.35
 
 EXPOSE 8001
 

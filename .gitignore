@@ -51,6 +51,11 @@ __pycache__/
 *pyc*
 venv/
 .venv/
+.venv-ml/
+backend/.venv-ml/
+backend/models/*.pt
+backend/models/*.json
+!backend/models/.gitkeep
 
 # Development tools
 chainlit.md

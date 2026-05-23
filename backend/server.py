@@ -18,6 +18,7 @@ import math
 import statistics
 import csv
 import io
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -86,6 +87,16 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             
             mongodb_connected = True
             logger.info(f"✅ Successfully connected to MongoDB database: {db_name}")
+
+            from ml_stats import init_ml_stats_tracker
+
+            tracker = init_ml_stats_tracker(db)
+            await tracker.load_history_from_db(hours=24)
+            try:
+                await db.ml_inference_logs.create_index([("timestamp", -1)])
+            except Exception:
+                pass
+            logger.info("✅ ML stats tracker initialized")
             
             # 🆕 Инициализация кластеризатора
             global obstacle_clusterer
@@ -145,6 +156,12 @@ async def startup_event():
     logger.info("🚀 Starting Good Road API...")
     try:
         await connect_to_mongodb()
+        model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
+        if os.path.exists(model_path):
+            info = event_classifier.neural_classifier.reload(model_path)
+            logger.info(f"🧠 Neural model loaded: available={info.get('available')}")
+        else:
+            logger.warning(f"🧠 Neural model not found at {model_path}")
         logger.info("✅ All services initialized successfully")
     except Exception as e:
         logger.error(f"⚠️ Failed to connect to MongoDB during startup: {str(e)}")
@@ -256,7 +273,41 @@ class UserWarning(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+# Rate limiting for data ingestion endpoints
+rate_limit_store: Dict[str, List[float]] = {}
+RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
+RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
+
+def check_rate_limit(device_id: str) -> bool:
+    """Проверяет rate limit для устройства. Возвращает False если лимит превышен."""
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW
+    
+    if device_id not in rate_limit_store:
+        rate_limit_store[device_id] = []
+    
+    # Очищаем старые записи
+    rate_limit_store[device_id] = [
+        t for t in rate_limit_store[device_id] if t > window_start
+    ]
+    
+    if len(rate_limit_store[device_id]) >= RATE_LIMIT_REQUESTS:
+        return False
+    
+    rate_limit_store[device_id].append(now)
+    return True
+
 # Helper Functions
+def validate_gps_coords(lat: Optional[float], lon: Optional[float]) -> bool:
+    """Проверяет, что координаты GPS валидны и не нулевые"""
+    if lat is None or lon is None:
+        return False
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return False
+    if lat == 0.0 and lon == 0.0:
+        return False
+    return True
+
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance between two coordinates using Haversine formula"""
     R = 6371000  # Earth's radius in meters
@@ -395,12 +446,16 @@ async def root():
         "message": "Good Road API - Smart Road Monitoring System",
         "version": "2.0.0",
         "status": "operational",
-        "mongodb_connected": mongodb_connected
+        "mongodb_connected": mongodb_connected,
+        "neural_model": event_classifier.neural_classifier.get_model_info(),
     }
 
 @api_router.post("/sensor-data")
 async def upload_sensor_data(batch: SensorDataBatch):
     """Upload batch of sensor data from mobile device"""
+    # Rate limit check
+    if not check_rate_limit(batch.deviceId):
+        raise HTTPException(status_code=429, detail="Too many requests. Rate limit exceeded.")
     try:
         # Separate location, accelerometer, and event data
         location_data = [point for point in batch.sensorData if point.type == "location"]
@@ -434,6 +489,10 @@ async def upload_sensor_data(batch: SensorDataBatch):
                 lat = location_point.data.get("latitude")
                 lon = location_point.data.get("longitude")
                 timestamp = location_point.timestamp
+                
+                # Пропускаем точки с невалидными координатами
+                if not validate_gps_coords(lat, lon):
+                    continue
                 
                 # Find nearby accelerometer readings (within 30 seconds)
                 nearby_accel = [
@@ -613,11 +672,11 @@ async def upload_sensor_data(batch: SensorDataBatch):
         
         # Store processed data
         if processed_conditions:
-            await db.road_conditions.insert_many(processed_conditions)
+            await db.road_conditions.insert_many(processed_conditions, ordered=False)
             print(f"✅ Stored {len(processed_conditions)} road conditions")
         
         if processed_warnings:
-            await db.road_warnings.insert_many(processed_warnings)
+            await db.road_warnings.insert_many(processed_warnings, ordered=False)
             print(f"✅ Stored {len(processed_warnings)} warnings")
         
         return {
@@ -731,6 +790,11 @@ async def get_ml_statistics():
 
 from ml_processor import EventClassifier, WarningGenerator
 from clustering import ObstacleClusterer
+from ml_stats import get_ml_stats_tracker
+
+_default_model_path = ROOT_DIR / "models" / "accel_lstm.pt"
+if not os.environ.get("NEURAL_MODEL_PATH") and _default_model_path.exists():
+    os.environ["NEURAL_MODEL_PATH"] = str(_default_model_path)
 
 # Инициализация ML процессоров
 event_classifier = EventClassifier()
@@ -745,6 +809,9 @@ async def process_raw_data(batch: RawDataBatch):
     Новый endpoint для приема сырых данных с устройств
     Сервер анализирует данные и классифицирует события
     """
+    # Rate limit check
+    if not check_rate_limit(batch.deviceId):
+        raise HTTPException(status_code=429, detail="Too many requests. Rate limit exceeded.")
     try:
         device_id = batch.deviceId
         raw_count = len(batch.data)
@@ -761,6 +828,12 @@ async def process_raw_data(batch: RawDataBatch):
             timestamp = datetime.fromtimestamp(data_point.timestamp / 1000)
             gps = data_point.gps
             accel_raw = data_point.accelerometer
+            
+            # Пропускаем точки с невалидными координатами
+            lat, lng = gps.get("latitude"), gps.get("longitude")
+            if not validate_gps_coords(lat, lng):
+                print(f"   ⏭️ Пропуск точки с невалидными координатами: lat={lat}, lng={lng}")
+                continue
             
             # 🆕 Обратная совместимость: поддержка обоих форматов
             if isinstance(accel_raw, list):
@@ -913,11 +986,31 @@ async def process_raw_data(batch: RawDataBatch):
                 processed_events.append(processed_event)
                 
                 # Проверяем нужно ли предупредить пользователя
+                # Используем центроид кластера как позицию события (если кластер существовал до нас)
+                event_lat = gps.get("latitude")
+                event_lng = gps.get("longitude")
+                effective_event_lat = event_lat
+                effective_event_lng = event_lng
+                
+                if cluster_id:
+                    try:
+                        cluster = await db.obstacle_clusters.find_one(
+                            {"_id": cluster_id},
+                            {"location": 1, "reportCount": 1}
+                        )
+                        if cluster and cluster.get("reportCount", 0) > 1:
+                            loc = cluster.get("location", {})
+                            if loc.get("latitude") and loc.get("longitude"):
+                                effective_event_lat = loc["latitude"]
+                                effective_event_lng = loc["longitude"]
+                    except Exception:
+                        pass
+                
                 should_warn, distance = warning_generator.should_warn_user(
-                    user_lat=gps.get("latitude"),
-                    user_lng=gps.get("longitude"),
-                    event_lat=gps.get("latitude"),
-                    event_lng=gps.get("longitude"),
+                    user_lat=event_lat,
+                    user_lng=event_lng,
+                    event_lat=effective_event_lat,
+                    event_lng=effective_event_lng,
                     event_type=event['eventType'],
                     severity=event['severity']
                 )
@@ -934,8 +1027,8 @@ async def process_raw_data(batch: RawDataBatch):
                         "deviceId": device_id,
                         "eventType": event['eventType'],
                         "severity": event['severity'],
-                        "latitude": gps.get("latitude"),
-                        "longitude": gps.get("longitude"),
+                        "latitude": event_lat,
+                        "longitude": event_lng,
                         "distance": distance,
                         "message": warning_message,
                         "expiresAt": datetime.utcnow() + timedelta(minutes=5),
@@ -946,15 +1039,15 @@ async def process_raw_data(batch: RawDataBatch):
         
         # Сохраняем в базу данных
         if raw_documents:
-            await db.raw_sensor_data.insert_many(raw_documents)
+            await db.raw_sensor_data.insert_many(raw_documents, ordered=False)
             print(f"✅ Сохранено {len(raw_documents)} сырых записей")
         
         if processed_events:
-            await db.processed_events.insert_many(processed_events)
+            await db.processed_events.insert_many(processed_events, ordered=False)
             print(f"✅ Классифицировано {len(processed_events)} событий")
         
         if user_warnings:
-            await db.user_warnings.insert_many(user_warnings)
+            await db.user_warnings.insert_many(user_warnings, ordered=False)
             print(f"✅ Создано {len(user_warnings)} предупреждений")
         
         return {
@@ -1661,6 +1754,98 @@ async def update_ml_thresholds(update: MLThresholdsUpdate):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class MLPredictRequest(BaseModel):
+    accelerometer: List[Dict[str, float]]
+    speed: float = 0.0
+    device_id: str = "admin-test"
+
+
+@api_router.get("/admin/v2/ml-model/status")
+async def ml_model_status():
+    """Статус загруженной нейросетевой модели."""
+    return event_classifier.neural_classifier.get_model_info()
+
+
+@api_router.get("/admin/v2/ml-model/stats")
+async def ml_model_stats():
+    """Статистика работы модели (runtime + MongoDB за 24ч)."""
+    tracker = get_ml_stats_tracker()
+    runtime = tracker.snapshot() if tracker else {}
+    db_stats = {}
+    if db and mongodb_connected:
+        since = datetime.utcnow() - timedelta(hours=24)
+        pipeline = [
+            {"$match": {"timestamp": {"$gte": since}}},
+            {
+                "$group": {
+                    "_id": None,
+                    "count": {"$sum": 1},
+                    "avg_confidence": {"$avg": "$neuralConfidence"},
+                    "avg_latency": {"$avg": "$latencyMs"},
+                }
+            },
+        ]
+        agg = await db.ml_inference_logs.aggregate(pipeline).to_list(1)
+        if agg:
+            db_stats = agg[0]
+            db_stats.pop("_id", None)
+        by_type = await db.ml_inference_logs.aggregate(
+            [
+                {"$match": {"timestamp": {"$gte": since}, "neuralType": {"$ne": None}}},
+                {"$group": {"_id": "$neuralType", "count": {"$sum": 1}}},
+            ]
+        ).to_list(20)
+        db_stats["by_predicted_24h"] = {r["_id"]: r["count"] for r in by_type}
+    return {"runtime": runtime, "database_24h": db_stats}
+
+
+@api_router.get("/admin/v2/ml-model/recent")
+async def ml_model_recent(limit: int = Query(50, ge=1, le=200)):
+    """Последние предсказания модели."""
+    tracker = get_ml_stats_tracker()
+    if tracker:
+        return {"items": tracker.recent_list(limit)}
+    return {"items": []}
+
+
+@api_router.post("/admin/v2/ml-model/predict")
+async def ml_model_predict(body: MLPredictRequest):
+    """Тестовый инференс из админки."""
+    import time as _time
+
+    acc = body.accelerometer
+    if len(acc) < 3:
+        raise HTTPException(status_code=400, detail="Need at least 3 accelerometer points")
+
+    t0 = _time.perf_counter()
+    neural = None
+    if event_classifier.neural_classifier.is_available():
+        neural = event_classifier.neural_classifier.classify_with_neural_network(
+            acc, body.speed
+        )
+    latency_ms = (_time.perf_counter() - t0) * 1000
+
+    stats = event_classifier._compute_accelerometer_stats(
+        [p["x"] for p in acc],
+        [p["y"] for p in acc],
+        [p["z"] for p in acc],
+    )
+    heuristic = event_classifier._classify_from_stats(stats, body.speed)
+
+    min_conf = float(os.environ.get("NEURAL_MIN_CONFIDENCE", "0.35"))
+    neural_used = neural if neural and neural.get("confidence", 0) >= min_conf else None
+    final = neural_used or heuristic
+
+    return {
+        "neural": neural,
+        "heuristic": heuristic,
+        "final": final,
+        "latency_ms": latency_ms,
+        "min_confidence_threshold": min_conf,
+    }
+
 
 # 🆕 API для редактирования событий
 @api_router.put("/admin/v2/events/{event_id}")
@@ -3098,6 +3283,17 @@ async def ml_settings_api(request: Request):
     return templates.TemplateResponse("ml_settings.html", {"request": request})
 
 
+@app.get("/admin/ml-dashboard", response_class=HTMLResponse)
+async def ml_dashboard_page(request: Request):
+    """Дашборд статистики нейросетевой модели."""
+    return templates.TemplateResponse("admin_ml_dashboard.html", {"request": request})
+
+
+@api_router.get("/admin/ml-dashboard", response_class=HTMLResponse)
+async def ml_dashboard_page_api(request: Request):
+    return templates.TemplateResponse("admin_ml_dashboard.html", {"request": request})
+
+
 # Admin Index - Main navigation page
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_index(request: Request):
@@ -3159,10 +3355,16 @@ from admin_api import get_admin_editor_router
 admin_editor_router = get_admin_editor_router(db)
 app.include_router(admin_editor_router)
 
+cors_origins = os.environ.get("CORS_ORIGINS", "*")
+if cors_origins == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in cors_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
