@@ -20,6 +20,6 @@ patchesStrategicMerge:
 
 images:
   - name: road-monitor-backend
-    newTag: v1.0.0
+    newTag: v2.0.0
   - name: road-monitor-frontend
-    newTag: v1.0.0
+    newTag: v2.0.0

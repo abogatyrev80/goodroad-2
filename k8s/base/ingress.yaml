@@ -13,12 +13,11 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - road-monitor.example.com
-    - api.road-monitor.example.com
+    - goodroad.su
+    - api.goodroad.su
     secretName: road-monitor-tls
   rules:
-  # Frontend
-  - host: road-monitor.example.com
+  - host: goodroad.su
     http:
       paths:
       - path: /
@@ -28,8 +27,7 @@ spec:
             name: frontend
             port:
               number: 3000
-  # Backend API
-  - host: api.road-monitor.example.com
+  - host: api.goodroad.su
     http:
       paths:
       - path: /
