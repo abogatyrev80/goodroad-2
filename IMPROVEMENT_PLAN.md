@@ -156,6 +156,46 @@ services/audio/
 
 ---
 
+## Фаза 7: Web-обновление бэкенда (Webhook + Admin Upload)
+
+### 7.1 Создать `services/updater.py`
+Модуль с классом `BackendUpdater`:
+- `check_git_status()` — git fetch + ahead/behind
+- `git_pull()` — `git pull --ff-only`, возвращает diff
+- `validate_code()` — syntax check всех `.py`
+- `restart_service()` — `supervisorctl restart backend`
+- `deploy_from_zip(zip_bytes)` — распаковка ZIP, валидация, переключение
+- `get_deployment_log()` — история обновлений из JSON-файла
+
+### 7.2 Создать `routers/deploy.py`
+Эндпоинты:
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| `POST` | `/api/webhook/github` | GitHub webhook — автоматический pull при push |
+| `GET` | `/api/admin/deploy` | Страница админки: статус, лог, форма загрузки |
+| `POST` | `/api/admin/deploy/upload` | Загрузка ZIP-архива с кодом |
+| `POST` | `/api/admin/deploy/pull` | Ручной git pull из админки |
+| `GET` | `/api/admin/deploy/log` | JSON с историей обновлений |
+
+### 7.3 Создать `templates/admin_deploy.html`
+Страница админки с:
+- Статус: ветка, коммит, ahead/behind
+- Кнопка "Pull from Git"
+- Форма загрузки ZIP (drag&drop)
+- Лог последних 20 обновлений (таблица)
+
+### 7.4 Добавить карточку в `admin_index.html`
+Ссылка на новую страницу `/api/admin/deploy` в сетке карточек.
+
+### 7.5 Безопасность
+- Webhook: проверка secret из `GITHUB_WEBHOOK_SECRET`
+- Lock-файл `/tmp/backend-update.lock` — предотвратить одновременные обновления
+- Валидация кода до рестарта; если fail — откат
+- Graceful shutdown через SIGINT
+
+---
+
 ## Приоритет выполнения
 
 | Приоритет | Фаза | Задача | Время |
@@ -171,3 +211,7 @@ services/audio/
 | P3 | 4.2 | Объединить сервисы | ~2 часа |
 | P3 | 5 | Инфраструктура | ~1 час |
 | P4 | 6 | ML + безопасность | ~3 часа |
+| P1 | 7.1 | `services/updater.py` | ~1 час |
+| P1 | 7.2 | `routers/deploy.py` | ~1 час |
+| P1 | 7.3 | `templates/admin_deploy.html` | ~1 час |
+| P1 | 7.4 | Карточка в admin_index.html | ~15 мин |
