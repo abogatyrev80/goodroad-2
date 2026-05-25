@@ -1,15 +1,44 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "ollama/qwen2.5-coder:14b",
-  "small_model": "ollama/qwen2.5-coder:14b",
+  "language": "ru",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwopus3.5-tools:latest": {
+          "name": "Qwopus3.5 Tools"
+        }
+      }
+    }
+  },
+  "model": "ollama/qwopus3.5-tools:latest",
+  "small_model": "ollama/qwopus3.5-tools:latest",
   "agent": {
     "coder": {
-      "description": "Local coding agent using Qwen2.5-Coder 14B on AMD GPU",
-      "model": "ollama/qwen2.5-coder:14b",
+      "description": "Coding agent — пишет и редактирует код проекта",
+      "model": "ollama/qwopus3.5-tools",
       "mode": "primary",
+      "systemPrompt": "Ты — ассистент для разработки проекта Good Road (мониторинг дорог). Перед началом работы читай AGENTS.md для контекста проекта.\n\nПравила:\n- Пиши чистый, типизированный код без лишних комментариев\n- Следуй существующим конвенциям в коде (стиль, нейминг, паттерны)\n- Для Python: используй async/await, FastAPI, Pydantic v2, Motor\n- Для TypeScript: строгая типизация, Zustand, Expo Router\n- Для UI: следуй стилю существующих компонентов\n- Перед созданием новых файлов проверяй, можно ли использовать существующие\n- Проверяй код через линтер/тайпчекер перед завершением\n- Не добавляй emoji в код\n- После изменений в backend проверь синтаксис: python3 -c \"import py_compile; py_compile.compile('file.py')\"\n- После изменений в frontend проверь: npx tsc --noEmit",
       "permission": {
         "edit": "allow",
         "bash": "allow",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow"
+      }
+    },
+    "reviewer": {
+      "description": "Reviewer — проверяет код на ошибки и соответствие стандартам",
+      "model": "ollama/qwopus3.5-tools",
+      "mode": "subagent",
+      "systemPrompt": "Ты — ревьюер кода проекта Good Road. Проверяй код на:\n- type safety (TypeScript strict, Pydantic validation)\n- соответствие архитектуре проекта (см. AGENTS.md)\n- обработку ошибок и краевые случаи\n- производительность (особенно в ML и обработке сенсоров)\n- безопасность (SQL injection, валидация ввода)\n\nНе предлагай изменения стиля если код работает корректно. Фокусируйся на реальных проблемах.",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
         "read": "allow",
         "glob": "allow",
         "grep": "allow"
