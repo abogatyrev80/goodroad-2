@@ -3,11 +3,14 @@
 Объединяет близкие события от разных устройств в один кластер
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import math
 import uuid
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 
 
 class ObstacleClusterer:
@@ -185,7 +188,7 @@ class ObstacleClusterer:
         }
         
         await self.db.obstacle_clusters.insert_one(cluster)
-        print(f"✅ Создан новый кластер {cluster_id}: {event['eventType']} at ({event['latitude']:.5f}, {event['longitude']:.5f})")
+        logger.info("Создан новый кластер %s: %s at (%.5f, %.5f)", cluster_id, event['eventType'], event['latitude'], event['longitude'])
         
         return cluster_id
     
@@ -214,7 +217,7 @@ class ObstacleClusterer:
         if is_new_device:
             devices.append(device_id)
         
-        # ✅ ИСПРАВЛЕНО: Обновляем счетчик отчетов только при НОВОМ устройстве
+        # ИСПРАВЛЕНО: Обновляем счетчик отчетов только при НОВОМ устройстве
         new_report_count = len(devices)  # reportCount = количество уникальных устройств!
         
         # Обновляем severity
@@ -266,7 +269,7 @@ class ObstacleClusterer:
             }
         )
         
-        print(f"✅ Обновлен кластер {cluster_id}: reportCount={new_report_count}, confidence={self._calculate_confidence(new_report_count):.2f}")
+        logger.info("Обновлен кластер %s: reportCount=%d, confidence=%.2f", cluster_id, new_report_count, self._calculate_confidence(new_report_count))
         
         return cluster_id
     
@@ -327,6 +330,6 @@ class ObstacleClusterer:
         )
         
         if result.modified_count > 0:
-            print(f"⏰ Помечено {result.modified_count} кластеров как expired")
+            logger.info("Помечено %d кластеров как expired", result.modified_count)
         
         return result.modified_count

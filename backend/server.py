@@ -86,7 +86,7 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             await client.admin.command('ping')
             
             mongodb_connected = True
-            logger.info(f"✅ Successfully connected to MongoDB database: {db_name}")
+            logger.info("Successfully connected to MongoDB database: %s", db_name)
 
             from ml_stats import init_ml_stats_tracker
 
@@ -96,35 +96,35 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
                 await db.ml_inference_logs.create_index([("timestamp", -1)])
             except Exception:
                 pass
-            logger.info("✅ ML stats tracker initialized")
+            logger.info("ML stats tracker initialized")
             
-            # 🆕 Инициализация кластеризатора
+            # Инициализация кластеризатора
             global obstacle_clusterer
             obstacle_clusterer = ObstacleClusterer(db)
-            logger.info("✅ Obstacle clusterer initialized")
+            logger.info("Obstacle clusterer initialized")
             
-            # 🆕 Создание индексов для obstacle_clusters
+            # Создание индексов для obstacle_clusters
             try:
                 await db.obstacle_clusters.create_index([("status", 1)])
                 await db.obstacle_clusters.create_index([("expiresAt", 1)])
                 # Простые индексы для lat/lng (не гео-пространственные)
                 await db.obstacle_clusters.create_index([("location.latitude", 1)])
                 await db.obstacle_clusters.create_index([("location.longitude", 1)])
-                logger.info("✅ Created indexes for obstacle_clusters collection")
+                logger.info("Created indexes for obstacle_clusters collection")
             except Exception as e:
-                logger.warning(f"⚠️ Could not create indexes (may already exist): {e}")
+                logger.warning("Could not create indexes (may already exist): %s", e)
             
             return
             
         except Exception as e:
-            logger.error(f"❌ MongoDB connection attempt {attempt}/{max_retries} failed: {str(e)}")
+            logger.error("MongoDB connection attempt %d/%d failed: %s", attempt, max_retries, e)
             logger.error(f"Error type: {type(e).__name__}")
             
             if attempt < max_retries:
-                logger.info(f"⏳ Retrying in {retry_delay} seconds...")
+                logger.info("Retrying in %d seconds...", retry_delay)
                 await asyncio.sleep(retry_delay)
             else:
-                logger.critical(f"❌ Failed to connect to MongoDB after {max_retries} attempts")
+                logger.critical("Failed to connect to MongoDB after %d attempts", max_retries)
                 # Don't raise HTTPException in startup - just raise regular Exception
                 raise Exception(f"MongoDB connection failed after {max_retries} attempts: {str(e)}")
 
@@ -138,7 +138,7 @@ async def close_mongodb_connection():
         logger.info("Closing MongoDB connection...")
         client.close()
         mongodb_connected = False
-        logger.info("✅ MongoDB connection closed")
+        logger.info("MongoDB connection closed")
 
 # Create the main app without a prefix
 app = FastAPI(
@@ -153,19 +153,19 @@ async def startup_event():
     Initialize services on startup
     Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
-    logger.info("🚀 Starting Good Road API...")
+    logger.info("Starting Good Road API...")
     try:
         await connect_to_mongodb()
         model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
         if os.path.exists(model_path):
             info = event_classifier.neural_classifier.reload(model_path)
-            logger.info(f"🧠 Neural model loaded: available={info.get('available')}")
+            logger.info("Neural model loaded: available=%s", info.get('available'))
         else:
-            logger.warning(f"🧠 Neural model not found at {model_path}")
-        logger.info("✅ All services initialized successfully")
+            logger.warning("Neural model not found at %s", model_path)
+        logger.info("All services initialized successfully")
     except Exception as e:
-        logger.error(f"⚠️ Failed to connect to MongoDB during startup: {str(e)}")
-        logger.warning("⚠️ API will start in degraded mode. Health checks will fail until database is available.")
+        logger.error("Failed to connect to MongoDB during startup: %s", e)
+        logger.warning("API will start in degraded mode. Health checks will fail until database is available.")
         # Don't raise - let the app start and retry connections via readiness probe
         global mongodb_connected
         mongodb_connected = False
@@ -177,7 +177,7 @@ async def shutdown_event():
     """
     logger.info("🛑 Shutting down Good Road API...")
     await close_mongodb_connection()
-    logger.info("✅ Shutdown complete")
+    logger.info("Shutdown complete")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -230,7 +230,7 @@ class RawSensorData(BaseModel):
     deviceId: str
     timestamp: int  # Unix timestamp в миллисекундах
     gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
-    # 🆕 Поддержка двух форматов для обратной совместимости:
+    # Поддержка двух форматов для обратной совместимости:
     # - Новый: массив высокочастотных данных [{x, y, z, timestamp}, ...]
     # - Старый: один объект {x, y, z}
     accelerometer: Union[List[AccelerometerReading], Dict[str, float]]
@@ -272,6 +272,36 @@ class UserWarning(BaseModel):
     expiresAt: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+
+# Admin Limits Configuration
+class LimitsConfig(BaseModel):
+    clusters_default_limit: int = 1000
+    clusters_max_limit: int = 50000
+    sensor_data_default_limit: int = 1000
+    sensor_data_max_limit: int = 100000
+    clusters_active_limit: int = 1000
+    csv_export_default_limit: int = 10000
+    csv_export_max_limit: int = 100000
+
+DEFAULT_LIMITS = LimitsConfig()
+
+async def get_limits_from_db() -> LimitsConfig:
+    try:
+        doc = await db.admin_limits.find_one({"_id": "limits_config"})
+        if doc:
+            doc.pop("_id", None)
+            return LimitsConfig(**doc)
+    except Exception:
+        pass
+    return DEFAULT_LIMITS
+
+async def save_limits_to_db(limits: LimitsConfig) -> LimitsConfig:
+    await db.admin_limits.update_one(
+        {"_id": "limits_config"},
+        {"$set": limits.model_dump()},
+        upsert=True
+    )
+    return limits
 
 # Rate limiting for data ingestion endpoints
 rate_limit_store: Dict[str, List[float]] = {}
@@ -469,15 +499,13 @@ async def upload_sensor_data(batch: SensorDataBatch):
             "locationPoints": len(location_data),
             "accelerometerPoints": len(accel_data),
             "eventPoints": len(event_data),  # NEW: count of events
-            "rawData": [point.dict() for point in batch.sensorData]
+            "rawData": [point.model_dump() for point in batch.sensorData]
         }
         
         await db.sensor_data.insert_one(sensor_doc)
         
-        print(f"📥 Received batch from {batch.deviceId}:")
-        print(f"   Location points: {len(location_data)}")
-        print(f"   Accelerometer points: {len(accel_data)}")
-        print(f"   Event points: {len(event_data)}")  # NEW: log events
+        logger.info("Received batch from %s: location=%d accel=%d events=%d",
+                     batch.deviceId, len(location_data), len(accel_data), len(event_data))
         
         # Process data for road condition analysis
         processed_conditions = []
@@ -502,7 +530,7 @@ async def upload_sensor_data(batch: SensorDataBatch):
                 
                 if len(nearby_accel) >= 5:  # Need minimum data points
                     # Convert SensorDataPoint objects to dictionaries for analysis
-                    accel_dicts = [point.dict() for point in nearby_accel]
+                    accel_dicts = [point.model_dump() for point in nearby_accel]
                     analysis = analyze_accelerometer_data(accel_dicts)
                     
                     # Create road condition record
@@ -533,20 +561,19 @@ async def upload_sensor_data(batch: SensorDataBatch):
         
         # ✨ NEW: Process EventDetector events (modern event-driven approach)
         if event_data:
-            print(f"🎯 Processing {len(event_data)} EventDetector events...")
+            logger.info("Processing %d EventDetector events...", len(event_data))
             for event_point in event_data:
                 event_info = event_point.data
                 
-                # Логирование для отладки
-                print(f"   📍 Debug - event_info structure: {list(event_info.keys())}")
-                print(f"   📍 Debug - location field: {event_info.get('location')}")
+                logger.debug("event_info keys: %s, location: %s",
+                             list(event_info.keys()), event_info.get('location'))
                 
                 # Extract location from event
                 location = event_info.get("location", {})
                 lat = location.get("latitude")
                 lon = location.get("longitude")
                 
-                print(f"   📍 Debug - extracted lat: {lat}, lon: {lon}")
+                logger.debug("extracted lat=%s, lon=%s", lat, lon)
                 
                 if lat and lon:
                     # Map event severity (1-5) to condition score (0-100)
@@ -614,7 +641,7 @@ async def upload_sensor_data(batch: SensorDataBatch):
                                 }
                             }
                         )
-                        print(f"   ✅ Обновлено препятствие: {event_type} (подтверждений: {confirmations})")
+                        logger.info("Обновлено препятствие: %s (подтверждений: %d)", event_type, confirmations)
                     else:
                         # Создать новое препятствие
                         condition = {
@@ -668,16 +695,16 @@ async def upload_sensor_data(batch: SensorDataBatch):
                             "created_at": datetime.utcnow()
                         }
                         processed_warnings.append(warning_doc)
-                        print(f"   ⚠️  Warning generated: {event_type} at ({lat:.6f}, {lon:.6f})")
+                        logger.warning("Warning generated: %s at (%.6f, %.6f)", event_type, lat, lon)
         
         # Store processed data
         if processed_conditions:
             await db.road_conditions.insert_many(processed_conditions, ordered=False)
-            print(f"✅ Stored {len(processed_conditions)} road conditions")
+            logger.info("Stored %d road conditions", len(processed_conditions))
         
         if processed_warnings:
             await db.road_warnings.insert_many(processed_warnings, ordered=False)
-            print(f"✅ Stored {len(processed_warnings)} warnings")
+            logger.info("Stored %d warnings", len(processed_warnings))
         
         return {
             "message": "Sensor data processed successfully",
@@ -718,7 +745,7 @@ async def cleanup_expired_obstacles():
                 }
             )
             
-            print(f"🕒 Помечено {result.modified_count} препятствий как устаревшие")
+            logger.info("Помечено %d препятствий как устаревшие", result.modified_count)
             
             return {
                 "message": "Cleanup completed",
@@ -800,7 +827,7 @@ if not os.environ.get("NEURAL_MODEL_PATH") and _default_model_path.exists():
 event_classifier = EventClassifier()
 warning_generator = WarningGenerator()
 
-# 🆕 Инициализация кластеризатора (будет инициализирован после подключения к БД)
+# Инициализация кластеризатора (будет инициализирован после подключения к БД)
 obstacle_clusterer = None
 
 @api_router.post("/raw-data")
@@ -816,7 +843,7 @@ async def process_raw_data(batch: RawDataBatch):
         device_id = batch.deviceId
         raw_count = len(batch.data)
         
-        print(f"📥 Получен батч сырых данных от {device_id}: {raw_count} точек")
+        logger.info("Получен батч сырых данных от %s: %d точек", device_id, raw_count)
         
         # Сохраняем сырые данные для истории и ML обучения
         raw_documents = []
@@ -832,10 +859,10 @@ async def process_raw_data(batch: RawDataBatch):
             # Пропускаем точки с невалидными координатами
             lat, lng = gps.get("latitude"), gps.get("longitude")
             if not validate_gps_coords(lat, lng):
-                print(f"   ⏭️ Пропуск точки с невалидными координатами: lat={lat}, lng={lng}")
+                logger.warning("Пропуск точки с невалидными координатами: lat=%s, lng=%s", lat, lng)
                 continue
             
-            # 🆕 Обратная совместимость: поддержка обоих форматов
+            # Обратная совместимость: поддержка обоих форматов
             if isinstance(accel_raw, list):
                 # Новый формат: массив значений
                 accel_array = accel_raw
@@ -844,7 +871,7 @@ async def process_raw_data(batch: RawDataBatch):
                     "y": sum(a.y for a in accel_array) / len(accel_array) if accel_array else 0,
                     "z": sum(a.z for a in accel_array) / len(accel_array) if accel_array else 0,
                 }
-                print(f"   📊 Получен массив: {len(accel_array)} значений акселерометра")
+                logger.info("Получен массив: %d значений акселерометра", len(accel_array))
             else:
                 # Старый формат: один объект {x, y, z}
                 accel_array = []
@@ -853,7 +880,7 @@ async def process_raw_data(batch: RawDataBatch):
                     "y": accel_raw.get("y", 0),
                     "z": accel_raw.get("z", 0),
                 }
-                print("   📊 Получен старый формат: одно значение акселерометра")
+                logger.info("Получен старый формат: одно значение акселерометра")
             
             # Сохраняем сырые данные (summary для backward compatibility)
             raw_doc = {
@@ -867,7 +894,7 @@ async def process_raw_data(batch: RawDataBatch):
                 "accelerometer_x": accel_summary["x"],
                 "accelerometer_y": accel_summary["y"],
                 "accelerometer_z": accel_summary["z"],
-                "accelerometer_count": len(accel_array),  # 🆕 Сколько значений в массиве
+                "accelerometer_count": len(accel_array),  # Сколько значений в массиве
                 "created_at": datetime.utcnow()
             }
             raw_documents.append(raw_doc)
@@ -895,9 +922,9 @@ async def process_raw_data(batch: RawDataBatch):
                         'variance': 0,
                     }
                 }
-                print(f"   🚨 Пользовательский отчет: {manual_event_type} от {device_id}")
+                logger.info("Пользовательский отчет: %s от %s", manual_event_type, device_id)
             else:
-                # 🆕 Классифицируем событие через ML процессор с массивом данных
+                # Классифицируем событие через ML процессор с массивом данных
                 if accel_array and len(accel_array) > 0:
                     # Конвертируем AccelerometerReading объекты в dict для ML процессора
                     accel_dict_array = [
@@ -927,7 +954,7 @@ async def process_raw_data(batch: RawDataBatch):
                     }
             
             if event and event.get('eventType'):
-                # 🆕 КЛАСТЕРИЗАЦИЯ: Находим или создаём кластер для события
+                # КЛАСТЕРИЗАЦИЯ: Находим или создаём кластер для события
                 cluster_id = None
                 if obstacle_clusterer:
                     try:
@@ -941,9 +968,9 @@ async def process_raw_data(batch: RawDataBatch):
                             },
                             device_id=device_id
                         )
-                        print(f"✅ Кластеризация: событие {event.get('eventType')} → cluster {cluster_id}")
+                        logger.info("Кластеризация: событие %s → cluster %s", event.get('eventType'), cluster_id)
                     except Exception as e:
-                        print(f"⚠️ Ошибка кластеризации: {e}")
+                        logger.error("Ошибка кластеризации: %s", e)
                         import traceback
                         traceback.print_exc()
                 
@@ -967,11 +994,11 @@ async def process_raw_data(batch: RawDataBatch):
                     "accelerometer_deltaZ": event['accelerometer']['deltaZ'],
                     "accelerometer_variance": event['accelerometer']['variance'],
                     "roadType": event['roadType'],
-                    "clusterId": cluster_id,  # 🆕 Добавляем ID кластера
+                    "clusterId": cluster_id,  # Добавляем ID кластера
                     "created_at": datetime.utcnow()
                 }
                 
-                # 🆕 Копируем дополнительные поля из анализа паттернов
+                # Копируем дополнительные поля из анализа паттернов
                 if 'impact_intensity' in event:
                     processed_event['impact_intensity'] = event['impact_intensity']
                 if 'wave_amplitude' in event:
@@ -1035,20 +1062,22 @@ async def process_raw_data(batch: RawDataBatch):
                         "created_at": datetime.utcnow()
                     }
                     user_warnings.append(warning_doc)
-                    print(f"   ⚠️  Предупреждение: {warning_message}")
+                    logger.warning("Предупреждение: %s", warning_message)
         
         # Сохраняем в базу данных
         if raw_documents:
             await db.raw_sensor_data.insert_many(raw_documents, ordered=False)
-            print(f"✅ Сохранено {len(raw_documents)} сырых записей")
+            logger.info("Сохранено %d сырых записей", len(raw_documents))
         
         if processed_events:
-            await db.processed_events.insert_many(processed_events, ordered=False)
-            print(f"✅ Классифицировано {len(processed_events)} событий")
+            events_collection = db.processed_events
+            await events_collection.insert_many(processed_events, ordered=False)
+            logger.info("Классифицировано %d событий", len(processed_events))
         
         if user_warnings:
-            await db.user_warnings.insert_many(user_warnings, ordered=False)
-            print(f"✅ Создано {len(user_warnings)} предупреждений")
+            warnings_collection = db.road_warnings
+            await warnings_collection.insert_many(user_warnings, ordered=False)
+            logger.info("Создано %d предупреждений", len(user_warnings))
         
         return {
             "message": "Raw data processed successfully",
@@ -1218,62 +1247,39 @@ async def get_processed_events(
 
 @api_router.get("/admin/v2/clusters")
 async def get_obstacle_clusters(
-    limit: int = Query(1000, ge=1, le=50000, description="Максимальное количество кластеров (1-50000)"),
+    limit: Optional[int] = Query(None, ge=1, le=100000, description="Максимальное количество кластеров"),
     status: str = "active",
-    min_reports: int = 0  # 🆕 Минимум отчётов для фильтрации
+    min_reports: int = 0
 ):
-    """
-    🆕 Получить кластеры препятствий
-    
-    Args:
-        limit: Максимальное количество кластеров (по умолчанию 1000, макс 50000)
-        status: Статус кластера (active, expired, fixed)
-        min_reports: Минимальное количество отчётов (0 = все, 3 = подтверждённые)
-    
-    Returns:
-        Список кластеров с агрегированной информацией
-    """
+    limits = await get_limits_from_db()
+    limit = limit or limits.clusters_default_limit
+    limit = min(limit, limits.clusters_max_limit)
     try:
         if not obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        
-        # Автоматически помечаем устаревшие кластеры
         await obstacle_clusterer.expire_old_clusters()
-        
-        # Получаем активные кластеры
         query = {"status": status}
         if status == "active":
             query["expiresAt"] = {"$gt": datetime.utcnow()}
-        
-        # 🆕 Фильтр по минимальному количеству отчётов
         if min_reports > 0:
             query["reportCount"] = {"$gte": min_reports}
-        
         clusters = await db.obstacle_clusters.find(
             query,
-            {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1, 
-             "confidence": 1, "reportCount": 1, "devices": 1, 
-             "firstReported": 1, "lastReported": 1, "status": 1, 
+            {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1,
+             "confidence": 1, "reportCount": 1, "devices": 1,
+             "firstReported": 1, "lastReported": 1, "status": 1,
              "expiresAt": 1, "roadInfo": 1}
         ).sort("lastReported", -1).limit(limit).to_list(limit)
-        
-        # Преобразуем даты в строки для JSON
         for cluster in clusters:
             cluster['clusterId'] = cluster.pop('_id')
             cluster['firstReported'] = cluster['firstReported'].isoformat() if cluster.get('firstReported') else None
             cluster['lastReported'] = cluster['lastReported'].isoformat() if cluster.get('lastReported') else None
             cluster['expiresAt'] = cluster['expiresAt'].isoformat() if cluster.get('expiresAt') else None
-            
-            # Убираем history из severity (слишком большой для передачи)
             if 'severity' in cluster and 'history' in cluster['severity']:
                 del cluster['severity']['history']
             if 'roadInfo' in cluster and 'speeds' in cluster['roadInfo']:
                 del cluster['roadInfo']['speeds']
-        
-        return {
-            "total": len(clusters),
-            "clusters": clusters
-        }
+        return {"total": len(clusters), "clusters": clusters}
     except HTTPException:
         raise
     except Exception as e:
@@ -1290,20 +1296,20 @@ async def recalculate_all_clusters():
         if not obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
         
-        logger.info("🗑️ Удаление всех существующих кластеров...")
+        logger.info("Удаление всех существующих кластеров...")
         
         # Удаляем все кластеры
         delete_result = await db.obstacle_clusters.delete_many({})
         deleted_count = delete_result.deleted_count
         
-        logger.info(f"✅ Удалено кластеров: {deleted_count}")
+        logger.info("Удалено кластеров: %s", deleted_count)
         
         # Получаем ВСЕ события (используем cursor для больших объёмов)
-        logger.info("📊 Получение всех событий...")
+        logger.info("Получение всех событий...")
         
         # Подсчитываем сначала
         total_events = await db.processed_events.count_documents({})
-        logger.info(f"📦 Всего событий в БД: {total_events}")
+        logger.info("Всего событий в БД: %d", total_events)
         
         # Получаем все события батчами
         all_events = []
@@ -1311,7 +1317,7 @@ async def recalculate_all_clusters():
         async for event in cursor:
             all_events.append(event)
         
-        logger.info(f"📦 Получено событий для обработки: {len(all_events)}")
+        logger.info("Получено событий для обработки: %d", len(all_events))
         
         # Пересоздаём кластеры
         logger.info("🔄 Создание кластеров с новыми параметрами...")
@@ -1345,7 +1351,7 @@ async def recalculate_all_clusters():
         # Подсчитываем итоговое количество кластеров
         final_clusters = await db.obstacle_clusters.count_documents({})
         
-        logger.info(f"✅ Пересоздание завершено!")
+        logger.info("Пересоздание завершено")
         logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
         logger.info(f"  Создано кластеров: {final_clusters}")
         
@@ -1372,7 +1378,7 @@ async def cleanup_old_data(
     delete_raw_data: bool = True
 ):
     """
-    🗑️ Очистить старые данные
+    Очистить старые данные
     
     Args:
         days: Удалить данные старше N дней
@@ -1384,36 +1390,34 @@ async def cleanup_old_data(
         from datetime import datetime, timedelta
         
         cutoff_date = datetime.utcnow() - timedelta(days=days)
-        logger.info(f"🗑️ Очистка данных старше {cutoff_date.strftime('%Y-%m-%d')}")
+        cutoff_str = cutoff_date.strftime('%Y-%m-%d')
+        logger.info("Очистка данных старше %s", cutoff_str)
         
         results = {
             "cutoff_date": cutoff_date.isoformat(),
             "days": days
         }
         
-        # Удаление сырых данных
         if delete_raw_data:
             raw_result = await db.raw_sensor_data.delete_many({
                 "created_at": {"$lt": cutoff_date}
             })
             results["deleted_raw_data"] = raw_result.deleted_count
-            logger.info(f"  ✅ Удалено сырых данных: {raw_result.deleted_count}")
+            logger.info("Удалено сырых данных: %d", raw_result.deleted_count)
         
-        # Удаление событий
         if delete_events:
             events_result = await db.processed_events.delete_many({
                 "timestamp": {"$lt": cutoff_date}
             })
             results["deleted_events"] = events_result.deleted_count
-            logger.info(f"  ✅ Удалено событий: {events_result.deleted_count}")
+            logger.info("Удалено событий: %d", events_result.deleted_count)
         
-        # Удаление кластеров
         if delete_clusters:
             clusters_result = await db.obstacle_clusters.delete_many({
                 "created_at": {"$lt": cutoff_date}
             })
             results["deleted_clusters"] = clusters_result.deleted_count
-            logger.info(f"  ✅ Удалено кластеров: {clusters_result.deleted_count}")
+            logger.info("Удалено кластеров: %d", clusters_result.deleted_count)
         
         # Статистика после очистки
         remaining_raw = await db.raw_sensor_data.count_documents({})
@@ -1426,7 +1430,7 @@ async def cleanup_old_data(
             "clusters": remaining_clusters
         }
         
-        logger.info(f"✅ Очистка завершена. Осталось: raw={remaining_raw}, events={remaining_events}, clusters={remaining_clusters}")
+        logger.info("Очистка завершена. Осталось: raw=%d, events=%d, clusters=%d", remaining_raw, remaining_events, remaining_clusters)
         
         return results
         
@@ -1442,7 +1446,7 @@ async def delete_all_data(
     delete_raw_data: bool = False
 ):
     """
-    ⚠️ Удалить ВСЕ данные (требует подтверждение)
+     Удалить ВСЕ данные (требует подтверждение)
     
     Args:
         confirm: Должно быть "DELETE_ALL_DATA"
@@ -1457,24 +1461,24 @@ async def delete_all_data(
                 detail="Требуется подтверждение: confirm='DELETE_ALL_DATA'"
             )
         
-        logger.warning("⚠️ УДАЛЕНИЕ ВСЕХ ДАННЫХ!")
+        logger.warning("УДАЛЕНИЕ ВСЕХ ДАННЫХ!")
         
         results = {}
         
         if delete_raw_data:
             raw_result = await db.raw_sensor_data.delete_many({})
             results["deleted_raw_data"] = raw_result.deleted_count
-            logger.warning(f"  🗑️ Удалено всех сырых данных: {raw_result.deleted_count}")
+            logger.warning("Удалено всех сырых данных: %d", raw_result.deleted_count)
         
         if delete_events:
             events_result = await db.processed_events.delete_many({})
             results["deleted_events"] = events_result.deleted_count
-            logger.warning(f"  🗑️ Удалено всех событий: {events_result.deleted_count}")
+            logger.warning("Удалено всех событий: %d", events_result.deleted_count)
         
         if delete_clusters:
             clusters_result = await db.obstacle_clusters.delete_many({})
             results["deleted_clusters"] = clusters_result.deleted_count
-            logger.warning(f"  🗑️ Удалено всех кластеров: {clusters_result.deleted_count}")
+            logger.warning("Удалено всех кластеров: %d", clusters_result.deleted_count)
         
         return {
             "success": True,
@@ -1522,7 +1526,7 @@ async def get_nearby_obstacles(
     min_confirmations: int = 1
 ):
     """
-    🆕 Получить препятствия рядом с текущей позицией (для мобильного приложения)
+    Получить препятствия рядом с текущей позицией (для мобильного приложения)
     
     Args:
         latitude: Широта текущей позиции
@@ -1703,7 +1707,7 @@ class AdminAnalytics(BaseModel):
     date_range: str
 
 
-# 🆕 ML Configuration Models
+# ML Configuration Models
 class MLThresholdsUpdate(BaseModel):
     """Модель для обновления порогов ML классификатора"""
     pothole: Optional[Dict[str, float]] = None
@@ -1711,7 +1715,7 @@ class MLThresholdsUpdate(BaseModel):
     bump: Optional[Dict[str, float]] = None
     vibration: Optional[Dict[str, float]] = None
 
-# 🆕 API для управления порогами ML
+# API для управления порогами ML
 @api_router.get("/admin/v2/ml-thresholds")
 async def get_ml_thresholds():
     """Получить текущие пороги ML классификатора"""
@@ -1847,7 +1851,7 @@ async def ml_model_predict(body: MLPredictRequest):
     }
 
 
-# 🆕 API для редактирования событий
+# API для редактирования событий
 @api_router.put("/admin/v2/events/{event_id}")
 async def update_event(event_id: str, update_data: Dict):
     """Обновить событие по ID"""
@@ -1881,7 +1885,7 @@ async def delete_event(event_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🆕 API для очистки базы данных (работает с любой подключенной БД)
+# API для очистки базы данных (работает с любой подключенной БД)
 @api_router.delete("/admin/clear-database")
 async def clear_database(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
@@ -1963,7 +1967,7 @@ async def clear_database(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🆕 API для очистки базы данных V2 с фильтром по диапазону дат
+# API для очистки базы данных V2 с фильтром по диапазону дат
 @api_router.delete("/admin/clear-database-v2")
 async def clear_database_v2(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
@@ -2071,7 +2075,7 @@ async def clear_database_v2(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🆕 API для редактирования raw data
+# API для редактирования raw data
 @api_router.delete("/admin/v2/raw-data/{data_id}")
 async def delete_raw_data(data_id: str):
     """Удалить raw data по ID"""
@@ -2090,14 +2094,14 @@ async def delete_raw_data(data_id: str):
 
 @api_router.get("/admin/sensor-data")
 async def get_all_sensor_data(
-    limit: int = Query(1000, ge=1, le=100000, description="Максимальное количество записей (1-100000)"),
+    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей"),
     skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
 ):
-    """
-    Get all sensor data for administrative analysis
-    """
+    limits = await get_limits_from_db()
+    limit = limit or limits.sensor_data_default_limit
+    limit = min(limit, limits.sensor_data_max_limit)
     try:
         # Build query filters
         query = {}
@@ -2804,7 +2808,7 @@ async def count_data_by_filters(filters: BulkDeleteFilters):
         
         return {
             "count": count,
-            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None},
+            "filters_applied": {k: v for k, v in filters.model_dump().items() if v is not None},
             "sample_records": sample_data
         }
         
@@ -2851,7 +2855,7 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
             "deleted_count": result.deleted_count,
             "matched_count": count_before,
             "remaining_records": remaining_count,
-            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None}
+            "filters_applied": {k: v for k, v in filters.model_dump().items() if v is not None}
         }
         
     except Exception as e:
@@ -2862,11 +2866,11 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
 async def export_sensor_data_csv(
     date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    limit: int = Query(10000, ge=1, le=100000, description="Максимальное количество записей для экспорта (1-100000)")
+    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта")
 ):
-    """
-    Export sensor data as CSV file
-    """
+    limits = await get_limits_from_db()
+    limit = limit or limits.csv_export_default_limit
+    limit = min(limit, limits.csv_export_max_limit)
     try:
         # Build query
         query = {}
@@ -3256,6 +3260,24 @@ async def bulk_delete_clusters(ids_data: dict):
         logger.error(f"Error bulk deleting clusters: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error bulk deleting clusters: {str(e)}")
 
+
+@app.get("/admin/settings/limits", response_class=HTMLResponse)
+async def admin_limits_page_direct(request: Request):
+    return templates.TemplateResponse("admin_limits.html", {"request": request})
+
+@api_router.get("/admin/settings/limits", response_class=HTMLResponse)
+async def admin_limits_page(request: Request):
+    return templates.TemplateResponse("admin_limits.html", {"request": request})
+
+@api_router.get("/admin/settings/limits/api")
+async def get_limits_api():
+    limits = await get_limits_from_db()
+    return limits.model_dump()
+
+@api_router.post("/admin/settings/limits/api")
+async def save_limits_api(limits: LimitsConfig):
+    saved = await save_limits_to_db(limits)
+    return {"status": "ok", "limits": saved.model_dump()}
 
 @api_router.get("/admin/settings/v2", response_class=HTMLResponse)
 async def admin_settings_v2_api(request: Request):

@@ -1,7 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "language": "ru",
   "provider": {
+    "opencode": {
+      "name": "OpenCode Cloud"
+    },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (local)",
@@ -15,12 +17,12 @@
       }
     }
   },
-  "model": "ollama/qwopus3.5-tools:latest",
+  "model": "opencode/big-pickle",
   "small_model": "ollama/qwopus3.5-tools:latest",
   "agent": {
     "coder": {
       "description": "Coding agent — пишет и редактирует код проекта",
-      "model": "ollama/qwopus3.5-tools",
+      "model": "opencode/big-pickle",
       "mode": "primary",
       "systemPrompt": "Ты — ассистент для разработки проекта Good Road (мониторинг дорог). Перед началом работы читай AGENTS.md для контекста проекта.\n\nПравила:\n- Пиши чистый, типизированный код без лишних комментариев\n- Следуй существующим конвенциям в коде (стиль, нейминг, паттерны)\n- Для Python: используй async/await, FastAPI, Pydantic v2, Motor\n- Для TypeScript: строгая типизация, Zustand, Expo Router\n- Для UI: следуй стилю существующих компонентов\n- Перед созданием новых файлов проверяй, можно ли использовать существующие\n- Проверяй код через линтер/тайпчекер перед завершением\n- Не добавляй emoji в код\n- После изменений в backend проверь синтаксис: python3 -c \"import py_compile; py_compile.compile('file.py')\"\n- После изменений в frontend проверь: npx tsc --noEmit",
       "permission": {

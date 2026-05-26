@@ -3,6 +3,7 @@ ML Processor для анализа сырых данных и классифик
 Портирует логику из EventDetector.ts на Python для серверной обработки
 """
 
+import logging
 import math
 import os
 import time
@@ -11,12 +12,14 @@ from datetime import datetime, timedelta
 
 from ml_stats import get_ml_stats_tracker
 
+logger = logging.getLogger(__name__)
+
 
 class EventClassifier:
     """Классификатор событий на основе данных акселерометра"""
     
     def __init__(self):
-        # 🆕 ОПТИМИЗИРОВАННЫЕ пороги (08.12.2025)
+        # ОПТИМИЗИРОВАННЫЕ пороги (08.12.2025)
         # Обновлено: повышены пороги для уменьшения ложных срабатываний
         # Baseline: Z=0.440±0.097 м/с², magnitude=1.049±0.044 м/с²
         self.thresholds = {
@@ -44,7 +47,7 @@ class EventClassifier:
                 'min_speed': 3.0         # 11 км/ч
             },
             
-            # ⚠️ Яма в дороге (высокая скорость + резкий удар)
+            # Яма в дороге (высокая скорость + резкий удар)
             'pothole': {
                 'deltaZ': 0.55,          # ПОВЫШЕНО ДО 0.55 (было 0.40) - СТРОЖЕ!
                 'deltaY': 0.45,          # ПОВЫШЕНО до 0.45 (было 0.35)
@@ -66,7 +69,7 @@ class EventClassifier:
                 'min_duration': 2        # минимум 2 секунды вибрации
             },
             
-            # 🎯 Уровни серьёзности (severity levels)
+            # Уровни серьёзности (severity levels)
             'severity_levels': {
                 'critical': 0.35,        # ПОВЫШЕНО: 3.5σ (ΔZ > 0.35)
                 'high': 0.30,            # ПОВЫШЕНО: 3.0σ (ΔZ > 0.30)
@@ -183,7 +186,7 @@ class EventClassifier:
             (event_type, severity, confidence)
         """
         
-        # 1. ⚠️ ЯМА (самые строгие условия - высокая скорость + резкий удар)
+        # 1.  ЯМА (самые строгие условия - высокая скорость + резкий удар)
         if (speed >= self.thresholds['pothole']['min_speed'] and
             abs(deltaZ) > self.thresholds['pothole']['deltaZ'] and 
             abs(deltaY) > self.thresholds['pothole']['deltaY'] and
@@ -249,7 +252,7 @@ class EventClassifier:
         speed: float
     ) -> Optional[Dict]:
         """
-        🆕 Анализирует массив высокочастотных данных акселерометра
+        Анализирует массив высокочастотных данных акселерометра
         
         Args:
             device_id: ID устройства
@@ -270,7 +273,7 @@ class EventClassifier:
         # Вычисляем агрегированные показатели
         stats = self._compute_accelerometer_stats(x_values, y_values, z_values)
         
-        # 🆕 Анализируем паттерны (форма сигнала)
+        # Анализируем паттерны (форма сигнала)
         patterns = self._analyze_patterns(x_values, y_values, z_values)
         stats['patterns'] = patterns  # Добавляем результаты анализа паттернов в stats
         
@@ -403,7 +406,7 @@ class EventClassifier:
     
     def _detect_pothole_pattern(self, z_values: List[float], threshold: float = 0.04) -> Tuple[bool, float]:
         """
-        🆕 ДЕТЕКТОР ПАТТЕРНА "ЯМА" (POTHOLE)
+        ДЕТЕКТОР ПАТТЕРНА "ЯМА" (POTHOLE)
         ЯМА: машина ПАДАЕТ ВНИЗ (Z↓), потом ВЫХОДИТ ВВЕРХ (Z↑)
         Паттерн: ↓↓↓ резко вниз (падение в яму) → ↑↑↑ резко вверх (выход из ямы)
         
@@ -434,7 +437,7 @@ class EventClassifier:
     
     def _detect_speedbump_pattern(self, z_values: List[float], threshold: float = 0.04) -> Tuple[bool, float]:
         """
-        🆕 ДЕТЕКТОР ПАТТЕРНА "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" (SPEED BUMP)
+        ДЕТЕКТОР ПАТТЕРНА "ЛЕЖАЧИЙ ПОЛИЦЕЙСКИЙ" (SPEED BUMP)
         ЛЕЖАЧИЙ: машина ПОДНИМАЕТСЯ ВВЕРХ (Z↑), потом СПУСКАЕТСЯ ВНИЗ (Z↓)
         Паттерн: ↑↑↑ резко вверх (въезд на бугор) → ↓↓↓ резко вниз (съезд с бугра)
         
@@ -465,7 +468,7 @@ class EventClassifier:
     
     def _detect_wave_pattern(self, z_values: List[float], threshold: float = 0.06) -> Tuple[bool, float]:
         """
-        🆕 ДЕТЕКТОР ПАТТЕРНА "ВОЛНА"
+        ДЕТЕКТОР ПАТТЕРНА "ВОЛНА"
         Ищет плавную волну в последовательности (характерно для лежачего полицейского)
         Паттерн: ↗ плавно вверх → ↘ плавно вниз ИЛИ наоборот
         
@@ -503,7 +506,7 @@ class EventClassifier:
     
     def _detect_vibration_pattern(self, magnitude_values: List[float]) -> Tuple[bool, float]:
         """
-        🆕 ДЕТЕКТОР ПАТТЕРНА "ВИБРАЦИЯ"
+        ДЕТЕКТОР ПАТТЕРНА "ВИБРАЦИЯ"
         Ищет постоянные высокочастотные колебания (плохое покрытие)
         
         Args:
@@ -533,7 +536,7 @@ class EventClassifier:
     
     def _analyze_patterns(self, x_values: List[float], y_values: List[float], z_values: List[float]) -> Dict:
         """
-        🆕 АНАЛИЗ ВСЕХ ПАТТЕРНОВ
+        АНАЛИЗ ВСЕХ ПАТТЕРНОВ
         Анализирует форму сигнала для определения типа события
         
         Returns:
@@ -576,7 +579,7 @@ class EventClassifier:
     
     def _classify_from_stats(self, stats: Dict, speed: float) -> Optional[Dict]:
         """
-        🆕 УЛУЧШЕННАЯ классификация на основе статистики + анализа паттернов
+        УЛУЧШЕННАЯ классификация на основе статистики + анализа паттернов
         Использует форму сигнала для более точного определения типа события
         """
         
@@ -585,12 +588,12 @@ class EventClassifier:
         # Вычисляем отклонение Z от базового уровня
         delta_z = abs(stats['max_z'] - baseline_z)
         
-        # 🆕 ПРИОРИТЕТ 1: АНАЛИЗ ПАТТЕРНОВ (новая логика)
+        # ПРИОРИТЕТ 1: АНАЛИЗ ПАТТЕРНОВ (новая логика)
         # Паттерны дают более точную классификацию и работают при низкой скорости
         patterns = stats.get('patterns', {})
         
         if patterns:
-            # 🆕 УЛУЧШЕННАЯ ЛОГИКА: оба паттерна могут быть обнаружены одновременно
+            # УЛУЧШЕННАЯ ЛОГИКА: оба паттерна могут быть обнаружены одновременно
             # Выбираем тот, у которого интенсивность выше
             pothole_pattern = patterns.get('pothole', {})
             speedbump_pattern = patterns.get('speedbump', {})
@@ -645,7 +648,7 @@ class EventClassifier:
                     'note': f'Speed bump pattern (↑↓): подъем {intensity:.2f}'
                 }
             
-            # 🔥 ЯМА обнаружена
+            # ЯМА обнаружена
             elif detected_type == 'pothole':
                 # Определяем severity по интенсивности ямы
                 if intensity > 0.35:
@@ -732,7 +735,7 @@ class EventClassifier:
                 'note': 'Speed bump detected: moderate speed + vertical impact'
             }
         
-        # ⚠️ ЯМА: высокая скорость (>45 км/ч) + вертикальное отклонение
+        # ЯМА: высокая скорость (>45 км/ч) + вертикальное отклонение
         pothole_threshold = self.thresholds['pothole']
         if (delta_z >= pothole_threshold['deltaZ'] and 
             speed >= pothole_threshold['min_speed'] and
@@ -796,7 +799,7 @@ class EventClassifier:
     
     def _calculate_severity_from_delta_z(self, delta_z: float, min_val: float = None, max_val: float = None) -> int:
         """
-        🆕 Вычисляет severity (1-5) на основе отклонения Z от baseline
+        Вычисляет severity (1-5) на основе отклонения Z от baseline
         Использует фиксированные пороги из анализа реальных данных
         
         1 = Critical (ΔZ > 0.291 м/с² = 3.0σ)
@@ -827,7 +830,7 @@ class EventClassifier:
         for event_type, thresholds in new_thresholds.items():
             if event_type in self.thresholds:
                 self.thresholds[event_type].update(thresholds)
-        print(f"✅ Пороги обновлены: {self.thresholds}")
+        logger.info("Пороги обновлены: %s", self.thresholds)
 
 class NeuralEventClassifier:
     """

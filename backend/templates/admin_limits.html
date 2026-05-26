@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road Admin - Лимиты данных</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a; color: #e2e8f0; padding: 2rem;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: #1e293b; padding: 2rem; border-radius: 12px;
+            margin-bottom: 2rem; border: 1px solid #334155;
+        }
+        .header h1 { font-size: 2rem; color: #60a5fa; margin-bottom: 0.5rem; }
+        .header p { color: #94a3b8; }
+        .section {
+            background: #1e293b; padding: 2rem; border-radius: 12px;
+            margin-bottom: 2rem; border: 1px solid #334155;
+        }
+        .section h2 { font-size: 1.5rem; color: #60a5fa; margin-bottom: 1.5rem; }
+        .limit-grid { display: grid; gap: 1.5rem; }
+        .limit-card {
+            background: #0f172a; padding: 1.5rem; border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        .limit-card h3 { color: #60a5fa; margin-bottom: 1rem; font-size: 1.1rem; }
+        .param-group { margin-bottom: 1rem; }
+        .param-group label {
+            display: block; color: #94a3b8; margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .param-group input {
+            width: 100%; padding: 0.75rem; background: #1e293b;
+            border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 1rem;
+        }
+        .param-group input:focus { outline: none; border-color: #60a5fa; }
+        .param-group .hint {
+            font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;
+        }
+        .button-group { display: flex; gap: 1rem; margin-top: 2rem; }
+        .btn {
+            padding: 0.75rem 1.5rem; border: none; border-radius: 6px;
+            font-size: 1rem; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-secondary:hover { background: #475569; }
+        .message {
+            padding: 1rem; border-radius: 6px; margin-top: 1rem; display: none;
+        }
+        .message.success { background: #10b981; color: white; display: block; }
+        .message.error { background: #ef4444; color: white; display: block; }
+        .back-link {
+            display: inline-block; color: #60a5fa; text-decoration: none;
+            margin-bottom: 2rem; font-size: 1rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .description {
+            background: #0f172a; padding: 1rem; border-radius: 6px;
+            border-left: 4px solid #60a5fa; margin-bottom: 1.5rem;
+        }
+        .description p { color: #cbd5e1; line-height: 1.6; margin-bottom: 0.5rem; }
+        .description code {
+            background: #1e293b; padding: 0.2rem 0.4rem;
+            border-radius: 3px; color: #60a5fa;
+        }
+        .badge {
+            display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
+            font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem;
+        }
+        .badge-default { background: #334155; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin" class="back-link">← Вернуться в админ-панель</a>
+        <div class="header">
+            <h1>📊 Настройка лимитов данных</h1>
+            <p>Управление максимальным количеством записей в разделах админ-панели</p>
+        </div>
+        <div class="section">
+            <div class="description">
+                <p><strong>Как это работает:</strong></p>
+                <p>• Лимиты определяют сколько записей отображается в каждом разделе</p>
+                <p>• <strong>По умолчанию</strong> показывается значение по умолчанию</p>
+                <p>• <strong>Максимум</strong> — максимальное значение, которое можно запросить через API</p>
+                <p>• Изменения вступают в силу сразу после сохранения</p>
+            </div>
+            <div class="limit-grid">
+                <div class="limit-card">
+                    <h3>📋 Кластеры препятствий</h3>
+                    <div class="param-group">
+                        <label>Лимит по умолчанию:</label>
+                        <input type="number" min="1" max="100000" id="clusters-default">
+                        <div class="hint">Сколько кластеров показывать по умолчанию</div>
+                    </div>
+                    <div class="param-group">
+                        <label>Максимальный лимит:</label>
+                        <input type="number" min="1" max="100000" id="clusters-max">
+                        <div class="hint">Максимальное значение, которое можно задать</div>
+                    </div>
+                </div>
+                <div class="limit-card">
+                    <h3>📈 Данные сенсоров</h3>
+                    <div class="param-group">
+                        <label>Лимит по умолчанию:</label>
+                        <input type="number" min="1" max="200000" id="sensor-default">
+                        <div class="hint">Сколько записей показывать по умолчанию</div>
+                    </div>
+                    <div class="param-group">
+                        <label>Максимальный лимит:</label>
+                        <input type="number" min="1" max="200000" id="sensor-max">
+                        <div class="hint">Максимальное значение, которое можно задать</div>
+                    </div>
+                </div>
+                <div class="limit-card">
+                    <h3>📤 CSV Экспорт</h3>
+                    <div class="param-group">
+                        <label>Лимит по умолчанию:</label>
+                        <input type="number" min="1" max="200000" id="csv-default">
+                        <div class="hint">Сколько записей экспортировать по умолчанию</div>
+                    </div>
+                    <div class="param-group">
+                        <label>Максимальный лимит:</label>
+                        <input type="number" min="1" max="200000" id="csv-max">
+                        <div class="hint">Максимальное значение для экспорта</div>
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="saveLimits()">💾 Сохранить</button>
+                <button class="btn btn-secondary" onclick="loadLimits()">🔄 Сбросить</button>
+            </div>
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+    <script>
+        async function loadLimits() {
+            try {
+                const resp = await fetch('/api/admin/settings/limits/api');
+                const data = await resp.json();
+                document.getElementById('clusters-default').value = data.clusters_default_limit;
+                document.getElementById('clusters-max').value = data.clusters_max_limit;
+                document.getElementById('sensor-default').value = data.sensor_data_default_limit;
+                document.getElementById('sensor-max').value = data.sensor_data_max_limit;
+                document.getElementById('csv-default').value = data.csv_export_default_limit;
+                document.getElementById('csv-max').value = data.csv_export_max_limit;
+                showMessage('✅ Лимиты загружены', 'success');
+            } catch (e) {
+                showMessage('❌ Ошибка загрузки: ' + e.message, 'error');
+            }
+        }
+        async function saveLimits() {
+            try {
+                const body = {
+                    clusters_default_limit: parseInt(document.getElementById('clusters-default').value),
+                    clusters_max_limit: parseInt(document.getElementById('clusters-max').value),
+                    sensor_data_default_limit: parseInt(document.getElementById('sensor-default').value),
+                    sensor_data_max_limit: parseInt(document.getElementById('sensor-max').value),
+                    csv_export_default_limit: parseInt(document.getElementById('csv-default').value),
+                    csv_export_max_limit: parseInt(document.getElementById('csv-max').value)
+                };
+                const resp = await fetch('/api/admin/settings/limits/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    showMessage('✅ Лимиты сохранены!', 'success');
+                } else {
+                    showMessage('❌ Ошибка: ' + (data.detail || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showMessage('❌ Ошибка сохранения: ' + e.message, 'error');
+            }
+        }
+        function showMessage(text, type) {
+            const el = document.getElementById('message');
+            el.textContent = text;
+            el.className = 'message ' + type;
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+        loadLimits();
+    </script>
+</body>
+</html>

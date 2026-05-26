@@ -112,7 +112,7 @@ SEVERITY_METRICS: List[SeverityMetrics] = [
 async def get_severity_metrics():
     """Получить детальные критерии severity для понимания масштаба"""
     return {
-        "metrics": [m.dict() for m in SEVERITY_METRICS],
+        "metrics": [m.model_dump() for m in SEVERITY_METRICS],
         "explanation": {
             "ru": "Severity (тяжесть) определяется на основе анализа данных акселерометра. "
                   "Чем больше вертикальное ускорение (deltaZ) и общая magnitude, тем выше опасность.",
@@ -181,7 +181,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Cluster not found")
         
-        logger.info(f"✏️ Cluster {cluster_id} updated manually: {list(update_data.keys())}")
+        logger.info("Cluster %s updated manually: %s", cluster_id, list(update_data.keys()))
         
         return {"success": True, "updated_fields": list(update_data.keys())}
     
@@ -203,7 +203,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             {"$unset": {"clusterId": ""}}
         )
         
-        logger.info(f"🗑️ Cluster {cluster_id} deleted. Reason: {reason or 'Not specified'}")
+        logger.info("Cluster %s deleted. Reason: %s", cluster_id, reason or 'Not specified')
         
         return {"success": True, "deleted_id": cluster_id}
     
@@ -224,7 +224,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             {"$unset": {"clusterId": ""}}
         )
         
-        logger.info(f"🗑️ Bulk deleted {result.deleted_count} clusters. Reason: {request.reason or 'Not specified'}")
+        logger.info("Bulk deleted %d clusters. Reason: %s", result.deleted_count, request.reason or 'Not specified')
         
         return {
             "success": True,
@@ -270,7 +270,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Event not found")
         
-        logger.info(f"✏️ Event {event_id} updated manually: {list(update_data.keys())}")
+        logger.info("Event %s updated manually: %s", event_id, list(update_data.keys()))
         
         return {"success": True, "updated_fields": list(update_data.keys())}
     
@@ -282,7 +282,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Event not found")
         
-        logger.info(f"🗑️ Event {event_id} deleted. Reason: {reason or 'Not specified'}")
+        logger.info("Event %s deleted. Reason: %s", event_id, reason or 'Not specified')
         
         return {"success": True, "deleted_id": event_id}
     
@@ -296,7 +296,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             {"id": {"$in": request.ids}}
         )
         
-        logger.info(f"🗑️ Bulk deleted {result.deleted_count} events. Reason: {request.reason or 'Not specified'}")
+        logger.info("Bulk deleted %d events. Reason: %s", result.deleted_count, request.reason or 'Not specified')
         
         return {
             "success": True,
