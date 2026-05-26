@@ -358,6 +358,4 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
 # Функция для подключения роутера
 def get_admin_editor_router(db: AsyncIOMotorDatabase):
     """Получить роутер с доступом к БД"""
-    import asyncio
-    asyncio.create_task(init_admin_editor_routes(db))
-    return admin_editor_router
+    return init_admin_editor_routes(db)

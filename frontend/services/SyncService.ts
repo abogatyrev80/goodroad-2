@@ -113,55 +113,55 @@ export class SyncService {
   private async uploadSensorData() {
     const unsyncedData = await localDB.getUnsyncedSensorData();
     if (unsyncedData.length === 0) {
-      console.log('📤 No unsynced sensor data to upload');
+      console.log('No unsynced sensor data to upload');
       return;
     }
 
-    console.log(`📤 Uploading ${unsyncedData.length} sensor data records...`);
+    console.log(`Uploading ${unsyncedData.length} sensor data records...`);
 
     try {
-      // Отправляем данные пачками по 50 записей
+      const deviceId = 'mobile-app-' + Date.now();
       const batchSize = 50;
       for (let i = 0; i < unsyncedData.length; i += batchSize) {
         const batch = unsyncedData.slice(i, i + batchSize);
-        
-        // Правильный формат для backend API /api/sensor-data
-        const response = await fetch(`${this.backendUrl}api/sensor-data`, {
+
+        const rawBatch = {
+          deviceId,
+          data: batch.map(item => ({
+            deviceId,
+            timestamp: new Date(item.timestamp).getTime(),
+            gps: {
+              latitude: item.latitude,
+              longitude: item.longitude,
+              speed: item.speed || 0,
+              accuracy: item.accuracy || 0,
+            },
+            accelerometer: item.accelerometer
+              ? [{ x: item.accelerometer.x, y: item.accelerometer.y, z: item.accelerometer.z }]
+              : [{ x: 0, y: 0, z: 0 }],
+          })),
+        };
+
+        const response = await fetch(`${this.backendUrl}api/raw-data`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            deviceId: 'mobile-app-' + Date.now(), // Уникальный ID устройства
-            sensorData: batch.map(item => ({
-              type: 'location',
-              timestamp: new Date(item.timestamp).getTime(),
-              data: {
-                latitude: item.latitude,
-                longitude: item.longitude,
-                speed: item.speed,
-                accuracy: item.accuracy
-              }
-            }))
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rawBatch),
         });
 
         if (response.ok) {
           const result = await response.json();
           const localIds = batch.map(item => item.id!);
-          
-          // Отмечаем как синхронизированные
+
           await localDB.markSensorDataSynced(localIds, []);
-          
-          console.log(`✅ Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(unsyncedData.length/batchSize)}`);
-          console.log(`📊 Server response:`, result);
+
+          console.log(`Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(unsyncedData.length/batchSize)}`);
         } else {
           const errorText = await response.text();
-          console.error(`❌ Failed to upload batch: ${response.status} - ${errorText}`);
+          console.error(`Failed to upload batch: ${response.status} - ${errorText}`);
         }
       }
     } catch (error) {
-      console.error('❌ Upload sensor data error:', error);
+      console.error('Upload sensor data error:', error);
     }
   }
 
