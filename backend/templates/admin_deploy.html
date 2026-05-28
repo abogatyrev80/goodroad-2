@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Road - Деплой</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 { font-size: 2rem; }
+        .header p { opacity: 0.9; margin-top: 0.3rem; }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 1rem;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-top: 0.3rem;
+            word-break: break-all;
+        }
+
+        .stat-value.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s;
+        }
+
+        .upload-zone:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        .upload-zone.dragover {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .upload-zone-text {
+            font-size: 1rem;
+            color: #718096;
+        }
+
+        .upload-zone-text strong { color: #2d3748; }
+
+        .upload-zone-hint {
+            font-size: 0.8rem;
+            color: #a0aec0;
+            margin-top: 0.5rem;
+        }
+
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .log-table th {
+            text-align: left;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.8rem;
+            color: #718096;
+            text-transform: uppercase;
+            border-bottom: 2px solid #edf2f7;
+        }
+
+        .log-table td {
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+            color: #4a5568;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .log-success { color: #48bb78; font-weight: 600; }
+        .log-failure { color: #e53e3e; font-weight: 600; }
+
+        .message {
+            padding: 0.8rem 1.2rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .message.success { background: #f0fff4; color: #22543d; border: 1px solid #48bb78; display: block; }
+        .message.error { background: #fff5f5; color: #742a2a; border: 1px solid #e53e3e; display: block; }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: white;
+            opacity: 0.8;
+            text-decoration: none;
+        }
+        .back-link:hover { opacity: 1; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Деплой бэкенда</h1>
+            <p>Git pull, ZIP upload, история обновлений</p>
+            <a href="/api/admin" class="back-link">&larr; На главную</a>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="card">
+            <div class="card-title">Статус репозитория</div>
+            <div class="status-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Ветка</div>
+                    <div class="stat-value">{{ status.get('branch', '—') }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Коммит</div>
+                    <div class="stat-value mono">{{ status.get('short_commit', '—') }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Сообщение</div>
+                    <div class="stat-value">{{ status.get('message', '—') }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Впереди/Позади</div>
+                    <div class="stat-value">{{ status.get('ahead', '?') }}/{{ status.get('behind', '?') }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Незакоммиченные</div>
+                    <div class="stat-value">{{ 'Есть' if status.get('has_uncommitted') else 'Нет' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Git pull</div>
+            <p style="color: #718096; margin-bottom: 1rem; font-size: 0.9rem;">
+                Выполнить <code>git pull --ff-only</code> из ветки main. Код будет автоматически проверен и сервис перезапущен.
+            </p>
+            <button class="btn btn-primary" onclick="gitPull()">Pull and Restart</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">ZIP upload</div>
+            <p style="color: #718096; margin-bottom: 1rem; font-size: 0.9rem;">
+                Загрузите ZIP-архив с кодом бэкенда. Код будет проверен на синтаксис и развёрнут.
+            </p>
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-zone-text">
+                    <strong>Выберите ZIP файл</strong> или перетащите его сюда
+                </div>
+                <div class="upload-zone-hint">Только .zip, макс. 100MB</div>
+            </div>
+            <input type="file" id="fileInput" accept=".zip" style="display:none">
+            <button class="btn btn-success" id="uploadBtn" disabled style="margin-top: 1rem;" onclick="uploadZip()">Загрузить и деплоить</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">История обновлений</div>
+            {% if log %}
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Метод</th>
+                        <th>Сообщение</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in log %}
+                    <tr>
+                        <td>{{ entry.timestamp[:19] }}</td>
+                        <td>{{ entry.method }}</td>
+                        <td>{{ entry.message }}</td>
+                        <td class="{{ 'log-success' if entry.success else 'log-failure' }}">
+                            {{ 'OK' if entry.success else 'FAIL' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #a0aec0;">История пуста</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadZone = document.getElementById('uploadZone');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const message = document.getElementById('message');
+
+        function showMessage(text, type) {
+            message.className = `message ${type}`;
+            message.textContent = text;
+            setTimeout(() => { message.style.display = 'none'; }, 5000);
+        }
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                onFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', onFileSelect);
+
+        function onFileSelect() {
+            if (fileInput.files.length > 0) {
+                const name = fileInput.files[0].name;
+                uploadZone.querySelector('.upload-zone-text').innerHTML = `<strong>${name}</strong>`;
+                uploadBtn.disabled = false;
+            }
+        }
+
+        async function gitPull() {
+            try {
+                const res = await fetch('/api/admin/deploy/pull', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showMessage(data.detail || 'Error', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error: ' + e.message, 'error');
+            }
+        }
+
+        async function uploadZip() {
+            if (!fileInput.files.length) return;
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/admin/deploy/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showMessage(data.detail || 'Error', 'error');
+                }
+            } catch (e) {
+                showMessage('Network error: ' + e.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
