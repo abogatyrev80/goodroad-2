@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Good Road — Neural Network Dashboard v4</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.header{background:#1e293b;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155}
+.header h1{font-size:18px;font-weight:600;color:#f1f5f9}
+.header .status{display:flex;gap:16px;font-size:13px}
+.header .status span{display:flex;align-items:center;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.green{background:#22c55e}.dot.yellow{background:#eab308}.dot.red{background:#ef4444}.dot.gray{background:#6b7280}
+.tabs{display:flex;background:#1e293b;border-bottom:2px solid #334155;padding:0 24px}
+.tab{padding:12px 20px;cursor:pointer;font-size:14px;font-weight:500;color:#94a3b8;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{color:#e2e8f0}
+.tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.content{padding:24px;display:none}
+.content.active{display:block}
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:1fr 1fr 1fr}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
+.card h3{font-size:14px;font-weight:500;color:#94a3b8;margin-bottom:12px}
+.card .value{font-size:28px;font-weight:700;color:#f1f5f9}
+.card .sub{font-size:12px;color:#64748b;margin-top:4px}
+.chart-container{position:relative;height:300px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:#94a3b8;font-weight:500;border-bottom:1px solid #334155}
+td{padding:10px 12px;border-bottom:1px solid #1e293b}
+tr:hover{background:#1e293b}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge.pothole{background:#dc2626;color:#fff}
+.badge.speed_bump{background:#f59e0b;color:#000}
+.badge.bump{background:#f97316;color:#fff}
+.badge.braking{background:#3b82f6;color:#fff}
+.badge.vibration{background:#8b5cf6;color:#fff}
+.badge.normal{background:#22c55e;color:#fff}
+.badge.neural{background:#06b6d4;color:#000}
+.badge.heuristic{background:#6b7280;color:#fff}
+.badge.running{background:#eab308;color:#000}
+.badge.completed{background:#22c55e;color:#fff}
+.badge.failed{background:#ef4444;color:#fff}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.progress-bar{background:#334155;border-radius:4px;height:8px;overflow:hidden;margin-top:8px}
+.progress-bar .fill{height:100%;background:#3b82f6;transition:width .3s}
+.confusion-matrix{display:grid;gap:2px;max-width:400px}
+.confusion-matrix .cell{padding:8px;text-align:center;font-size:12px;font-weight:600;border-radius:4px}
+.confusion-matrix .header{background:#334155;color:#94a3b8}
+.confusion-matrix .diagonal{background:#22c55e33;color:#22c55e}
+.confusion-matrix .off-diagonal{background:#ef444433;color:#ef4444}
+.confusion-matrix .zero{color:#475569}
+#live-log{max-height:400px;overflow-y:auto;font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;background:#0f172a;border-radius:8px;padding:12px}
+#live-log .line{padding:3px 0;border-bottom:1px solid #1e293b}
+#live-log .time{color:#64748b}
+#live-log .neural{color:#06b6d4}
+#live-log .heuristic{color:#94a3b8}
+#live-log .event{color:#f59e0b}
+.empty{text-align:center;padding:40px;color:#64748b}
+.loading{text-align:center;padding:20px;color:#94a3b8}
+@media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}.tabs{overflow-x:auto}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧠 Neural Network Dashboard v4</h1>
+  <div class="status">
+    <span><span class="dot gray" id="worker-dot"></span> Worker: <span id="worker-status">loading</span></span>
+    <span><span class="dot gray" id="trainer-dot"></span> Trainer: <span id="trainer-status">loading</span></span>
+    <span style="color:#64748b" id="last-update"></span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('inference')">📊 Inference Monitor</div>
+  <div class="tab" onclick="switchTab('training')">🏋️ Training Progress</div>
+  <div class="tab" onclick="switchTab('accuracy')">🎯 Accuracy Metrics</div>
+  <div class="tab" onclick="switchTab('logs')">📜 Real-time Logs</div>
+  <div class="tab" onclick="switchTab('external')">🌐 External Training</div>
+</div>
+
+<!-- TAB 1: Inference Monitor -->
+<div class="content active" id="tab-inference">
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Total Processed</h3>
+      <div class="value" id="m-total">—</div>
+      <div class="sub">всего обработано точек</div>
+    </div>
+    <div class="card">
+      <h3>Events Detected</h3>
+      <div class="value" id="m-events">—</div>
+      <div class="sub">событий обнаружено</div>
+    </div>
+    <div class="card">
+      <h3>Neural Ratio</h3>
+      <div class="value" id="m-neural">—</div>
+      <div class="sub">% предсказаний нейросетью</div>
+    </div>
+    <div class="card">
+      <h3>Errors</h3>
+      <div class="value" id="m-errors">—</div>
+      <div class="sub">ошибок обработки</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Predictions by Type</h3>
+      <div class="chart-container"><canvas id="chart-types"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Confidence Distribution</h3>
+      <div class="chart-container"><canvas id="chart-confidence"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Recent Inference Logs</h3>
+    <table>
+      <thead><tr><th>Time</th><th>Device</th><th>Event</th><th>Confidence</th><th>Severity</th><th>Method</th><th>Latency</th></tr></thead>
+      <tbody id="inference-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 2: Training Progress -->
+<div class="content" id="tab-training">
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Total Training Runs</h3>
+      <div class="value" id="t-runs">—</div>
+    </div>
+    <div class="card">
+      <h3>Current Threshold</h3>
+      <div class="value" id="t-threshold">—</div>
+      <div class="sub">новых событий для retrain</div>
+    </div>
+    <div class="card">
+      <h3>Last Accuracy</h3>
+      <div class="value" id="t-accuracy">—</div>
+      <div class="sub" id="t-model">—</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Training History</h3>
+      <div class="chart-container"><canvas id="chart-training"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Data Progress</h3>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:8px">Прогресс до следующего retrain</p>
+      <div id="data-progress"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3>Training Runs History</h3>
+      <button class="btn btn-primary" onclick="triggerRetrain()" id="btn-retrain">🔄 Trigger Retrain</button>
+    </div>
+    <table>
+      <thead><tr><th>Run ID</th><th>Started</th><th>Samples</th><th>Accuracy</th><th>Val Accuracy</th><th>Status</th><th>Model</th></tr></thead>
+      <tbody id="training-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 3: Accuracy Metrics -->
+<div class="content" id="tab-accuracy">
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Total Inferences</h3>
+      <div class="value" id="a-total">—</div>
+    </div>
+    <div class="card">
+      <h3>Last 24h</h3>
+      <div class="value" id="a-24h">—</div>
+    </div>
+    <div class="card">
+      <h3>Avg Processing Time</h3>
+      <div class="value" id="a-latency">—</div>
+      <div class="sub">мс на предсказание</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Event Type Distribution</h3>
+      <div class="chart-container"><canvas id="chart-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Severity Distribution</h3>
+      <div class="chart-container"><canvas id="chart-severity"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3>Neural vs Heuristic</h3>
+      <div class="chart-container"><canvas id="chart-methods"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Confidence by Event Type</h3>
+      <table>
+        <thead><tr><th>Event Type</th><th>Count</th><th>Avg Confidence</th><th>Avg Severity</th><th>Avg Latency</th></tr></thead>
+        <tbody id="metrics-table"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 4: Real-time Logs -->
+<div class="content" id="tab-logs">
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card" style="grid-column:span 2">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:13px;color:#94a3b8">Фильтры:</label>
+        <select id="log-filter-type" onchange="filterLogs()" style="padding:6px 10px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px">
+          <option value="">All events</option>
+          <option value="pothole">Pothole</option>
+          <option value="speed_bump">Speed Bump</option>
+          <option value="bump">Bump</option>
+          <option value="braking">Braking</option>
+          <option value="vibration">Vibration</option>
+        </select>
+        <select id="log-filter-method" onchange="filterLogs()" style="padding:6px 10px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px">
+          <option value="">All methods</option>
+          <option value="neural_network">Neural</option>
+          <option value="heuristic">Heuristic</option>
+          <option value="pattern_analysis">Pattern</option>
+        </select>
+        <label style="font-size:13px;color:#94a3b8;display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Log Stats</h3>
+      <div class="value" id="log-count">0</div>
+      <div class="sub">записей в логе</div>
+    </div>
+  </div>
+
+  <div id="live-log"><div class="empty">Waiting for data...</div></div>
+</div>
+
+<!-- TAB 5: External Training -->
+<div class="content" id="tab-external">
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <h3>External Server</h3>
+      <div class="value" id="ext-server-status">—</div>
+      <div class="sub" id="ext-server-url">—</div>
+    </div>
+    <div class="card">
+      <h3>Datasets Ready</h3>
+      <div class="value" id="ext-datasets">—</div>
+      <div class="sub">доступно для обучения</div>
+    </div>
+    <div class="card">
+      <h3>Models Trained</h3>
+      <div class="value" id="ext-models">—</div>
+      <div class="sub">на внешнем сервере</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Training Trigger</h3>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:12px">Создать датасет и запустить обучение на GPU-сервере</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="createDataset()">📦 Create Dataset</button>
+        <button class="btn btn-primary" onclick="triggerExternalTraining()">🚀 Trigger Training</button>
+      </div>
+      <div id="ext-trigger-result" style="margin-top:12px;font-size:13px;color:#94a3b8"></div>
+    </div>
+    <div class="card">
+      <h3>Server Status</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="refreshExternalStatus()">🔄 Refresh Status</button>
+      </div>
+      <div id="ext-status-details" style="margin-top:12px;font-size:13px;color:#94a3b8"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Datasets</h3>
+    <table>
+      <thead><tr><th>ID</th><th>Samples</th><th>Classes</th><th>Size</th><th>Created</th><th>Expires</th><th>Actions</th></tr></thead>
+      <tbody id="ext-datasets-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>External Models</h3>
+    <table>
+      <thead><tr><th>ID</th><th>Version</th><th>Accuracy</th><th>Dataset</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+      <tbody id="ext-models-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let charts = {};
+let logEntries = [];
+let refreshInterval;
+const API = '/api/admin/nn';
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.statusText);
+    return await r.json();
+  } catch(e) {
+    console.error('Fetch error:', url, e);
+    return null;
+  }
+}
+
+function formatTime(t) {
+  if (!t) return '—';
+  const d = new Date(t);
+  return d.toLocaleTimeString('ru-RU');
+}
+
+function formatDateTime(t) {
+  if (!t) return '—';
+  const d = new Date(t);
+  return d.toLocaleString('ru-RU');
+}
+
+function severityLabel(s) {
+  return {1:'Critical',2:'High',3:'Medium',4:'Low',5:'Minimal'}[s] || '—';
+}
+
+function severityColor(s) {
+  return {1:'#ef4444',2:'#f97316',3:'#eab308',4:'#3b82f6',5:'#6b7280'}[s] || '#6b7280';
+}
+
+function destroyChart(name) {
+  if (charts[name]) { charts[name].destroy(); charts[name] = null; }
+}
+
+function makeChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return null;
+  charts[id] = new Chart(ctx.getContext('2d'), config);
+  return charts[id];
+}
+
+const EVENT_COLORS = {
+  pothole: '#ef4444', speed_bump: '#f59e0b', bump: '#f97316',
+  braking: '#3b82f6', vibration: '#8b5cf6'
+};
+
+async function loadInferenceMonitor() {
+  const stats = await fetchJSON(API + '/live-stats');
+  if (stats) {
+    document.getElementById('m-total').textContent = stats.total_processed || 0;
+    document.getElementById('m-events').textContent = stats.events_detected || 0;
+    document.getElementById('m-neural').textContent = (stats.neural_ratio || 0) + '%';
+    document.getElementById('m-errors').textContent = stats.errors || 0;
+
+    const dot = document.getElementById('worker-dot');
+    const status = document.getElementById('worker-status');
+    if (stats.started_at) {
+      dot.className = 'dot green';
+      status.textContent = 'running';
+    } else {
+      dot.className = 'dot red';
+      status.textContent = 'stopped';
+    }
+  }
+
+  const metrics = await fetchJSON(API + '/metrics');
+  if (metrics) {
+    const byType = metrics.by_event_type || [];
+    if (byType.length > 0) {
+      makeChart('chart-types', {
+        type: 'bar',
+        data: {
+          labels: byType.map(e => e._id || 'unknown'),
+          datasets: [{
+            label: 'Count',
+            data: byType.map(e => e.count),
+            backgroundColor: byType.map(e => EVENT_COLORS[e._id] || '#6b7280'),
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    const byMethod = metrics.by_detection_method || [];
+    const neuralCount = byMethod.find(m => m._id === 'neural_network')?.count || 0;
+    const heuristicCount = byMethod.find(m => m._id === 'heuristic')?.count || 0;
+    const patternCount = byMethod.find(m => m._id === 'pattern_analysis')?.count || 0;
+    makeChart('chart-confidence', {
+      type: 'doughnut',
+      data: {
+        labels: ['Neural', 'Heuristic', 'Pattern'],
+        datasets: [{
+          data: [neuralCount, heuristicCount, patternCount],
+          backgroundColor: ['#06b6d4', '#6b7280', '#f59e0b'],
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8' } } }
+      }
+    });
+  }
+
+  const logs = await fetchJSON(API + '/inference-logs?limit=20');
+  if (logs && logs.logs) {
+    const tbody = document.getElementById('inference-table');
+    if (logs.logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No inference logs yet</td></tr>';
+    } else {
+      tbody.innerHTML = logs.logs.map(l => `
+        <tr>
+          <td>${formatTime(l.timestamp)}</td>
+          <td>${(l.device_id||'').substring(0,12)}...</td>
+          <td>${l.result_event_type ? `<span class="badge ${l.result_event_type}">${l.result_event_type}</span>` : '<span class="badge normal">none</span>'}</td>
+          <td>${l.result_confidence ? (l.result_confidence * 100).toFixed(1) + '%' : '—'}</td>
+          <td style="color:${severityColor(l.result_severity)}">${severityLabel(l.result_severity)}</td>
+          <td><span class="badge ${l.detection_method === 'neural_network' ? 'neural' : 'heuristic'}">${l.detection_method || '—'}</span></td>
+          <td>${l.processing_time_ms ? l.processing_time_ms.toFixed(1) + 'ms' : '—'}</td>
+        </tr>
+      `).join('');
+    }
+  }
+}
+
+async function loadTrainingProgress() {
+  const stats = await fetchJSON(API + '/model-status');
+  if (stats && stats.trainer) {
+    const t = stats.trainer;
+    document.getElementById('t-runs').textContent = t.retrains_completed || 0;
+    document.getElementById('t-threshold').textContent = t.current_threshold || '—';
+
+    document.getElementById('trainer-status').textContent =
+      t.last_retrain_at ? 'idle' : 'waiting';
+    document.getElementById('trainer-dot').className = 'dot green';
+  }
+
+  const metrics = await fetchJSON(API + '/metrics');
+  if (metrics && metrics.last_training_run) {
+    const lr = metrics.last_training_run;
+    document.getElementById('t-accuracy').textContent =
+      lr.accuracy ? (lr.accuracy * 100).toFixed(1) + '%' : '—';
+    document.getElementById('t-model').textContent =
+      lr.model_path ? lr.model_path.split('/').pop() : 'no model';
+  }
+
+  const runs = await fetchJSON(API + '/training-runs?limit=10');
+  if (runs && runs.runs) {
+    makeChart('chart-training', {
+      type: 'line',
+      data: {
+        labels: runs.runs.map(r => r.run_id),
+        datasets: [
+          {
+            label: 'Accuracy',
+            data: runs.runs.map(r => r.final_accuracy),
+            borderColor: '#22c55e', backgroundColor: '#22c55e33',
+            fill: true, tension: 0.3
+          },
+          {
+            label: 'Val Accuracy',
+            data: runs.runs.map(r => r.final_val_accuracy),
+            borderColor: '#3b82f6', backgroundColor: '#3b82f633',
+            fill: true, tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { min: 0, max: 1, ticks: { color: '#94a3b8', callback: v => (v*100)+'%' }, grid: { color: '#1e293b' } },
+          x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { display: false } }
+        },
+        plugins: { legend: { labels: { color: '#94a3b8' } } }
+      }
+    });
+
+    const tbody = document.getElementById('training-table');
+    if (runs.runs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No training runs yet</td></tr>';
+    } else {
+      tbody.innerHTML = runs.runs.map(r => `
+        <tr>
+          <td>${r.run_id}</td>
+          <td>${formatDateTime(r.started_at)}</td>
+          <td>${r.samples_used || '—'}</td>
+          <td>${r.final_accuracy ? (r.final_accuracy*100).toFixed(1)+'%' : '—'}</td>
+          <td>${r.final_val_accuracy ? (r.final_val_accuracy*100).toFixed(1)+'%' : '—'}</td>
+          <td><span class="badge ${r.status}">${r.status}</span></td>
+          <td style="font-size:11px">${r.model_path ? r.model_path.split('/').pop() : '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    const progressEl = document.getElementById('data-progress');
+    const totalEvents = metrics?.events?.total || 0;
+    const threshold = stats?.trainer?.current_threshold || 1000;
+    const pct = Math.min(100, Math.round(totalEvents / threshold * 100));
+    progressEl.innerHTML = `
+      <div style="font-size:14px;margin-bottom:4px">${totalEvents} / ${threshold} events</div>
+      <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">${pct}% до следующего retrain</div>
+    `;
+  }
+}
+
+async function loadAccuracyMetrics() {
+  const metrics = await fetchJSON(API + '/metrics');
+  if (!metrics) return;
+
+  document.getElementById('a-total').textContent = metrics.inference?.total || 0;
+  document.getElementById('a-24h').textContent = metrics.inference?.last_24h || 0;
+
+  const byType = metrics.by_event_type || [];
+  const avgLatency = byType.reduce((s, e) => s + (e.avg_processing_ms || 0), 0) / Math.max(byType.length, 1);
+  document.getElementById('a-latency').textContent = avgLatency.toFixed(1) + 'ms';
+
+  if (byType.length > 0) {
+    makeChart('chart-pie', {
+      type: 'pie',
+      data: {
+        labels: byType.map(e => e._id),
+        datasets: [{
+          data: byType.map(e => e.count),
+          backgroundColor: byType.map(e => EVENT_COLORS[e._id] || '#6b7280'),
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8' } } }
+      }
+    });
+  }
+
+  const bySeverity = metrics.by_severity || [];
+  if (bySeverity.length > 0) {
+    makeChart('chart-severity', {
+      type: 'bar',
+      data: {
+        labels: bySeverity.map(s => severityLabel(s._id)),
+        datasets: [{
+          label: 'Count',
+          data: bySeverity.map(s => s.count),
+          backgroundColor: bySeverity.map(s => severityColor(s._id)),
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  const byMethod = metrics.by_detection_method || [];
+  if (byMethod.length > 0) {
+    makeChart('chart-methods', {
+      type: 'bar',
+      data: {
+        labels: byMethod.map(m => m._id),
+        datasets: [{
+          label: 'Count',
+          data: byMethod.map(m => m.count),
+          backgroundColor: ['#06b6d4', '#6b7280', '#f59e0b', '#22c55e'],
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  const tbody = document.getElementById('metrics-table');
+  if (byType.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No metrics yet</td></tr>';
+  } else {
+    tbody.innerHTML = byType.map(e => `
+      <tr>
+        <td><span class="badge ${e._id}">${e._id}</span></td>
+        <td>${e.count}</td>
+        <td>${e.avg_confidence ? (e.avg_confidence*100).toFixed(1)+'%' : '—'}</td>
+        <td style="color:${severityColor(Math.round(e.avg_severity||0))}">${severityLabel(Math.round(e.avg_severity||0))}</td>
+        <td>${e.avg_processing_ms ? e.avg_processing_ms.toFixed(2)+'ms' : '—'}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+function addLogEntry(entry) {
+  logEntries.unshift(entry);
+  if (logEntries.length > 500) logEntries.pop();
+  renderLogs();
+}
+
+function renderLogs() {
+  const container = document.getElementById('live-log');
+  const typeFilter = document.getElementById('log-filter-type').value;
+  const methodFilter = document.getElementById('log-filter-method').value;
+
+  let filtered = logEntries;
+  if (typeFilter) filtered = filtered.filter(l => l.result_event_type === typeFilter);
+  if (methodFilter) filtered = filtered.filter(l => l.detection_method === methodFilter);
+
+  document.getElementById('log-count').textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty">No log entries</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.slice(0, 200).map(l => {
+    const methodClass = l.detection_method === 'neural_network' ? 'neural' : 'heuristic';
+    const eventClass = l.result_event_type ? 'event' : '';
+    return `<div class="line">
+      <span class="time">${formatTime(l.timestamp)}</span>
+      <span class="${methodClass}">[${l.detection_method || '?'}]</span>
+      <span class="${eventClass}">${l.result_event_type || '—'}</span>
+      conf=${l.result_confidence ? (l.result_confidence*100).toFixed(0)+'%' : '?'}
+      sev=${l.result_severity || '?'}
+      ${l.processing_time_ms ? l.processing_time_ms.toFixed(1)+'ms' : ''}
+    </div>`;
+  }).join('');
+
+  if (document.getElementById('log-autoscroll').checked) {
+    container.scrollTop = 0;
+  }
+}
+
+function filterLogs() { renderLogs(); }
+
+async function loadLiveLogs() {
+  const logs = await fetchJSON(API + '/inference-logs?limit=50');
+  if (logs && logs.logs) {
+    logEntries = logs.logs;
+    renderLogs();
+  }
+}
+
+async function triggerRetrain() {
+  const btn = document.getElementById('btn-retrain');
+  btn.disabled = true;
+  btn.textContent = '⏳ Training...';
+  try {
+    const r = await fetch(API + '/retrain', { method: 'POST' });
+    const data = await r.json();
+    alert(data.message || 'Retrain triggered');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '🔄 Trigger Retrain';
+}
+
+async function refreshAll() {
+  document.getElementById('last-update').textContent =
+    'Updated: ' + new Date().toLocaleTimeString('ru-RU');
+  await Promise.all([
+    loadInferenceMonitor(),
+    loadTrainingProgress(),
+    loadAccuracyMetrics(),
+    loadLiveLogs(),
+    loadExternalTraining()
+  ]);
+}
+
+// ─── External Training Tab ──────────────────────────────────────────────────
+const EXT_API = '/api/external';
+
+async function loadExternalTraining() {
+  const status = await fetchJSON(EXT_API + '/training/status');
+  if (status) {
+    document.getElementById('ext-server-status').textContent = status.total_models > 0 ? 'Configured' : 'Not Configured';
+    document.getElementById('ext-server-url').textContent = `${status.total_datasets} datasets, ${status.total_models} models`;
+    document.getElementById('ext-datasets').textContent = status.total_datasets;
+    document.getElementById('ext-models').textContent = status.total_models;
+
+    if (status.latest_run) {
+      const run = status.latest_run;
+      document.getElementById('ext-status-details').innerHTML =
+        `<div>Last run: <b>${run.run_id || '—'}</b></div>` +
+        `<div>Status: <span class="badge ${run.status}">${run.status}</span></div>` +
+        `<div>Trigger: ${run.trigger || '—'}</div>`;
+    }
+  }
+
+  const datasets = await fetchJSON(EXT_API + '/datasets');
+  if (datasets && datasets.datasets) {
+    const tbody = document.getElementById('ext-datasets-table');
+    if (datasets.datasets.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No datasets yet</td></tr>';
+    } else {
+      tbody.innerHTML = datasets.datasets.map(d => `
+        <tr>
+          <td>${d.dataset_id}</td>
+          <td>${d.total_samples}</td>
+          <td>${Object.keys(d.class_distribution || {}).length}</td>
+          <td>${d.file_size_bytes ? (d.file_size_bytes / 1024).toFixed(1) + ' KB' : '—'}</td>
+          <td>${formatDateTime(d.created_at)}</td>
+          <td>${formatDateTime(d.expires_at)}</td>
+          <td><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteDataset('${d.dataset_id}')">🗑️</button></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  const models = await fetchJSON(EXT_API + '/models');
+  if (models && models.models) {
+    const tbody = document.getElementById('ext-models-table');
+    if (models.models.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No models yet</td></tr>';
+    } else {
+      tbody.innerHTML = models.models.map(m => `
+        <tr>
+          <td>${m.model_id}</td>
+          <td>v${m.version}</td>
+          <td>${m.accuracy ? (m.accuracy*100).toFixed(1)+'%' : '—'}</td>
+          <td>${m.dataset_id || '—'}</td>
+          <td><span class="badge ${m.status}">${m.status}</span></td>
+          <td>${formatDateTime(m.created_at)}</td>
+          <td>
+            ${!m.activated ? `<button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="activateModel('${m.model_id}')">✅ Activate</button>` : '<span class="badge completed">Active</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+}
+
+async function createDataset() {
+  const result = document.getElementById('ext-trigger-result');
+  result.textContent = '⏳ Creating dataset...';
+  try {
+    const r = await fetch(EXT_API + '/dataset/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ min_samples: 100, min_per_class: 10 })
+    });
+    const data = await r.json();
+    if (data.dataset_id) {
+      result.innerHTML = `<span style="color:#22c55e">✅ Dataset created: ${data.dataset_id} (${data.total_samples} samples)</span>`;
+      loadExternalTraining();
+    } else {
+      result.innerHTML = `<span style="color:#ef4444">❌ ${data.error || 'Failed'}</span>`;
+    }
+  } catch(e) {
+    result.innerHTML = `<span style="color:#ef4444">❌ Error: ${e.message}</span>`;
+  }
+}
+
+async function triggerExternalTraining() {
+  const result = document.getElementById('ext-trigger-result');
+  result.textContent = '⏳ Getting latest dataset...';
+  try {
+    const dsResp = await fetchJSON(EXT_API + '/datasets');
+    if (!dsResp || !dsResp.datasets || dsResp.datasets.length === 0) {
+      result.innerHTML = '<span style="color:#ef4444">❌ No datasets available. Create one first.</span>';
+      return;
+    }
+    const latest = dsResp.datasets[0];
+    result.textContent = `⏳ Triggering training for ${latest.dataset_id}...`;
+    const r = await fetch(EXT_API + '/training/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset_id: latest.dataset_id, epochs: 35, batch_size: 32, seq_len: 64 })
+    });
+    const data = await r.json();
+    if (data.run_id) {
+      result.innerHTML = `<span style="color:#22c55e">✅ Training triggered: ${data.run_id}</span>`;
+      loadExternalTraining();
+    } else {
+      result.innerHTML = `<span style="color:#ef4444">❌ ${data.detail || 'Failed'}</span>`;
+    }
+  } catch(e) {
+    result.innerHTML = `<span style="color:#ef4444">❌ Error: ${e.message}</span>`;
+  }
+}
+
+async function deleteDataset(id) {
+  if (!confirm('Delete dataset ' + id + '?')) return;
+  try {
+    await fetch(EXT_API + '/dataset/' + id, { method: 'DELETE' });
+    loadExternalTraining();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function activateModel(id) {
+  try {
+    const r = await fetch(EXT_API + '/model/' + id + '/activate', { method: 'POST' });
+    const data = await r.json();
+    if (data.success) {
+      alert('Model activated successfully');
+      loadExternalTraining();
+    } else {
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function refreshExternalStatus() {
+  const result = document.getElementById('ext-status-details');
+  result.textContent = '⏳ Checking status...';
+  try {
+    const status = await fetchJSON(EXT_API + '/training/status');
+    if (status) {
+      result.innerHTML =
+        `<div>Total datasets: <b>${status.total_datasets}</b></div>` +
+        `<div>Total models: <b>${status.total_models}</b></div>` +
+        `<div>Active model: <b>${status.active_model ? status.active_model.model_id : 'None'}</b></div>` +
+        `<div>Last check: ${new Date().toLocaleTimeString('ru-RU')}</div>`;
+    }
+  } catch(e) {
+    result.innerHTML = `<span style="color:#ef4444">❌ Error: ${e.message}</span>`;
+  }
+}
+
+refreshAll();
+refreshInterval = setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>

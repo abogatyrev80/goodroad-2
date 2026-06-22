@@ -25,6 +25,12 @@ from models import (
 from services.geo import (
     validate_gps_coords, calculate_distance,
 )
+from dataset_exporter import DatasetExporter
+from model_registry import ModelRegistry
+from external_training_api import external_training_router, init_external_training
+from inference_worker import InferenceWorker
+from auto_trainer import AutoTrainer
+from nn_admin_api import nn_admin_router, init_nn_admin
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +50,20 @@ async def startup_event():
     logger.info("Starting Good Road API...")
     try:
         await connect_to_mongodb()
+
+        # Initialize neural network monitoring and external training
+        from config import db as _db
+        if _db is not None:
+            dataset_exporter = DatasetExporter(_db)
+            model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
+            init_external_training(_db, dataset_exporter, model_registry)
+            inference_worker = InferenceWorker(_db, event_classifier, obstacle_clusterer)
+            auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
+            init_nn_admin(_db, inference_worker, auto_trainer)
+            await inference_worker.start()
+            await auto_trainer.start()
+            logger.info("InferenceWorker and AutoTrainer started")
+
         model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
         if os.path.exists(model_path):
             info = event_classifier.neural_classifier.reload(model_path)
@@ -2363,6 +2383,8 @@ async def download_frontend_archive():
 
 # Include the router in the main app
 app.include_router(api_router)
+app.include_router(nn_admin_router)
+app.include_router(external_training_router)
 
 # Include admin editor router
 from admin_api import get_admin_editor_router
