@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 INFERENCE_INTERVAL = int(os.getenv('NN_INFERENCE_INTERVAL', '30'))
 BATCH_SIZE = int(os.getenv('NN_INFERENCE_BATCH_SIZE', '50'))
+USE_NN_BACKEND = os.getenv('NN_USE_NN_BACKEND', 'false').lower() == 'true'
 
 
 class InferenceWorker:
@@ -30,6 +31,7 @@ class InferenceWorker:
         self.obstacle_clusterer = obstacle_clusterer
         self._task: Optional[asyncio.Task] = None
         self._running = False
+        self._nn_backend = None
         self._stats: Dict[str, Any] = {
             'total_processed': 0,
             'events_detected': 0,
@@ -40,6 +42,7 @@ class InferenceWorker:
             'last_batch_at': None,
             'last_batch_count': 0,
             'last_batch_ms': 0,
+            'backend_name': None,
         }
 
     @property
@@ -64,10 +67,30 @@ class InferenceWorker:
         await self.db.inference_logs.create_index([("device_id", 1)])
         await self.db.raw_sensor_data.create_index([("processed_by_inference", 1), ("timestamp", 1)])
 
+        if USE_NN_BACKEND:
+            self._init_nn_backend()
+
         logger.info(
-            f"🚀 InferenceWorker started (interval={INFERENCE_INTERVAL}s, batch={BATCH_SIZE})"
+            f"InferenceWorker started (interval={INFERENCE_INTERVAL}s, batch={BATCH_SIZE}, backend={self._stats.get('backend_name', 'event_classifier')})"
         )
         self._task = asyncio.create_task(self._run_loop())
+
+    def _init_nn_backend(self):
+        """Initialize nn_backend for direct neural network inference."""
+        try:
+            from nn_backend import create_backend
+            model_path = os.getenv('NEURAL_MODEL_PATH', 'models/accel_lstm.pt')
+            if not os.path.exists(model_path):
+                logger.warning(f"NN model not found: {model_path}, using EventClassifier")
+                return
+
+            self._nn_backend = create_backend()
+            self._nn_backend.load(model_path)
+            self._stats['backend_name'] = self._nn_backend.name
+            logger.info(f"NN backend initialized: {self._nn_backend.name}")
+        except Exception as e:
+            logger.warning(f"Failed to init nn_backend: {e}, using EventClassifier")
+            self._nn_backend = None
 
     async def stop(self):
         self._running = False

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
 Обучение LSTM-классификатора препятствий на RX 6800 XT (PyTorch + ROCm).
+Поддержка ONNX экспорта для быстрого CPU inference на серверах без GPU.
 
 Примеры:
   python train_model.py --api-url https://goodroad.su --epochs 30
   python train_model.py --synthetic --epochs 10
   python train_model.py --mongo-url "$MONGO_URL" --db test_database
+  python train_model.py --device cpu --export-onnx
+  python train_model.py --device rocm --epochs 20
 """
 
 from __future__ import annotations
@@ -60,8 +63,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--synthetic-per-class", type=int, default=200)
     p.add_argument("--days-back", type=int, default=None)
     p.add_argument("--limit-batches", type=int, default=5000)
-    p.add_argument("--device", choices=("auto", "cpu", "cuda", "gpu"), default="auto")
+    p.add_argument("--device", choices=("auto", "cpu", "cuda", "gpu", "rocm"), default="auto")
     p.add_argument("--min-samples", type=int, default=100)
+    p.add_argument("--export-onnx", action="store_true", help="Export trained model to ONNX format")
     return p.parse_args()
 
 
@@ -201,8 +205,19 @@ def main() -> int:
     clf.save(str(out))
     print(f"\nМодель сохранена: {out.resolve()}")
     print(f"Метаданные:       {out.with_suffix('.json').resolve()}")
+
+    if args.export_onnx:
+        onnx_path = out.with_suffix(".onnx")
+        onnx_result = clf.export_onnx(str(onnx_path))
+        if onnx_result:
+            print(f"ONNX модель:      {onnx_result}")
+        else:
+            print("ONNX экспорт не удался (продолжаем с PyTorch)")
+
     print("\nДля backend:")
     print(f"  export NEURAL_MODEL_PATH={out.resolve()}")
+    print(f"  export NN_DEVICE={'auto' if args.device == 'auto' else args.device}")
+    print(f"  export NN_INFERENCE_BACKEND=auto")
     return 0
 
 

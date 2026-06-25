@@ -836,19 +836,22 @@ class EventClassifier:
 class NeuralEventClassifier:
     """
     Класс для интеграции нейросетевого анализа с текущим EventClassifier
+    Поддерживает несколько бэкендов: PyTorch, ONNX, Remote GPU
     """
     
     def __init__(self, enabled: bool = True, model_path: Optional[str] = None):
         self.enabled = enabled
         self.model_path = model_path
         self.nn_classifier = None
+        self._nn_backend = None
         self._load_error = None
+        self._backend = None
         
         if self.enabled:
             self.initialize_neural_network()
         
     def initialize_neural_network(self):
-        """Инициализация нейросети (.pt PyTorch или .keras TensorFlow)."""
+        """Инициализация нейросети с выбором бэкенда."""
         if not self.enabled:
             return
         
@@ -858,6 +861,20 @@ class NeuralEventClassifier:
             return
 
         path = self.model_path
+
+        use_backend = os.getenv('NN_USE_NN_BACKEND', 'false').lower() == 'true'
+        if use_backend:
+            try:
+                from nn_backend import create_backend
+                backend = create_backend()
+                backend.load(path)
+                self._nn_backend = backend
+                self._backend = backend.name
+                self._load_error = None
+                return
+            except Exception as exc:
+                self._load_error = f'nn_backend failed: {exc}, falling back to legacy'
+
         try:
             if path.endswith('.pt'):
                 from accel_nn import AccelClassifier
@@ -890,7 +907,26 @@ class NeuralEventClassifier:
             return None
         
         try:
-            event_type, confidence = self.nn_classifier.predict(accelerometer_data)
+            if self._nn_backend is not None:
+                import numpy as np
+                from accel_nn import _pad_or_trim_window
+
+                arr = np.array(
+                    [[d["x"], d["y"], d["z"]] for d in accelerometer_data],
+                    dtype=np.float32,
+                )
+                if len(arr) < 1:
+                    return None
+
+                window_size = getattr(self._nn_backend, 'window_size', 32)
+                window = _pad_or_trim_window(arr, window_size)
+                window = window[np.newaxis, ...]
+
+                idx, confidence = self._nn_backend.predict(window)
+                from ml_constants import INDEX_TO_EVENT
+                event_type = INDEX_TO_EVENT.get(idx, 'unknown')
+            else:
+                event_type, confidence = self.nn_classifier.predict(accelerometer_data)
         except Exception:
             return None
         
@@ -917,6 +953,8 @@ class NeuralEventClassifier:
 
     def is_available(self) -> bool:
         """Возвращает True, если нейросетевая модель успешно загружена."""
+        if self._nn_backend is not None:
+            return self._nn_backend.is_available()
         if self.nn_classifier is None:
             return False
         if getattr(self, '_backend', None) == 'pytorch':
@@ -932,7 +970,9 @@ class NeuralEventClassifier:
             "load_error": self._load_error,
             "min_confidence": float(os.getenv("NEURAL_MIN_CONFIDENCE", "0.35")),
         }
-        if self.is_available() and getattr(self, "_backend", None) == "pytorch":
+        if self._nn_backend is not None:
+            info["backend"] = self._nn_backend.name
+        elif self.is_available() and getattr(self, "_backend", None) == "pytorch":
             info["window_size"] = getattr(self.nn_classifier, "window_size", None)
         return info
 
@@ -940,6 +980,7 @@ class NeuralEventClassifier:
         if model_path:
             self.model_path = model_path
         self.nn_classifier = None
+        self._nn_backend = None
         self._load_error = None
         self._backend = None
         self.initialize_neural_network()

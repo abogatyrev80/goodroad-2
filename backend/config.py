@@ -44,6 +44,17 @@ _default_model_path = ROOT_DIR / "models" / "accel_lstm.pt"
 if not os.environ.get("NEURAL_MODEL_PATH") and _default_model_path.exists():
     os.environ["NEURAL_MODEL_PATH"] = str(_default_model_path)
 
+NN_INFERENCE_BACKEND = os.environ.get("NN_INFERENCE_BACKEND", "auto")
+NN_DEVICE = os.environ.get("NN_DEVICE", "auto")
+NN_USE_NN_BACKEND = os.environ.get("NN_USE_NN_BACKEND", "false").lower() == "true"
+NN_REMOTE_GPU_URL = os.environ.get("NN_REMOTE_GPU_URL", "")
+NN_AUTO_CONVERT_ONNX = os.environ.get("NN_AUTO_CONVERT_ONNX", "true").lower() == "true"
+
+logger.info(
+    "NN config: backend=%s, device=%s, use_nn_backend=%s, auto_onnx=%s",
+    NN_INFERENCE_BACKEND, NN_DEVICE, NN_USE_NN_BACKEND, NN_AUTO_CONVERT_ONNX,
+)
+
 rate_limit_store: Dict[str, List[float]] = {}
 RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))

@@ -1,10 +1,13 @@
 """
 PyTorch LSTM-классификатор акселерометра (обучение на ROCm / RX 6800 XT).
+Поддержка ONNX Runtime для быстрого CPU inference на серверах без GPU.
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -15,6 +18,10 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 
 from ml_constants import INDEX_TO_EVENT, NUM_CLASSES
+
+logger = logging.getLogger(__name__)
+
+AUTO_CONVERT_ONNX = os.getenv("NN_AUTO_CONVERT_ONNX", "true").lower() == "true"
 
 
 def _pad_or_trim_window(window: np.ndarray, size: int) -> np.ndarray:
@@ -226,3 +233,34 @@ class AccelClassifier:
         self.scaler.mean_ = np.array(ckpt["scaler_mean"], dtype=np.float64)
         self.scaler.scale_ = np.array(ckpt["scaler_scale"], dtype=np.float64)
         self.scaler.n_features_in_ = 3
+
+        if AUTO_CONVERT_ONNX:
+            self.export_onnx(str(p.with_suffix(".onnx")))
+
+    def export_onnx(self, onnx_path: str) -> Optional[str]:
+        """Export model to ONNX format for fast CPU inference."""
+        if self.model is None:
+            logger.warning("Cannot export ONNX: model not loaded")
+            return None
+
+        p = Path(onnx_path)
+        if p.exists():
+            logger.info(f"ONNX model already exists: {p}")
+            return str(p)
+
+        try:
+            dummy = torch.randn(1, self.window_size, 3).to(self.device)
+            torch.onnx.export(
+                self.model,
+                dummy,
+                str(p),
+                input_names=["input"],
+                output_names=["output"],
+                dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
+                opset_version=14,
+            )
+            logger.info(f"ONNX model exported: {p} ({p.stat().st_size / 1024:.1f} KB)")
+            return str(p)
+        except Exception as e:
+            logger.warning(f"ONNX export failed: {e}")
+            return None
