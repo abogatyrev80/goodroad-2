@@ -82,21 +82,17 @@ class BatchOfflineManager {
       // 🔧 MIGRATION: Очистить старые данные с неправильным форматом (2025-01-19)
       // После исправления формата сообщений нужно очистить offline очередь
       if (this.offlineQueue.length > 0 && !IS_WEB) {
-        console.log('🧹 Обнаружена старая offline очередь, очистка...');
         this.offlineQueue = [];
         await AsyncStorage.removeItem(STORAGE_KEY);
         this.stats.offlineQueueSize = 0;
         this.stats.failedSends = 0;
         this.updateStats();
-        console.log('✅ Offline очередь очищена после обновления формата');
       }
       
       await this.checkNetworkStatus();
       this.setupNetworkListener(); // Мгновенная отправка при появлении сети
       this.startNetworkMonitoring();
       
-      console.log('✅ BatchOfflineManager инициализирован');
-      console.log(`📦 Offline очередь: ${this.offlineQueue.length} записей`);
     } catch (error) {
       console.error('❌ Ошибка инициализации BatchOfflineManager:', error);
     }
@@ -117,7 +113,6 @@ class BatchOfflineManager {
       if (stored) {
         this.offlineQueue = JSON.parse(stored);
         this.stats.offlineQueueSize = this.offlineQueue.length;
-        console.log(`📥 Загружено ${this.offlineQueue.length} записей из offline хранилища`);
       }
     } catch (error) {
       console.error('❌ Ошибка загрузки offline очереди:', error);
@@ -155,9 +150,7 @@ class BatchOfflineManager {
       const connected = networkState.isConnected === true;
       const reachable = networkState.isInternetReachable !== false; // undefined = не проверяли, считаем ок
       this.isOnline = connected && reachable;
-      console.log(`📡 Статус сети: ${this.isOnline ? 'Online' : 'Offline'}`);
       if (this.isOnline && this.offlineQueue.length > 0) {
-        console.log('🔄 Сеть доступна, запуск синхронизации офлайн-очереди...');
         this.processOfflineQueue();
       }
     } catch (error) {
@@ -178,7 +171,6 @@ class BatchOfflineManager {
         const nowOnline = connected && reachable;
         if (nowOnline && !this.isOnline && this.offlineQueue.length > 0) {
           this.isOnline = true;
-          console.log('📡 Сеть восстановлена — немедленная отправка офлайн-очереди');
           this.processOfflineQueue();
         } else {
           this.isOnline = nowOnline;
@@ -204,19 +196,15 @@ class BatchOfflineManager {
     this.stats.totalEvents++;
     this.stats.pendingEvents = this.batch.length;
     
-    console.log(`📦 Событие добавлено в batch: ${event.eventType} (severity ${event.severity})`);
-    console.log(`📊 Batch размер: ${this.batch.length}/${BATCH_SIZE}`);
     
     // Немедленная отправка для критичных событий
     if (event.shouldSendImmediately) {
-      console.log('🚨 Критичное событие - немедленная отправка!');
       this.sendBatch(currentLocation, currentSpeed, gpsAccuracy, 'critical');
       return;
     }
     
     // Отправка при достижении BATCH_SIZE
     if (this.batch.length >= BATCH_SIZE) {
-      console.log(`✅ Batch заполнен (${BATCH_SIZE} событий) - отправка`);
       this.sendBatch(currentLocation, currentSpeed, gpsAccuracy, 'normal');
       return;
     }
@@ -225,7 +213,6 @@ class BatchOfflineManager {
     if (!this.batchTimer) {
       this.batchTimer = setTimeout(() => {
         if (this.batch.length > 0) {
-          console.log(`⏰ Таймаут batch (${BATCH_TIMEOUT_MS/1000} сек) - отправка ${this.batch.length} событий`);
           this.sendBatch(currentLocation, currentSpeed, gpsAccuracy, 'normal');
         }
       }, BATCH_TIMEOUT_MS);
@@ -244,7 +231,6 @@ class BatchOfflineManager {
     priority: 'critical' | 'high' | 'normal' = 'normal'
   ) {
     if (this.batch.length === 0) {
-      console.log('⚠️ Batch пустой, отправка не требуется');
       return;
     }
     
@@ -285,7 +271,6 @@ class BatchOfflineManager {
       await this.sendPackage(dataPackage);
     } else {
       // Сохранить в offline очередь
-      console.log('📴 Нет сети - сохранение в offline очередь');
       this.addToOfflineQueue(dataPackage);
     }
   }
@@ -326,10 +311,6 @@ class BatchOfflineManager {
         }))
       };
       
-      console.log(`📡 Отправка package ${dataPackage.id}:`);
-      console.log(`   События: ${dataPackage.events.length}`);
-      console.log(`   Приоритет: ${dataPackage.priority}`);
-      console.log(`   URL: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -340,7 +321,6 @@ class BatchOfflineManager {
       
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Package ${dataPackage.id} отправлен успешно!`, result);
         this.stats.successfulSends++;
         this.stats.lastSyncTime = Date.now();
         this.updateStats();
@@ -355,10 +335,8 @@ class BatchOfflineManager {
       // Добавить в offline очередь для retry
       dataPackage.retryCount++;
       if (dataPackage.retryCount <= 3) { // Максимум 3 попытки
-        console.log(`🔄 Retry ${dataPackage.retryCount}/3 - добавление в offline очередь`);
         this.addToOfflineQueue(dataPackage);
       } else {
-        console.log(`❌ Превышен лимит retry для package ${dataPackage.id} - отброшен`);
       }
       
       this.updateStats();
@@ -380,14 +358,11 @@ class BatchOfflineManager {
             .filter(pkg => pkg.priority !== 'critical')
             .slice(-MAX_OFFLINE_RECORDS + 100)
         );
-      console.log(`⚠️ Offline очередь переполнена, очищены старые записи`);
     }
     
     this.offlineQueue.push(dataPackage);
     this.saveOfflineQueue();
     
-    console.log(`💾 Package ${dataPackage.id} сохранён в offline очередь`);
-    console.log(`📊 Размер offline очереди: ${this.offlineQueue.length}/${MAX_OFFLINE_RECORDS}`);
   }
   
   /**
@@ -399,7 +374,6 @@ class BatchOfflineManager {
     }
     
     this.isSending = true;
-    console.log(`🔄 Обработка offline очереди: ${this.offlineQueue.length} записей`);
     
     // Сортировка по приоритету (критичные первыми)
     const sortedQueue = [...this.offlineQueue].sort((a, b) => {
@@ -427,9 +401,6 @@ class BatchOfflineManager {
     
     await this.saveOfflineQueue();
     
-    console.log(`✅ Offline синхронизация завершена:`);
-    console.log(`   Успешно: ${successfulIds.length}`);
-    console.log(`   Осталось: ${this.offlineQueue.length}`);
     
     this.isSending = false;
   }
@@ -461,11 +432,9 @@ class BatchOfflineManager {
    * Принудительная синхронизация
    */
   async forceSyncNow(currentLocation: any, currentSpeed: number, gpsAccuracy: number) {
-    console.log('🔄 Принудительная синхронизация...');
     
     // Если batch пустой, создать тестовое событие для подтверждения связи
     if (this.batch.length === 0 && currentLocation) {
-      console.log('📍 Batch пустой, создаём тестовую точку для синхронизации...');
       
       // Создать тестовое событие с текущими GPS координатами
       const testEvent: DetectedEvent = {
@@ -491,7 +460,6 @@ class BatchOfflineManager {
       };
       
       this.batch.push(testEvent);
-      console.log('✅ Тестовая точка добавлена в batch');
     }
     
     // Отправить текущий batch
@@ -524,7 +492,6 @@ class BatchOfflineManager {
       lastSyncTime: null,
     };
     this.updateStats();
-    console.log('🧹 BatchOfflineManager очищен');
   }
 }
 

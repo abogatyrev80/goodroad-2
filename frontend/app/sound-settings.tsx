@@ -4,16 +4,13 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import SoundManager from '../components/SoundManager';
 
 export default function SoundSettingsScreen() {
-  const router = useRouter();
 
   const handleSave = () => {
-    console.log('✅ Звуковые настройки сохранены');
   };
 
   return (

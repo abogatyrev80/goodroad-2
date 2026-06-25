@@ -232,12 +232,10 @@ export default function SettingsScreen() {
     try {
       if (soundOption.isCustom && soundOption.uri) {
         // TODO: Implement custom sound playback with expo-audio
-        console.log(`🔊 Testing custom sound: ${soundOption.name}`);
         Alert.alert('Тест звука', `Воспроизведение: ${soundOption.name}`);
       } else {
         // Воспроизводим встроенные звуки
         await playBuiltInSound(soundOption.id, settings.warningVolume);
-        console.log(`🔊 Testing sound: ${soundOption.name}`);
       }
       
     } catch (error) {

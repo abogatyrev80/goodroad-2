@@ -49,7 +49,6 @@ export default function AdminPanelSimple() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading local admin data...');
 
       // Инициализируем sync service (если ещё не инициализирован)
       await syncService.initialize();

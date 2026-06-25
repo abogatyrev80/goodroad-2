@@ -83,7 +83,6 @@ export default function AdminPanel() {
       // Используем правильный URL для Expo dev server
       const apiUrl = '/api/admin/sensor-data';
       
-      console.log(`📡 Loading sensor data from: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -93,12 +92,9 @@ export default function AdminPanel() {
         },
       });
       
-      console.log(`📡 Response status: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Raw API response:', data);
-        console.log('Response structure:', typeof data, Object.keys(data));
         
         if (data && data.data && Array.isArray(data.data)) {
           const formattedData: SensorDataPoint[] = data.data.map((item: any) => ({
@@ -117,7 +113,6 @@ export default function AdminPanel() {
           }));
           
           setSensorData(formattedData);
-          console.log(`✅ Successfully loaded ${formattedData.length} sensor data points`);
         } else {
           console.error('❌ Invalid data structure received:', data);
           Alert.alert('Ошибка', 'Неверная структура данных от сервера');
@@ -188,13 +183,10 @@ export default function AdminPanel() {
     );
     
     setFilteredData(filtered);
-    console.log(`🔍 Filtered: ${filtered.length}/${sensorData.length} points`);
   };
 
   const updatePointClassification = async (pointId: string, updates: Partial<SensorDataPoint>) => {
     try {
-      console.log('🔄 Updating point classification:', pointId);
-      console.log('📝 Updates:', updates);
       
       // Преобразуем camelCase в snake_case для backend
       const backendUpdates: any = {};
@@ -203,11 +195,9 @@ export default function AdminPanel() {
       if ('severity' in updates) backendUpdates.severity = updates.severity;
       if ('adminNotes' in updates) backendUpdates.admin_notes = updates.adminNotes;
       
-      console.log('📦 Backend payload:', backendUpdates);
       
       // Используем прямой запрос к локальному backend
       const apiUrl = `/api/admin/sensor-data/${pointId}`;
-      console.log('🌐 API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'PATCH',
@@ -218,11 +208,9 @@ export default function AdminPanel() {
         body: JSON.stringify(backendUpdates),
       });
       
-      console.log('📡 Response status:', response.status);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Update successful:', result);
         
         // Обновляем локальные данные
         setSensorData(prev => 
@@ -513,11 +501,8 @@ export default function AdminPanel() {
               Alert.alert('Тест API', 'Тестируем подключение к backend...');
               try {
                 const testUrl = '/api/admin/analytics';
-                console.log(`Testing API: ${testUrl}`);
                 const response = await fetch(testUrl);
-                console.log(`Response status: ${response.status}`);
                 const data = await response.json();
-                console.log('Response data:', data);
                 Alert.alert('API Тест', `Статус: ${response.status}\nДанные: ${JSON.stringify(data).substring(0, 100)}...`);
               } catch (error) {
                 console.error('API test error:', error);

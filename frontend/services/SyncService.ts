@@ -25,7 +25,6 @@ export class SyncService {
     // Убедимся что URL всегда заканчивается на /
     const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
     this.backendUrl = url.endsWith('/') ? url : url + '/';
-    console.log('🔗 SyncService backend URL:', this.backendUrl);
   }
 
   async initialize() {
@@ -39,7 +38,6 @@ export class SyncService {
         if (Platform.OS !== 'web') {
           const sub = Network.addNetworkStateListener((state) => {
             if (state.isConnected) {
-              console.log('📡 Сеть восстановлена — синхронизация с сервером');
               this.syncWithServer();
             }
           });
@@ -48,7 +46,6 @@ export class SyncService {
       }
       
       this.isInitialized = true;
-      console.log('✅ Sync service initialized (офлайн-данные синхронизируются при появлении сети)');
     } catch (error) {
       console.error('❌ Sync service initialization error:', error);
       console.warn('⚠️ Sync service continuing without local database');
@@ -83,11 +80,9 @@ export class SyncService {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (!networkState.isConnected) {
-        console.log('📡 No internet connection - sync skipped');
         return false;
       }
 
-      console.log('🔄 Starting sync with server...');
 
       // 1. Отправляем несинхронизированные данные на сервер
       await this.uploadSensorData();
@@ -101,7 +96,6 @@ export class SyncService {
       // 4. Очищаем старые данные
       await localDB.cleanupOldData(30);
 
-      console.log('✅ Sync completed successfully');
       return true;
     } catch (error) {
       console.error('❌ Sync error:', error);
@@ -113,11 +107,9 @@ export class SyncService {
   private async uploadSensorData() {
     const unsyncedData = await localDB.getUnsyncedSensorData();
     if (unsyncedData.length === 0) {
-      console.log('No unsynced sensor data to upload');
       return;
     }
 
-    console.log(`Uploading ${unsyncedData.length} sensor data records...`);
 
     try {
       const deviceId = 'mobile-app-' + Date.now();
@@ -154,7 +146,6 @@ export class SyncService {
 
           await localDB.markSensorDataSynced(localIds, []);
 
-          console.log(`Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(unsyncedData.length/batchSize)}`);
         } else {
           const errorText = await response.text();
           console.error(`Failed to upload batch: ${response.status} - ${errorText}`);
@@ -200,7 +191,6 @@ export class SyncService {
               warnings.length
             );
             
-            console.log(`📥 Downloaded ${warnings.length} warnings for ${region.name}`);
           }
         }
       }
@@ -217,7 +207,6 @@ export class SyncService {
         throw new Error('No internet connection');
       }
 
-      console.log(`📥 Downloading data for region: ${regionName}...`);
 
       const response = await fetch(
         `${this.backendUrl}api/warnings/region/${regionCode}/full?` +
@@ -247,7 +236,6 @@ export class SyncService {
       await localDB.saveWarnings(localWarnings);
       await localDB.updateRegionSyncStatus(regionCode, regionName, warnings.length);
 
-      console.log(`✅ Downloaded ${warnings.length} warnings for ${regionName}`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to download region ${regionName}:`, error);
@@ -313,14 +301,12 @@ export class SyncService {
   }
 
   async forceFullSync(): Promise<boolean> {
-    console.log('🔄 Forcing full sync...');
     return await this.syncWithServer();
   }
 
   // === MANUAL CONTROL ===
   async clearLocalData() {
     // Это для debug/reset функции
-    console.log('🗑️ Clearing all local data...');
     // Implement database clearing if needed
   }
 }

@@ -162,7 +162,6 @@ export default function HomeScreen() {
     try {
       const mode = await AsyncStorage.getItem('autostart_mode');
       setAutostartMode(mode || 'disabled');
-      console.log('🚀 Autostart mode:', mode);
 
       const alreadyTracking = await AsyncStorage.getItem('is_tracking_active') === 'true';
       if (alreadyTracking) return;
@@ -172,7 +171,6 @@ export default function HomeScreen() {
         const isCharging = batteryState === Battery.BatteryState.CHARGING || 
                           batteryState === Battery.BatteryState.FULL;
         if (isCharging) {
-          console.log('🚀 Auto-starting monitoring - device is charging...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -184,7 +182,6 @@ export default function HomeScreen() {
       if (mode === 'onBluetooth') {
         const shouldStart = await checkBluetoothConnection();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -196,7 +193,6 @@ export default function HomeScreen() {
       if (mode === 'withApps') {
         const shouldStart = await checkTriggerApps();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - trigger app detected...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -246,7 +242,6 @@ export default function HomeScreen() {
       if (currentMode === 'onBluetooth') {
         const shouldStart = await checkBluetoothConnection();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - Bluetooth device connected...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -255,7 +250,6 @@ export default function HomeScreen() {
       } else if (currentMode === 'withApps') {
         const shouldStart = await checkTriggerApps();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - trigger app detected on app resume...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -266,7 +260,6 @@ export default function HomeScreen() {
         const isCharging = batteryState === Battery.BatteryState.CHARGING || 
                           batteryState === Battery.BatteryState.FULL;
         if (isCharging) {
-          console.log('🚀 Auto-starting monitoring - device is charging...');
           setTimeout(() => {
             startTracking({ silent: true });
             setWasAutoStarted(true);
@@ -282,7 +275,6 @@ export default function HomeScreen() {
         if (await AsyncStorage.getItem('is_tracking_active') === 'true') return;
         const shouldStart = await checkBluetoothConnection();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - Bluetooth device connected (periodic check)...');
           startTracking({ silent: true });
           setWasAutoStarted(true);
         }
@@ -298,7 +290,6 @@ export default function HomeScreen() {
         const isCharging = batteryState === Battery.BatteryState.CHARGING || 
                           batteryState === Battery.BatteryState.FULL;
         if (isCharging) {
-          console.log('🚀 Auto-starting monitoring - device is charging (periodic check)...');
           startTracking({ silent: true });
           setWasAutoStarted(true);
         }
@@ -312,7 +303,6 @@ export default function HomeScreen() {
         if (await AsyncStorage.getItem('is_tracking_active') === 'true') return;
         const shouldStart = await checkTriggerApps();
         if (shouldStart) {
-          console.log('🚀 Auto-starting monitoring - trigger app detected (periodic check)...');
           startTracking({ silent: true });
           setWasAutoStarted(true);
         }
@@ -338,7 +328,6 @@ export default function HomeScreen() {
             const isConnected = await checkBluetoothConnection();
             if (!isConnected) {
               shouldStop = true;
-              console.log('⏹️ Auto-stopping monitoring - Bluetooth device disconnected...');
             }
           }
         } else if (currentMode === 'withApps') {
@@ -353,7 +342,6 @@ export default function HomeScreen() {
             const isAppActive = await checkTriggerApps();
             if (!isAppActive) {
               shouldStop = true;
-              console.log('⏹️ Auto-stopping monitoring - trigger app closed...');
             }
           }
         } else if (currentMode === 'onCharge') {
@@ -370,7 +358,6 @@ export default function HomeScreen() {
                               batteryState === Battery.BatteryState.FULL;
             if (!isCharging) {
               shouldStop = true;
-              console.log('⏹️ Auto-stopping monitoring - device unplugged...');
             }
           }
         }
@@ -418,24 +405,20 @@ export default function HomeScreen() {
     try {
       const savedDevice = await AsyncStorage.getItem('autostart_bluetooth_device');
       if (!savedDevice) {
-        console.log('📱 No Bluetooth device configured');
         return false;
       }
 
       // Проверяем/запрашиваем разрешение для Android 12+
       const hasPermission = await ensureBluetoothPermission();
       if (!hasPermission) {
-        console.log('📱 BLUETOOTH_CONNECT permission not granted');
         return false;
       }
 
       const device: { name: string; address?: string } = JSON.parse(savedDevice);
-      console.log('📱 Checking Bluetooth connection for device:', device.name);
       
       // Проверяем, включен ли Bluetooth
       const isEnabled = await RNBluetoothClassic.isBluetoothEnabled();
       if (!isEnabled) {
-        console.log('📱 Bluetooth is disabled');
         return false;
       }
       
@@ -446,7 +429,6 @@ export default function HomeScreen() {
           try {
             const connectedDevice = await RNBluetoothClassic.getConnectedDevice(device.address);
             if (connectedDevice && connectedDevice.isConnected()) {
-              console.log('📱 Bluetooth device is connected:', device.name);
               return true;
             }
           } catch {
@@ -458,21 +440,17 @@ export default function HomeScreen() {
             (d: { address: string }) => d.address === device.address
           );
           if (isConnected) {
-            console.log('📱 Bluetooth device is connected (from list):', device.name);
             return true;
           }
 
           // 2) Пытаемся подключиться к устройству (если оно в зоне и сопряжено)
           try {
             await RNBluetoothClassic.connectToDevice(device.address, {});
-            console.log('📱 Bluetooth device connected (just connected):', device.name);
             return true;
           } catch (connectError) {
             // Устройство недоступно или не принимает соединение (например, только A2DP)
-            console.log('📱 Bluetooth connect attempt failed:', (connectError as Error)?.message || connectError);
           }
 
-          console.log('📱 Bluetooth device is not connected:', device.name);
           return false;
         } catch (error) {
           console.error('Error checking Bluetooth connection by address:', error);
@@ -488,11 +466,9 @@ export default function HomeScreen() {
         );
         
         if (isConnected) {
-          console.log('📱 Bluetooth device is connected (by name):', device.name);
           return true;
         }
         
-        console.log('📱 Bluetooth device is not connected (by name):', device.name);
         return false;
       } catch (error) {
         console.error('Error checking Bluetooth connection by name:', error);
@@ -515,18 +491,14 @@ export default function HomeScreen() {
     try {
       const savedApps = await AsyncStorage.getItem('autostart_trigger_apps');
       if (!savedApps) {
-        console.log('📱 No trigger apps configured');
         return false;
       }
       const selectedPackageNames: string[] = JSON.parse(savedApps);
       if (selectedPackageNames.length === 0) {
-        console.log('📱 No apps selected');
         return false;
       }
-      console.log('📱 Selected trigger apps (package names):', selectedPackageNames.join(', '));
 
       if (Platform.OS !== 'android') {
-        console.log('📱 Trigger apps mode is Android-only');
         return false;
       }
 
@@ -535,7 +507,6 @@ export default function HomeScreen() {
       const lastBg = lastBackgroundTimeRef.current;
       if (lastBg != null && (now - lastBg) >= 3000) {
         lastBackgroundTimeRef.current = null;
-        console.log('📱 User returned from background after', Math.round((now - lastBg) / 1000), 's — starting monitoring (trigger apps heuristic)');
         return true;
       }
       return false;
@@ -566,10 +537,8 @@ export default function HomeScreen() {
           deviceId,
           backendUrl,
           (warnings) => {
-            console.log('⚠️ Received warnings from backend:', warnings);
           }
         );
-        console.log('🔧 RawDataCollector initialized with:', { deviceId, backendUrl });
       }
 
       // Загружаем настройки предупреждений
@@ -695,7 +664,6 @@ export default function HomeScreen() {
         }
       );
       locationSubscription.current = subscription;
-      console.log('✅ GPS tracking started');
 
       // Запускаем акселерометр (10 Hz) — на web expo-sensors не поддерживается
       if (Platform.OS !== 'web') {
@@ -712,9 +680,7 @@ export default function HomeScreen() {
           }
         });
         accelerometerSubscription.current = accelSubscription;
-        console.log('✅ Accelerometer started (10 Hz)');
       } else {
-        console.log('⚠️ Accelerometer skipped on web');
       }
 
       // 🆕 Интервал для сбора и отправки синхронизированных пакетов данных
@@ -736,11 +702,9 @@ export default function HomeScreen() {
           // Добавляем в буфер пакетов
           syncedDataBuffer.current.push(syncedPacket);
           
-          console.log(`📦 Пакет собран: ${accelerometerSnapshot.length} точек акселерометра, буфер: ${syncedDataBuffer.current.length}/5`);
           
           // Отправляем батч когда накопится 5 пакетов (= 5 секунд данных)
           if (syncedDataBuffer.current.length >= 5) {
-            console.log(`📤 Отправка батча из ${syncedDataBuffer.current.length} пакетов`);
             
             // Отправляем все пакеты
             syncedDataBuffer.current.forEach(packet => {
@@ -759,7 +723,6 @@ export default function HomeScreen() {
           dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
         } else {
           // Если GPS еще не готов, повторяем попытку
-          console.log('⏳ Ожидание GPS сигнала...');
           dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
         }
       };
@@ -776,7 +739,6 @@ export default function HomeScreen() {
           const keepScreenOn = await AsyncStorage.getItem('keep_screen_on');
           if (keepScreenOn === 'true') {
             await activateKeepAwakeAsync();
-            console.log('✅ Keep screen on enabled');
 
             // Установить минимальную яркость (сохраняем текущую и восстанавливаем при остановке)
             const available = await Brightness.isAvailableAsync();
@@ -795,7 +757,6 @@ export default function HomeScreen() {
                     }
                   }
                   await Brightness.setBrightnessAsync(minBrightness);
-                  console.log('✅ Min brightness set to', Math.round(minBrightness * 100), '%');
                 }
               } catch (brightnessErr) {
                 console.warn('Brightness error:', brightnessErr);
@@ -864,19 +825,16 @@ export default function HomeScreen() {
             const available = await Brightness.isAvailableAsync();
             if (available) {
               await Brightness.setBrightnessAsync(savedBrightnessRef.current);
-              console.log('✅ Brightness restored');
             }
             savedBrightnessRef.current = null;
           }
           deactivateKeepAwake();
-          console.log('✅ Keep screen on disabled');
         } catch {
           savedBrightnessRef.current = null;
         }
       }
 
       showToast('info', '⏹️ Мониторинг остановлен', 'Приложение больше не отслеживает дорогу', 3000);
-      console.log('✅ Tracking stopped and buffers cleared');
     } catch (error) {
       console.error('Error stopping tracking:', error);
     } finally {

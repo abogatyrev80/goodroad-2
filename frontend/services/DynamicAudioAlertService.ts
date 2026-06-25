@@ -126,7 +126,6 @@ class DynamicAudioAlertService {
         const parsed = JSON.parse(saved);
         if (typeof parsed === 'object' && parsed !== null) {
           this.settings = { ...this.settings, ...parsed };
-          console.log('🔊 Dynamic audio settings loaded:', this.settings);
         }
       }
     } catch (error) {
@@ -140,7 +139,6 @@ class DynamicAudioAlertService {
     
     try {
       await AsyncStorage.setItem('dynamic_audio_settings', JSON.stringify(this.settings));
-      console.log('✅ Dynamic audio settings saved:', this.settings);
     } catch (error) {
       console.error('❌ Error saving dynamic audio settings:', error);
     }
@@ -168,7 +166,6 @@ class DynamicAudioAlertService {
       );
       
       this.beepSound = sound;
-      console.log('✅ Beep sound initialized');
     } catch (error: any) {
       console.error('❌ Error initializing beep sound:', error);
     }
@@ -249,7 +246,6 @@ class DynamicAudioAlertService {
       await this.beepSound.playAsync();
       
       this.lastBeepTime = Date.now();
-      console.log(`🔊 Beep played: rate=${rate}, volume=${this.settings.volume}`);
     } catch (error: any) {
       console.error('❌ Error playing beep:', error);
     }
@@ -305,7 +301,6 @@ class DynamicAudioAlertService {
     if (timeSinceLastBeep >= beepInterval) {
       await this.playBeep(playbackRate);
       
-      console.log(`🔊 Beep: distance=${distance}m, interval=${beepInterval}ms, rate=${playbackRate.toFixed(2)}x, speedDiff=${speedDiff.toFixed(0)}km/h`);
     }
 
     // Запоминаем активное препятствие
@@ -375,7 +370,6 @@ class DynamicAudioAlertService {
         volume: this.settings.volume,
       });
       
-      console.log(`🗣️ Announced obstacle with custom text: ${customText}`);
     } catch (error) {
       console.error('❌ Error announcing obstacle with custom text:', error);
     }
@@ -422,7 +416,6 @@ class DynamicAudioAlertService {
     await this.playBeepWithPitch(pitch);
     this.lastBeepTime = now;
     
-    console.log(`🔊 Dynamic beep at ${distance}m (frequency: ${frequency.toFixed(2)}/s, pitch: ${pitch})`);
   }
 
   /**
@@ -443,7 +436,6 @@ class DynamicAudioAlertService {
       await this.beepSound.setVolumeAsync(this.settings.volume);
       await this.beepSound.playAsync();
       
-      console.log(`🔊 Beep with pitch played: pitch=${pitch}, volume=${this.settings.volume}`);
     } catch (error: any) {
       console.error('❌ Error playing beep with pitch:', error);
     }
@@ -474,7 +466,6 @@ class DynamicAudioAlertService {
       await sound.playAsync();
       
       this.lastBeepTime = Date.now();
-      console.log(`🎵 Playing custom sound: ${uri}`);
     } catch (error) {
       console.error('❌ Error playing custom sound:', error);
     }

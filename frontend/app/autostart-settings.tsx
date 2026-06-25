@@ -219,7 +219,6 @@ export default function AutostartSettingsScreen() {
       
       setAllInstalledApps(appsList);
       setFilteredApps(appsList);
-      console.log(`✅ Loaded ${appsList.length} installed apps`);
     } catch (error) {
       console.error('Error loading installed apps:', error);
       Alert.alert(
@@ -293,7 +292,6 @@ export default function AutostartSettingsScreen() {
         );
 
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('✅ BLUETOOTH_CONNECT permission granted');
           return true;
         } else {
           console.warn('⚠️ BLUETOOTH_CONNECT permission denied');
@@ -352,7 +350,6 @@ export default function AutostartSettingsScreen() {
       
       setAllBluetoothDevices(devicesList);
       setFilteredBluetoothDevices(devicesList);
-      console.log(`✅ Loaded ${devicesList.length} Bluetooth devices`);
     } catch (error: any) {
       console.error('Error loading Bluetooth devices:', error);
       const errorMessage = error?.message || 'Не удалось получить список устройств';

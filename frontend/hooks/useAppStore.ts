@@ -258,7 +258,6 @@ useAppStore.subscribe(
   (stats) => {
     // Log performance metrics for debugging
     if (__DEV__) {
-      console.log('Performance stats:', stats);
     }
   }
 );

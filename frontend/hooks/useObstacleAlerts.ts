@@ -216,14 +216,12 @@ export function useObstacleAlerts(
     if (speedDelta > 5) {
       // Водитель отреагировал (снизил скорость более чем на 5 км/ч)
       await obstacleService.recordDriverReaction(obstacle, 'confirmed');
-      console.log(`👍 Driver reacted to ${obstacle.type} at ${obstacle.distance}m`);
       
       // Удаляем из отслеживания
       alertedObstaclesForReaction.current.delete(obstacle.id);
     } else if (obstacle.distance < 50) {
       // Препятствие пройдено без снижения скорости - проигнорировано
       await obstacleService.recordDriverReaction(obstacle, 'ignored');
-      console.log(`😐 Driver ignored ${obstacle.type}`);
       
       // Удаляем из отслеживания
       alertedObstaclesForReaction.current.delete(obstacle.id);

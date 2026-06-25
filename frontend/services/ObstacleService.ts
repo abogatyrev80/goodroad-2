@@ -74,7 +74,6 @@ class ObstacleService {
     // Инициализируем URL
     const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
     this.backendUrl = url.endsWith('/') ? url : url + '/';
-    console.log('🚧 ObstacleService initialized with URL:', this.backendUrl);
 
     // Загружаем реакции водителя
     await this.loadDriverReactions();
@@ -98,13 +97,11 @@ class ObstacleService {
       // Проверяем кэш
       const now = Date.now();
       if (now - this.lastFetchTime < this.CACHE_DURATION && this.cachedObstacles.length > 0) {
-        console.log('📦 Using cached obstacles:', this.cachedObstacles.length);
         return this.filterActiveObstacles(this.cachedObstacles, latitude, longitude);
       }
 
       // Запрашиваем с сервера
       const url = `${this.backendUrl}api/obstacles/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&min_confirmations=${minConfirmations}`;
-      console.log('🌐 Fetching obstacles from:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -122,7 +119,6 @@ class ObstacleService {
       this.cachedObstacles = data.obstacles;
       this.lastFetchTime = now;
 
-      console.log(`✅ Fetched ${data.total} obstacles`);
       
       return this.filterActiveObstacles(data.obstacles, latitude, longitude);
     } catch (error) {
@@ -232,7 +228,6 @@ class ObstacleService {
 
     await this.saveDriverReactions();
     
-    console.log(`📝 Driver reaction recorded: ${action} for ${obstacle.type} at ${obstacle.distance}m`);
   }
 
   /**
@@ -240,7 +235,6 @@ class ObstacleService {
    */
   markAsPassed(obstacleId: string): void {
     this.passedObstacles.add(obstacleId);
-    console.log(`✅ Obstacle marked as passed: ${obstacleId}`);
   }
 
   /**
@@ -248,7 +242,6 @@ class ObstacleService {
    */
   clearPassedObstacles(): void {
     this.passedObstacles.clear();
-    console.log('🧹 Cleared passed obstacles');
   }
 
   /**
@@ -273,7 +266,6 @@ class ObstacleService {
       const data = await AsyncStorage.getItem('driver_reactions');
       if (data) {
         this.driverReactions = JSON.parse(data);
-        console.log(`📂 Loaded ${this.driverReactions.length} driver reactions`);
       }
     } catch (error) {
       console.error('❌ Error loading driver reactions:', error);

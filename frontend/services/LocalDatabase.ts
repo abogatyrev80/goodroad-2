@@ -73,7 +73,6 @@ class LocalDatabaseManager {
     try {
       this.db = await SQLite.openDatabaseAsync('good_road.db');
       await this.createTables();
-      console.log('✅ Local database initialized');
     } catch (error) {
       console.error('❌ Database initialization error:', error);
       throw error;
@@ -142,7 +141,6 @@ class LocalDatabaseManager {
       ON warnings(latitude, longitude);
     `);
 
-    console.log('✅ Database tables created');
   }
 
   // === SENSOR DATA MANAGEMENT ===
@@ -173,7 +171,6 @@ class LocalDatabaseManager {
       new Date().toISOString()
     ]);
 
-    console.log(`💾 Saved sensor data locally (ID: ${result.lastInsertRowId})`);
     return result.lastInsertRowId as number;
   }
 
@@ -222,7 +219,6 @@ class LocalDatabaseManager {
       WHERE id IN (${placeholders})
     `, serverIds ? [...localIds, ...serverIds] : localIds);
 
-    console.log(`✅ Marked ${localIds.length} sensor data records as synced`);
   }
 
   // === WARNINGS MANAGEMENT ===
@@ -258,7 +254,6 @@ class LocalDatabaseManager {
         ]);
       }
       
-      console.log(`💾 Saved ${warnings.length} warnings locally`);
     } finally {
       await statement.finalizeAsync();
     }
@@ -320,7 +315,6 @@ class LocalDatabaseManager {
       VALUES (?, ?, ?, ?)
     `, [regionCode, regionName, new Date().toISOString(), warningCount]);
 
-    console.log(`📍 Updated sync status for region: ${regionName} (${warningCount} warnings)`);
   }
 
   async getDownloadedRegions(): Promise<Array<{code: string, name: string, lastSync: string, warningCount: number}>> {
@@ -376,7 +370,6 @@ class LocalDatabaseManager {
       WHERE is_verified = 0 AND last_updated < ?
     `, [cutoffISO]);
 
-    console.log(`🧹 Cleanup: removed ${sensorResult.changes} old sensor records, ${warningResult.changes} old warnings`);
   }
 
   async getDatabaseStats() {

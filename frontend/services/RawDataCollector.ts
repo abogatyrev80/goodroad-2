@@ -106,7 +106,6 @@ class RawDataCollector {
       const sub = Network.addNetworkStateListener((state) => {
         if (state.isConnected) {
           this.isOnline = true;
-          console.log('📡 Сеть восстановлена — отправка офлайн-очереди');
           this.processOfflineQueue();
         } else {
           this.isOnline = false;
@@ -116,9 +115,6 @@ class RawDataCollector {
     }
 
     RawDataCollector.currentInstance = this;
-    console.log('✅ RawDataCollector инициализирован (офлайн-очередь при отсутствии сети)');
-    console.log(`   Device ID: ${this.deviceId}`);
-    console.log(`   Backend URL: ${this.backendUrl}`);
   }
 
   /** Количество батчей в офлайн-очереди (для экрана статистики) */
@@ -141,7 +137,6 @@ class RawDataCollector {
     accelerometerBuffer: Array<{ x: number; y: number; z: number; timestamp: number }>,
     customTimestamp?: number // 🆕 Опциональный параметр для точного timestamp
   ): Promise<void> {
-    console.log(`📊 Добавление точки с ${accelerometerBuffer.length} значениями акселерометра`);
     
     const dataPoint: RawSensorDataPoint = {
       deviceId: this.deviceId,
@@ -189,7 +184,6 @@ class RawDataCollector {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (!networkState.isConnected) {
-        console.log('📴 Нет сети — батч сохранён в офлайн-очередь');
         this.isOnline = false;
         await this.saveToOfflineQueue(batch);
         return;
@@ -201,7 +195,6 @@ class RawDataCollector {
     }
 
     try {
-      console.log(`📤 Отправка батча: ${batch.data.length} точек`);
       
       const response = await fetch(`${this.backendUrl}api/raw-data`, {
         method: 'POST',
@@ -217,16 +210,10 @@ class RawDataCollector {
       
       const result: RawDataResponse = await response.json();
       
-      console.log(`✅ Батч отправлен успешно:`);
-      console.log(`   Сохранено: ${result.rawDataSaved} точек`);
-      console.log(`   Обнаружено событий: ${result.eventsDetected}`);
-      console.log(`   Предупреждений: ${result.warningsGenerated}`);
       
       // Обрабатываем предупреждения
       if (result.warnings && result.warnings.length > 0) {
-        console.log(`⚠️  Получены предупреждения: ${result.warnings.length}`);
         result.warnings.forEach(w => {
-          console.log(`   - ${w.message}`);
         });
         
         if (this.onWarningsReceived) {
@@ -247,7 +234,6 @@ class RawDataCollector {
    * Принудительная отправка всех данных
    */
   public async forceSend(): Promise<void> {
-    console.log('🔄 Принудительная отправка данных...');
     
     // Отправляем текущий буфер
     if (this.dataBuffer.length > 0) {
@@ -270,7 +256,6 @@ class RawDataCollector {
         queue.splice(0, queue.length - MAX_OFFLINE_BATCHES);
       }
       await AsyncStorage.setItem(this.OFFLINE_STORAGE_KEY, JSON.stringify(queue));
-      console.log(`💾 Батч сохранён в офлайн-очередь (всего: ${queue.length}/${MAX_OFFLINE_BATCHES})`);
     } catch (error) {
       console.error('❌ Ошибка сохранения в офлайн-очередь:', error);
     }
@@ -294,7 +279,6 @@ class RawDataCollector {
         this.isProcessingQueue = false;
         return;
       }
-      console.log(`📦 Отправка офлайн-очереди: ${queue.length} батчей`);
       const stillPending: RawDataBatch[] = [];
       for (const batch of queue) {
         try {
@@ -309,7 +293,6 @@ class RawDataCollector {
             body: JSON.stringify(batch),
           });
           if (response.ok) {
-            console.log(`✅ Офлайн-батч отправлен (${batch.data.length} точек)`);
             try {
               const result = await response.json();
               if (this.onWarningsReceived && result.warnings?.length) {
@@ -327,10 +310,8 @@ class RawDataCollector {
       }
       if (stillPending.length === 0) {
         await AsyncStorage.removeItem(this.OFFLINE_STORAGE_KEY);
-        console.log('✅ Офлайн-очередь полностью отправлена');
       } else {
         await AsyncStorage.setItem(this.OFFLINE_STORAGE_KEY, JSON.stringify(stillPending));
-        console.log(`📋 В очереди осталось ${stillPending.length} батчей`);
       }
     } catch (error) {
       console.error('❌ Ошибка обработки офлайн-очереди:', error);
@@ -369,7 +350,6 @@ class RawDataCollector {
       });
       
       if (response.ok) {
-        console.log(`✅ Предупреждение отклонено: ${warningId}`);
       }
       
     } catch (error) {
@@ -409,7 +389,6 @@ class RawDataCollector {
    */
   public clearBuffer(): void {
     this.dataBuffer = [];
-    console.log('🗑️  Буфер данных очищен');
   }
 }
 
