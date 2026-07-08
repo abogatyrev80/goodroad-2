@@ -18,6 +18,7 @@ from config import (
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
 )
+from pydantic import BaseModel
 from models import (
     AccelerometerReading, RawSensorData, RawDataBatch,
     ProcessedEvent, UserWarning, LimitsConfig,
