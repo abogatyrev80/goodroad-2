@@ -11,7 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from clustering import ObstacleClusterer
 from ml_processor import EventClassifier, WarningGenerator
-from ml_stats import get_ml_stats_tracker
+from ml_stats import get_ml_stats_tracker, init_ml_stats_tracker
 
 logging.basicConfig(
     level=logging.INFO,
