@@ -125,7 +125,7 @@ async def get_severity_metrics():
 # CLUSTERS - Управление кластерами
 # ====================================
 
-async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
+def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     """Инициализация с доступом к БД"""
     
     @admin_editor_router.get("/clusters/{cluster_id}")
