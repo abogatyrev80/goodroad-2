@@ -283,6 +283,7 @@ class DynamicAudioAlertService {
         ? `Снизьте скорость до ${recommendedSpeed} километров в час`
         : `Reduce speed to ${recommendedSpeed} kilometers per hour`;
       
+      await Speech.stop();
       Speech.speak(warningText, {
         language: this.settings.language === 'ru' ? 'ru-RU' : 'en-US',
         rate: 1.1,
@@ -337,6 +338,7 @@ class DynamicAudioAlertService {
       text = `${obstacleType} ahead in ${distance} meters. Recommended speed ${recommendedSpeed} kilometers per hour.`;
     }
 
+    await Speech.stop();
     Speech.speak(text, {
       language: this.settings.language === 'ru' ? 'ru-RU' : 'en-US',
       rate: 1.0,
@@ -363,6 +365,7 @@ class DynamicAudioAlertService {
     }
 
     try {
+      await Speech.stop();
       await Speech.speak(customText, {
         language: this.settings.language === 'ru' ? 'ru-RU' : 'en-US',
         pitch: 1.0,

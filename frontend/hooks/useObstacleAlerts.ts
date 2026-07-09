@@ -24,6 +24,7 @@ export function useObstacleAlerts(
   const previousSpeed = useRef<number>(0);
   const alertedObstaclesForReaction = useRef<Map<string, { obstacle: Obstacle; alerted: boolean }>>(new Map());
   const lastPositionRef = useRef<{ lat: number; lon: number } | null>(null);
+  const currentSpeedRef = useRef<number>(currentSpeed);
 
   // Загрузка препятствий каждые 30 секунд
   useEffect(() => {
@@ -152,6 +153,7 @@ export function useObstacleAlerts(
     // Получаем настройки динамической системы
     const settings = dynamicAudioService.getSettings();
     const alertSettings = alertSettingsService.getSettings();
+    const speed = currentSpeedRef.current;
 
     for (const obstacle of obstacleList) {
       const distance = obstacle.distance;
@@ -162,7 +164,7 @@ export function useObstacleAlerts(
       }
 
       // 🆕 ПРОВЕРКА СКОРОСТИ - должны ли мы предупреждать?
-      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, currentSpeed * 3.6); // м/с → км/ч
+      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, speed * 3.6); // м/с → км/ч
       
       if (!speedCheck.shouldAlert) {
         continue; // Скорость нормальная - молчим
@@ -197,7 +199,7 @@ export function useObstacleAlerts(
       
       if (shouldUseSiren) {
         const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, distance);
-        await dynamicAudioService.alertDynamicWithFrequency(obstacle, currentSpeed, sirenFrequency);
+        await dynamicAudioService.alertDynamicWithFrequency(obstacle, speed, sirenFrequency);
       }
 
       // Проверяем реакцию водителя
@@ -211,7 +213,7 @@ export function useObstacleAlerts(
     if (!alertData || !alertData.alerted) return;
 
     // Проверяем снизил ли водитель скорость
-    const speedDelta = previousSpeed.current - currentSpeed;
+    const speedDelta = previousSpeed.current - currentSpeedRef.current;
     
     if (speedDelta > 5) {
       // Водитель отреагировал (снизил скорость более чем на 5 км/ч)
@@ -231,7 +233,8 @@ export function useObstacleAlerts(
 
   // Отслеживание изменения скорости
   useEffect(() => {
-    previousSpeed.current = currentSpeed;
+    previousSpeed.current = currentSpeedRef.current;
+    currentSpeedRef.current = currentSpeed;
   }, [currentSpeed]);
 
   // Очистка при остановке
@@ -276,6 +279,7 @@ export function useObstacleAlerts(
   return {
     obstacles,
     closestObstacle,
+    obstaclesCount: obstacles.length,
     isNearObstacle: !!closestObstacle,
     refetchObstacles, // 🆕 Экспортируем функцию обновления
   };

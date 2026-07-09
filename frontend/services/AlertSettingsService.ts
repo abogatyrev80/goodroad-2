@@ -135,6 +135,38 @@ class AlertSettingsService {
     return `${baseText} ${Math.round(distance)} метров`;
   }
 
+  /**
+   * Определяет, нужен ли голосовой告警 для данного уровня
+   */
+  shouldUseVoice(alertLevel: 'silent' | 'visual' | 'voice' | 'full'): boolean {
+    return alertLevel === 'voice' || alertLevel === 'full';
+  }
+
+  /**
+   * Определяет, нужна ли непрерывная сирена для данного уровня
+   */
+  shouldUseSiren(alertLevel: 'silent' | 'visual' | 'voice' | 'full'): boolean {
+    return alertLevel === 'full';
+  }
+
+  /**
+   * Вычисляет частоту сирены (beep в секунду) на основе превышения скорости и расстояния
+   */
+  getSirenFrequency(speedExcess: number, distance: number): number {
+    let frequency = 0.5;
+    if (speedExcess > 0) {
+      frequency += Math.min(speedExcess / 20, 1.5);
+    }
+    if (distance < 100) {
+      frequency *= 2.0;
+    } else if (distance < 200) {
+      frequency *= 1.5;
+    } else if (distance < 300) {
+      frequency *= 1.2;
+    }
+    return Math.max(0.5, Math.min(3.0, frequency));
+  }
+
 }
 // Звуковые настройки теперь находятся в DynamicAudioAlertService (audio-settings.tsx)
 

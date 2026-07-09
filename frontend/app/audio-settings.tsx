@@ -175,7 +175,7 @@ export default function AudioSettingsScreen() {
               soundTheme: 'motion-tracker',
               customThemeSoundId: undefined,
               theme: 'moderate',
-              minDistance: 30,
+              minDistance: 50,
               maxDistance: 300,
               minSpeed: 5,
               beepStartDistance: 200,

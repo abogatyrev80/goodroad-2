@@ -180,6 +180,3 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 });
-
-// Добавляем View для исправления типов
-const View = require('react-native').View;
