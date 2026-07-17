@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+*.egg
+
+# Logs
+*.log
+*.err
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.backup*
+*_backup*
+*_backup_*
+
+# Model files
+*.keras
+*.h5
+*.onnx
+*.pt
+models/*.pth
+
+# Datasets
+datasets/
+backend/datasets/
+
+# Environment
+.env
+.env.local
