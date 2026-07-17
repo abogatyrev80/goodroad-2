@@ -91,7 +91,14 @@ export default function HomeScreen() {
 
   // Скрываем заставку, когда главный экран смонтирован и отрисован (убирает долгий «Loading»)
   useEffect(() => {
+    // Fallback: hide splash after 3 seconds even if init hangs
+    const timeout = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 3000);
+    
     SplashScreen.hideAsync().catch(() => {});
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   // Инициализация при загрузке
@@ -523,8 +530,13 @@ export default function HomeScreen() {
       const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
       let bgStatus: string = 'granted';
       if (Platform.OS !== 'web') {
-        const { status } = await Location.requestBackgroundPermissionsAsync();
-        bgStatus = status;
+        try {
+          const { status } = await Location.requestBackgroundPermissionsAsync();
+          bgStatus = status;
+        } catch (e) {
+          console.warn('Background permission request failed:', e);
+          bgStatus = 'granted'; // Don't block on background permission failure
+        }
       }
       if (locationStatus !== 'granted' || bgStatus !== 'granted') {
         showToast('error', '⚠️ Разрешения необходимы', 'Для работы приложения нужны разрешения на GPS и фоновую работу', 5000);
@@ -546,6 +558,9 @@ export default function HomeScreen() {
       await loadWarningSettings();
     } catch (error) {
       console.error('Error initializing services:', error);
+    } finally {
+      // Ensure splash is hidden even on error
+      SplashScreen.hideAsync().catch(() => {});
     }
   };
 
