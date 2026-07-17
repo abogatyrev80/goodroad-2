@@ -42,6 +42,17 @@ app = FastAPI(
     version="2.0.0"
 )
 
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
+
 @app.on_event("startup")
 async def startup_event():
     """
