@@ -1,39 +1,104 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
+from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-import csv
-import io
-import logging
+from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional, Union
 import uuid
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Dict, Optional
+import asyncio
+import math
+import statistics
+import csv
+import io
 
-from config import (
-    ROOT_DIR, templates, client, db, mongodb_connected,
-    obstacle_clusterer, event_classifier, warning_generator,
-    connect_to_mongodb, close_mongodb_connection,
-    get_limits_from_db, save_limits_to_db, check_rate_limit,
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-from pydantic import BaseModel
-from models import (
-    AccelerometerReading, RawSensorData, RawDataBatch,
-    ProcessedEvent, UserWarning, LimitsConfig,
-)
-from services.geo import (
-    validate_gps_coords, calculate_distance,
-)
-from dataset_exporter import DatasetExporter
-from model_registry import ModelRegistry
-from external_training_api import external_training_router, init_external_training
-from inference_worker import InferenceWorker
-from auto_trainer import AutoTrainer
-from nn_admin_api import nn_admin_router, init_nn_admin
-
 logger = logging.getLogger(__name__)
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection configuration with fallback for production
+mongo_url = os.environ.get('MONGO_URL') or os.environ.get('MONGODB_URI', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME') or os.environ.get('MONGODB_DB_NAME', 'good_road_db')
+
+# Global MongoDB client (will be initialized in startup event)
+client = None
+db = None
+
+# Connection state
+mongodb_connected = False
+
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
+
+# MongoDB connection helper
+async def connect_to_mongodb(max_retries=5, retry_delay=5):
+    """
+    Connect to MongoDB with retry logic for production deployment
+    """
+    global client, db, mongodb_connected
+    
+    logger.info(f"Attempting to connect to MongoDB database: {db_name}")
+    logger.info(f"MongoDB URL pattern: {mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost'}")
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            # Create MongoDB client with proper timeout settings
+            client_options = {
+                'serverSelectionTimeoutMS': 5000,
+                'connectTimeoutMS': 10000,
+                'socketTimeoutMS': 10000,
+            }
+            
+            # Add SSL/TLS settings for MongoDB Atlas
+            if 'mongodb+srv://' in mongo_url or 'mongodb.net' in mongo_url:
+                client_options['tls'] = True
+                client_options['tlsAllowInvalidCertificates'] = False
+                logger.info("Using MongoDB Atlas with SSL/TLS enabled")
+            
+            client = AsyncIOMotorClient(mongo_url, **client_options)
+            db = client[db_name]
+            
+            # Test connection
+            await client.admin.command('ping')
+            
+            mongodb_connected = True
+            logger.info(f"✅ Successfully connected to MongoDB database: {db_name}")
+            return
+            
+        except Exception as e:
+            logger.error(f"❌ MongoDB connection attempt {attempt}/{max_retries} failed: {str(e)}")
+            
+            if attempt < max_retries:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.critical(f"Failed to connect to MongoDB after {max_retries} attempts")
+                raise Exception(f"MongoDB connection failed: {str(e)}")
+
+async def close_mongodb_connection():
+    """
+    Close MongoDB connection gracefully
+    """
+    global client, mongodb_connected
+    
+    if client:
+        logger.info("Closing MongoDB connection...")
+        client.close()
+        mongodb_connected = False
+        logger.info("✅ MongoDB connection closed")
 
 # Create the main app without a prefix
 app = FastAPI(
@@ -46,38 +111,14 @@ app = FastAPI(
 async def startup_event():
     """
     Initialize services on startup
-    Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
-    logger.info("Starting Good Road API...")
+    logger.info("🚀 Starting Good Road API...")
     try:
         await connect_to_mongodb()
-
-        # Initialize neural network monitoring and external training
-        from config import db as _db
-        if _db is not None:
-            dataset_exporter = DatasetExporter(_db)
-            model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
-            init_external_training(_db, dataset_exporter, model_registry)
-            inference_worker = InferenceWorker(_db, event_classifier, obstacle_clusterer)
-            auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
-            init_nn_admin(_db, inference_worker, auto_trainer)
-            await inference_worker.start()
-            await auto_trainer.start()
-            logger.info("InferenceWorker and AutoTrainer started")
-
-        model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
-        if os.path.exists(model_path):
-            info = event_classifier.neural_classifier.reload(model_path)
-            logger.info("Neural model loaded: available=%s", info.get('available'))
-        else:
-            logger.warning("Neural model not found at %s", model_path)
-        logger.info("All services initialized successfully")
+        logger.info("✅ All services initialized successfully")
     except Exception as e:
-        logger.error("Failed to connect to MongoDB during startup: %s", e)
-        logger.warning("API will start in degraded mode. Health checks will fail until database is available.")
-        # Don't raise - let the app start and retry connections via readiness probe
-        global mongodb_connected
-        mongodb_connected = False
+        logger.critical(f"❌ Failed to initialize services: {str(e)}")
+        raise
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -86,46 +127,224 @@ async def shutdown_event():
     """
     logger.info("🛑 Shutting down Good Road API...")
     await close_mongodb_connection()
-    logger.info("Shutdown complete")
+    logger.info("✅ Shutdown complete")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+
+# Data Models
+class SensorDataPoint(BaseModel):
+    type: str  # 'location' or 'accelerometer'
+    timestamp: int
+    data: Dict[str, Any]
+
+class SensorDataBatch(BaseModel):
+    deviceId: str
+    sensorData: List[SensorDataPoint]
+
+class RoadCondition(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    latitude: float
+    longitude: float
+    condition_score: float  # 0-100, higher = better road
+    severity_level: str  # 'excellent', 'good', 'fair', 'poor', 'very_poor'
+    data_points: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class RoadWarning(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    latitude: float
+    longitude: float
+    warning_type: str  # 'pothole', 'rough_road', 'speed_bump', 'construction'
+    severity: str  # 'low', 'medium', 'high'
+    confidence: float  # 0-1
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LocationQuery(BaseModel):
+    latitude: float
+    longitude: float
+    radius: float = 1000  # meters
+
+# НОВЫЕ МОДЕЛИ ДЛЯ ИЗБЫТОЧНОГО СБОРА ДАННЫХ
+class AccelerometerReading(BaseModel):
+    """Одно значение акселерометра с timestamp"""
+    x: float
+    y: float
+    z: float
+    timestamp: Optional[int] = None
+
+class RawSensorData(BaseModel):
+    """Сырые данные с устройства для серверного анализа"""
+    deviceId: str
+    timestamp: int  # Unix timestamp в миллисекундах
+    gps: Dict[str, Any]  # {latitude, longitude, speed, accuracy, altitude}
+    # 🆕 Поддержка двух форматов для обратной совместимости:
+    # - Новый: массив высокочастотных данных [{x, y, z, timestamp}, ...]
+    # - Старый: один объект {x, y, z}
+    accelerometer: Union[List[AccelerometerReading], Dict[str, float]]
+    # Опциональные поля для пользовательских отчетов
+    userReported: Optional[bool] = False
+    eventType: Optional[str] = None
+    severity: Optional[int] = None
+    
+class RawDataBatch(BaseModel):
+    """Батч сырых данных"""
+    deviceId: str
+    data: List[RawSensorData]
+
+class ProcessedEvent(BaseModel):
+    """Событие, классифицированное сервером"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deviceId: str
+    timestamp: datetime
+    eventType: str  # 'pothole', 'braking', 'bump', 'vibration', 'normal'
+    severity: int  # 1-5
+    confidence: float  # 0-1
+    latitude: float
+    longitude: float
+    speed: float
+    accelerometer_data: Dict[str, float]  # {x, y, z, magnitude, deltaY, deltaZ, variance}
+    roadType: str  # 'asphalt', 'gravel', 'dirt', 'unknown'
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserWarning(BaseModel):
+    """Предупреждение для пользователя"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deviceId: str
+    eventType: str
+    severity: int
+    latitude: float
+    longitude: float
+    distance: float  # Расстояние до события в метрах
+    message: str
+    expiresAt: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Helper Functions
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two coordinates using Haversine formula"""
+    R = 6371000  # Earth's radius in meters
+    
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    
+    a = (math.sin(delta_lat / 2) ** 2 + 
+         math.cos(lat1_rad) * math.cos(lat2_rad) * 
+         math.sin(delta_lon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    return R * c
+
+def analyze_accelerometer_data(accel_data: List[Dict]) -> Dict[str, float]:
+    """Analyze accelerometer data to detect road conditions"""
+    if len(accel_data) < 5:
+        return {"variance": 0, "spikes": 0, "condition_score": 50}
+    
+    # Extract total acceleration values
+    total_accelerations = []
+    for point in accel_data:
+        if 'totalAcceleration' in point['data']:
+            total_accelerations.append(point['data']['totalAcceleration'])
+        else:
+            # Calculate if not provided
+            x, y, z = point['data']['x'], point['data']['y'], point['data']['z']
+            total_acc = math.sqrt(x**2 + y**2 + z**2)
+            total_accelerations.append(total_acc)
+    
+    if len(total_accelerations) < 2:
+        return {"variance": 0, "spikes": 0, "condition_score": 50}
+    
+    # Calculate variance (road roughness indicator)
+    variance = statistics.variance(total_accelerations)
+    
+    # Count acceleration spikes (potential potholes/bumps)
+    mean_acc = statistics.mean(total_accelerations)
+    threshold = mean_acc + 2 * math.sqrt(variance)
+    spikes = sum(1 for acc in total_accelerations if acc > threshold)
+    
+    # Calculate condition score (0-100, higher = better)
+    # Lower variance and fewer spikes = better road
+    base_score = 100
+    variance_penalty = min(50, variance * 1000)  # Scale variance
+    spike_penalty = min(30, spikes * 5)  # Penalize spikes
+    
+    condition_score = max(0, base_score - variance_penalty - spike_penalty)
+    
+    return {
+        "variance": variance,
+        "spikes": spikes,
+        "condition_score": condition_score,
+        "mean_acceleration": mean_acc
+    }
+
+def determine_severity_level(score: float) -> str:
+    """Convert numeric score to severity level"""
+    if score >= 80:
+        return "excellent"
+    elif score >= 60:
+        return "good"
+    elif score >= 40:
+        return "fair"
+    elif score >= 20:
+        return "poor"
+    else:
+        return "very_poor"
+
+def detect_road_issues(analysis: Dict[str, float]) -> List[RoadWarning]:
+    """Detect specific road issues from analysis"""
+    warnings = []
+    
+    if analysis["spikes"] >= 3:
+        warnings.append({
+            "warning_type": "pothole",
+            "severity": "high" if analysis["spikes"] >= 5 else "medium",
+            "confidence": min(0.9, analysis["spikes"] / 10)
+        })
+    
+    if analysis["variance"] > 0.5:
+        warnings.append({
+            "warning_type": "rough_road",
+            "severity": "high" if analysis["variance"] > 1.0 else "medium",
+            "confidence": min(0.8, analysis["variance"])
+        })
+    
+    return warnings
 
 
 # Health Check Endpoints (for Kubernetes probes)
 @app.get("/health")
 async def health_check():
     """
-    Liveness probe - returns 200 if service process is running
-    This endpoint should always return quickly without heavy operations
+    Basic health check - returns 200 if service is running
+    Used for liveness probe
     """
     return {
         "status": "healthy",
         "service": "Good Road API",
-        "version": "2.0.0",
-        "timestamp": datetime.utcnow().isoformat()
+        "version": "2.0.0"
     }
 
 @app.get("/ready")
 async def readiness_check():
     """
-    Readiness probe - returns 200 only if all dependencies are ready
-    Checks MongoDB connection and other critical dependencies
+    Readiness check - returns 200 only if all dependencies are ready
+    Used for readiness probe
     """
     if not mongodb_connected:
-        logger.warning("Readiness check failed: MongoDB not connected")
         raise HTTPException(status_code=503, detail="MongoDB not connected")
     
     try:
         # Quick ping to verify MongoDB is still responsive
-        if client:
-            await client.admin.command('ping')
+        await client.admin.command('ping')
         return {
             "status": "ready",
-            "service": "Good Road API",
             "mongodb": "connected",
-            "database": db_name,
-            "timestamp": datetime.utcnow().isoformat()
+            "database": db_name
         }
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
@@ -138,45 +357,582 @@ async def root():
         "message": "Good Road API - Smart Road Monitoring System",
         "version": "2.0.0",
         "status": "operational",
-        "mongodb_connected": mongodb_connected,
-        "neural_model": event_classifier.neural_classifier.get_model_info(),
+        "mongodb_connected": mongodb_connected
     }
 
-@api_router.post("/raw-data")
-async def ingest_raw_data(request: Request):
-    """Приём сырых данных с мобильных устройств (GPS + акселерометр)"""
+@api_router.post("/sensor-data")
+async def upload_sensor_data(batch: SensorDataBatch):
+    """Upload batch of sensor data from mobile device"""
     try:
-        body = await request.json()
-        device_id = body.get("deviceId")
-        data_points = body.get("data", [])
+        # Separate location, accelerometer, and event data
+        location_data = [point for point in batch.sensorData if point.type == "location"]
+        accel_data = [point for point in batch.sensorData if point.type == "accelerometer"]
+        event_data = [point for point in batch.sensorData if point.type == "event"]  # NEW: EventDetector events
         
-        if not device_id or not data_points:
-            raise HTTPException(status_code=400, detail="deviceId and data array required")
+        # Store raw sensor data
+        sensor_doc = {
+            "deviceId": batch.deviceId,
+            "timestamp": datetime.utcnow(),
+            "locationPoints": len(location_data),
+            "accelerometerPoints": len(accel_data),
+            "eventPoints": len(event_data),  # NEW: count of events
+            "rawData": [point.dict() for point in batch.sensorData]
+        }
         
-        inserted = 0
-        for point in data_points:
-            doc = {
-                "deviceId": device_id,
-                "timestamp": point.get("timestamp", int(datetime.utcnow().timestamp() * 1000)),
-                "gps": point.get("gps"),
-                "accelerometer": point.get("accelerometer"),
-                "userReported": point.get("userReported", False),
-                "eventType": point.get("eventType"),
-                "severity": point.get("severity"),
-                "receivedAt": datetime.utcnow(),
-            }
-            await db.raw_sensor_data.insert_one(doc)
-            inserted += 1
+        await db.sensor_data.insert_one(sensor_doc)
         
-        return {"status": "ok", "inserted": inserted}
-    except HTTPException:
-        raise
+        print(f"📥 Received batch from {batch.deviceId}:")
+        print(f"   Location points: {len(location_data)}")
+        print(f"   Accelerometer points: {len(accel_data)}")
+        print(f"   Event points: {len(event_data)}")  # NEW: log events
+        
+        # Process data for road condition analysis
+        processed_conditions = []
+        processed_warnings = []
+        
+        if location_data and accel_data:
+            # Group accelerometer data by location (simplified approach)
+            for location_point in location_data:
+                lat = location_point.data.get("latitude")
+                lon = location_point.data.get("longitude")
+                timestamp = location_point.timestamp
+                
+                # Find nearby accelerometer readings (within 30 seconds)
+                nearby_accel = [
+                    point for point in accel_data
+                    if abs(point.timestamp - timestamp) <= 30000  # 30 seconds
+                ]
+                
+                if len(nearby_accel) >= 5:  # Need minimum data points
+                    # Convert SensorDataPoint objects to dictionaries for analysis
+                    accel_dicts = [point.dict() for point in nearby_accel]
+                    analysis = analyze_accelerometer_data(accel_dicts)
+                    
+                    # Create road condition record
+                    condition = {
+                        "id": str(uuid.uuid4()),
+                        "latitude": lat,
+                        "longitude": lon,
+                        "condition_score": analysis["condition_score"],
+                        "severity_level": determine_severity_level(analysis["condition_score"]),
+                        "data_points": len(nearby_accel),
+                        "analysis_data": analysis,
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                    processed_conditions.append(condition)
+                    
+                    # Detect warnings
+                    warnings = detect_road_issues(analysis)
+                    for warning in warnings:
+                        warning_doc = {
+                            "id": str(uuid.uuid4()),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "created_at": datetime.utcnow(),
+                            **warning
+                        }
+                        processed_warnings.append(warning_doc)
+        
+        # ✨ NEW: Process EventDetector events (modern event-driven approach)
+        if event_data:
+            print(f"🎯 Processing {len(event_data)} EventDetector events...")
+            for event_point in event_data:
+                event_info = event_point.data
+                
+                # Логирование для отладки
+                print(f"   📍 Debug - event_info structure: {list(event_info.keys())}")
+                print(f"   📍 Debug - location field: {event_info.get('location')}")
+                
+                # Extract location from event
+                location = event_info.get("location", {})
+                lat = location.get("latitude")
+                lon = location.get("longitude")
+                
+                print(f"   📍 Debug - extracted lat: {lat}, lon: {lon}")
+                
+                if lat and lon:
+                    # Map event severity (1-5) to condition score (0-100)
+                    # severity 1 = critical = score 80
+                    # severity 2 = high = score 60
+                    # severity 3 = medium = score 40
+                    # severity 4 = low = score 20
+                    # severity 5 = normal = score 0
+                    severity = event_info.get("severity", 5)
+                    condition_score = 100 - (severity * 20)  # 1->80, 2->60, 3->40, 4->20, 5->0
+                    
+                    # Extract accelerometer data
+                    accel = event_info.get("accelerometer", {})
+                    
+                    # Проверка пользовательской отметки
+                    user_reported = event_info.get("userReported", False)
+                    event_type = event_info.get("eventType")
+                    
+                    # Механизм устаревания для пользовательских отметок
+                    expires_at = None
+                    if user_reported and event_type == "accident":
+                        # Аварии устаревают через 4 часа
+                        expires_at = datetime.utcnow() + timedelta(hours=4)
+                    elif user_reported:
+                        # Другие пользовательские отметки через 24 часа
+                        expires_at = datetime.utcnow() + timedelta(hours=24)
+                    
+                    # Проверить существующее препятствие поблизости (радиус 50 метров)
+                    existing_obstacle = None
+                    if user_reported:
+                        # Найти существующие препятствия в радиусе 50м
+                        nearby_obstacles = await db.road_conditions.find({
+                            "latitude": {"$gte": lat - 0.0005, "$lte": lat + 0.0005},
+                            "longitude": {"$gte": lon - 0.0005, "$lte": lon + 0.0005},
+                            "event_type": event_type,
+                            "status": {"$ne": "resolved"}
+                        }).to_list(length=10)
+                        
+                        if nearby_obstacles:
+                            # Найти ближайшее
+                            for obstacle in nearby_obstacles:
+                                existing_obstacle = obstacle
+                                break
+                    
+                    if existing_obstacle and user_reported:
+                        # Обновить существующее препятствие (подтверждение)
+                        confirmations = existing_obstacle.get("confirmations", 1) + 1
+                        last_confirmed_at = datetime.utcnow()
+                        
+                        # Продлить срок действия при подтверждении
+                        if event_type == "accident":
+                            new_expires_at = last_confirmed_at + timedelta(hours=4)
+                        else:
+                            new_expires_at = last_confirmed_at + timedelta(hours=24)
+                        
+                        await db.road_conditions.update_one(
+                            {"_id": existing_obstacle["_id"]},
+                            {
+                                "$set": {
+                                    "confirmations": confirmations,
+                                    "last_confirmed_at": last_confirmed_at,
+                                    "expires_at": new_expires_at,
+                                    "updated_at": datetime.utcnow(),
+                                    "status": "active"
+                                }
+                            }
+                        )
+                        print(f"   ✅ Обновлено препятствие: {event_type} (подтверждений: {confirmations})")
+                    else:
+                        # Создать новое препятствие
+                        condition = {
+                            "id": str(uuid.uuid4()),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "condition_score": max(0, min(100, condition_score)),
+                            "severity_level": determine_severity_level(condition_score),
+                            "data_points": 1,
+                            "event_type": event_type,
+                            "road_type": event_info.get("roadType", "unknown"),
+                            "speed": event_info.get("speed", 0),
+                            # Сырые данные акселерометра для ML анализа и адаптации устройств
+                            "accelerometer_x": accel.get("x", 0),
+                            "accelerometer_y": accel.get("y", 0),
+                            "accelerometer_z": accel.get("z", 0),
+                            "accelerometer_magnitude": accel.get("magnitude", 0),
+                            "accelerometer_variance": accel.get("variance", 0),
+                            "accelerometer_deltaX": accel.get("deltaX", 0),
+                            "accelerometer_deltaY": accel.get("deltaY", 0),
+                            "accelerometer_deltaZ": accel.get("deltaZ", 0),
+                            "user_reported": user_reported,  # НОВОЕ: пользовательская отметка
+                            "confirmations": 1,  # НОВОЕ: начальное количество подтверждений
+                            "last_confirmed_at": datetime.utcnow() if user_reported else None,  # НОВОЕ
+                            "expires_at": expires_at,  # НОВОЕ: время устаревания
+                            "status": "active",  # НОВОЕ: active/expired/resolved
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        processed_conditions.append(condition)
+                    
+                    # Generate warning for critical events
+                    if severity <= 2:  # Critical or high severity
+                        event_type = event_info.get("eventType", "unknown")
+                        warning_type_map = {
+                            "pothole": "pothole",
+                            "braking": "rough_road",
+                            "bump": "speed_bump",
+                            "vibration": "rough_road"
+                        }
+                        
+                        warning_doc = {
+                            "id": str(uuid.uuid4()),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "warning_type": warning_type_map.get(event_type, "rough_road"),
+                            "severity": "high" if severity == 1 else "medium",
+                            "confidence": 0.85,  # High confidence from EventDetector
+                            "event_type": event_type,
+                            "road_type": event_info.get("roadType", "unknown"),
+                            "created_at": datetime.utcnow()
+                        }
+                        processed_warnings.append(warning_doc)
+                        print(f"   ⚠️  Warning generated: {event_type} at ({lat:.6f}, {lon:.6f})")
+        
+        # Store processed data
+        if processed_conditions:
+            await db.road_conditions.insert_many(processed_conditions)
+            print(f"✅ Stored {len(processed_conditions)} road conditions")
+        
+        if processed_warnings:
+            await db.road_warnings.insert_many(processed_warnings)
+            print(f"✅ Stored {len(processed_warnings)} warnings")
+        
+        return {
+            "message": "Sensor data processed successfully",
+            "rawDataPoints": len(batch.sensorData),
+            "locationPoints": len(location_data),
+            "accelerometerPoints": len(accel_data),
+            "eventPoints": len(event_data),  # NEW
+            "conditionsProcessed": len(processed_conditions),
+            "warningsGenerated": len(processed_warnings)
+        }
+        
     except Exception as e:
-        logger.error(f"Error ingesting raw data: {e}")
+        logging.error(f"Error processing sensor data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing sensor data: {str(e)}")
+
+@api_router.post("/cleanup-expired-obstacles")
+async def cleanup_expired_obstacles():
+    """Очистить устаревшие препятствия (cron-задача)"""
+    try:
+        now = datetime.utcnow()
+        
+        # Найти устаревшие препятствия
+        expired = await db.road_conditions.find({
+            "expires_at": {"$lt": now},
+            "status": "active"
+        }).to_list(length=1000)
+        
+        # Пометить как устаревшие
+        if expired:
+            expired_ids = [e["_id"] for e in expired]
+            result = await db.road_conditions.update_many(
+                {"_id": {"$in": expired_ids}},
+                {
+                    "$set": {
+                        "status": "expired",
+                        "updated_at": now
+                    }
+                }
+            )
+            
+            print(f"🕒 Помечено {result.modified_count} препятствий как устаревшие")
+            
+            return {
+                "message": "Cleanup completed",
+                "expired_count": result.modified_count,
+                "timestamp": now
+            }
+        
+        return {
+            "message": "No expired obstacles found",
+            "expired_count": 0,
+            "timestamp": now
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/ml-statistics")
+async def get_ml_statistics():
+    """Get ML-ready statistics with variance, speed, and delta values"""
+    try:
+        conditions = await db.road_conditions.find({
+            "event_type": {"$ne": None},
+            "accelerometer_variance": {"$exists": True}
+        }).to_list(length=1000)
+        
+        # Group by event type
+        stats_by_type = {}
+        for condition in conditions:
+            event_type = condition.get("event_type", "unknown")
+            if event_type not in stats_by_type:
+                stats_by_type[event_type] = {
+                    "count": 0,
+                    "avg_magnitude": 0,
+                    "avg_variance": 0,
+                    "avg_speed": 0,
+                    "avg_deltaX": 0,
+                    "avg_deltaY": 0,
+                    "avg_deltaZ": 0,
+                    "magnitudes": [],
+                    "variances": [],
+                    "speeds": []
+                }
+            
+            stats = stats_by_type[event_type]
+            stats["count"] += 1
+            stats["magnitudes"].append(condition.get("accelerometer_magnitude", 0))
+            stats["variances"].append(condition.get("accelerometer_variance", 0))
+            stats["speeds"].append(condition.get("speed", 0))
+        
+        # Calculate averages
+        for event_type, stats in stats_by_type.items():
+            if stats["count"] > 0:
+                stats["avg_magnitude"] = sum(stats["magnitudes"]) / stats["count"]
+                stats["avg_variance"] = sum(stats["variances"]) / stats["count"]
+                stats["avg_speed"] = sum(stats["speeds"]) / stats["count"]
+                del stats["magnitudes"]
+                del stats["variances"]
+                del stats["speeds"]
+        
+        return {
+            "total_events": len(conditions),
+            "stats_by_type": stats_by_type
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==============================================================================
 # НОВАЯ АРХИТЕКТУРА: Избыточный сбор данных + серверная классификация
+# ==============================================================================
+
+from ml_processor import EventClassifier, WarningGenerator
+
+# Инициализация ML процессоров
+event_classifier = EventClassifier()
+warning_generator = WarningGenerator()
+
+@api_router.post("/raw-data")
+async def process_raw_data(batch: RawDataBatch):
+    """
+    Новый endpoint для приема сырых данных с устройств
+    Сервер анализирует данные и классифицирует события
+    """
+    try:
+        device_id = batch.deviceId
+        raw_count = len(batch.data)
+        
+        print(f"📥 Получен батч сырых данных от {device_id}: {raw_count} точек")
+        
+        # Сохраняем сырые данные для истории и ML обучения
+        raw_documents = []
+        processed_events = []
+        user_warnings = []
+        
+        for data_point in batch.data:
+            # Извлекаем данные
+            timestamp = datetime.fromtimestamp(data_point.timestamp / 1000)
+            gps = data_point.gps
+            accel_raw = data_point.accelerometer
+            
+            # 🆕 Обратная совместимость: поддержка обоих форматов
+            if isinstance(accel_raw, list):
+                # Новый формат: массив значений
+                accel_array = accel_raw
+                accel_summary = {
+                    "x": sum(a.x for a in accel_array) / len(accel_array) if accel_array else 0,
+                    "y": sum(a.y for a in accel_array) / len(accel_array) if accel_array else 0,
+                    "z": sum(a.z for a in accel_array) / len(accel_array) if accel_array else 0,
+                }
+                print(f"   📊 Получен массив: {len(accel_array)} значений акселерометра")
+            else:
+                # Старый формат: один объект {x, y, z}
+                accel_array = []
+                accel_summary = {
+                    "x": accel_raw.get("x", 0),
+                    "y": accel_raw.get("y", 0),
+                    "z": accel_raw.get("z", 0),
+                }
+                print(f"   📊 Получен старый формат: одно значение акселерометра")
+            
+            # Сохраняем сырые данные (summary для backward compatibility)
+            raw_doc = {
+                "deviceId": device_id,
+                "timestamp": timestamp,
+                "latitude": gps.get("latitude"),
+                "longitude": gps.get("longitude"),
+                "speed": gps.get("speed", 0),
+                "accuracy": gps.get("accuracy", 0),
+                "altitude": gps.get("altitude"),
+                "accelerometer_x": accel_summary["x"],
+                "accelerometer_y": accel_summary["y"],
+                "accelerometer_z": accel_summary["z"],
+                "accelerometer_count": len(accel_array),  # 🆕 Сколько значений в массиве
+                "created_at": datetime.utcnow()
+            }
+            raw_documents.append(raw_doc)
+            
+            # Проверяем является ли это пользовательским сообщением об аварии
+            is_user_reported = getattr(data_point, 'userReported', False)
+            manual_event_type = getattr(data_point, 'eventType', None)
+            manual_severity = getattr(data_point, 'severity', None)
+            
+            # Если пользователь вручную сообщил об аварии - используем его данные
+            if is_user_reported and manual_event_type:
+                event = {
+                    'eventType': manual_event_type,
+                    'severity': manual_severity or 1,
+                    'confidence': 1.0,  # Максимальная уверенность для ручных отчетов
+                    'roadType': 'unknown',
+                    'accelerometer': {
+                        'x': accel_summary["x"],
+                        'y': accel_summary["y"],
+                        'z': accel_summary["z"],
+                        'magnitude': 0,
+                        'deltaX': 0,
+                        'deltaY': 0,
+                        'deltaZ': 0,
+                        'variance': 0,
+                    }
+                }
+                print(f"   🚨 Пользовательский отчет: {manual_event_type} от {device_id}")
+            else:
+                # 🆕 Классифицируем событие через ML процессор с массивом данных
+                if accel_array and len(accel_array) > 0:
+                    # Конвертируем AccelerometerReading объекты в dict для ML процессора
+                    accel_dict_array = [
+                        {"x": a.x, "y": a.y, "z": a.z, "timestamp": a.timestamp}
+                        for a in accel_array
+                    ]
+                    event = event_classifier.analyze_accelerometer_array(
+                        device_id=device_id,
+                        accelerometer_data=accel_dict_array,
+                        speed=gps.get("speed", 0)
+                    )
+                else:
+                    event = None
+                
+                # Если событие обнаружено, добавляем accelerometer данные для обратной совместимости
+                if event:
+                    event['roadType'] = 'unknown'  # TODO: определить тип дороги
+                    event['accelerometer'] = {
+                        'x': accel_summary["x"],
+                        'y': accel_summary["y"],
+                        'z': accel_summary["z"],
+                        'magnitude': event.get('magnitude', 0),
+                        'deltaX': 0,
+                        'deltaY': event.get('delta_y', 0),
+                        'deltaZ': event.get('delta_z', 0),
+                        'variance': event.get('variance', 0),
+                    }
+            
+            if event:
+                # Событие обнаружено - сохраняем
+                processed_event = {
+                    "id": str(uuid.uuid4()),
+                    "deviceId": device_id,
+                    "timestamp": timestamp,
+                    "eventType": event['eventType'],
+                    "severity": event['severity'],
+                    "confidence": event['confidence'],
+                    "latitude": gps.get("latitude"),
+                    "longitude": gps.get("longitude"),
+                    "speed": gps.get("speed", 0),
+                    "accelerometer_x": event['accelerometer']['x'],
+                    "accelerometer_y": event['accelerometer']['y'],
+                    "accelerometer_z": event['accelerometer']['z'],
+                    "accelerometer_magnitude": event['accelerometer']['magnitude'],
+                    "accelerometer_deltaX": event['accelerometer']['deltaX'],
+                    "accelerometer_deltaY": event['accelerometer']['deltaY'],
+                    "accelerometer_deltaZ": event['accelerometer']['deltaZ'],
+                    "accelerometer_variance": event['accelerometer']['variance'],
+                    "roadType": event['roadType'],
+                    "created_at": datetime.utcnow()
+                }
+                processed_events.append(processed_event)
+                
+                # Проверяем нужно ли предупредить пользователя
+                should_warn, distance = warning_generator.should_warn_user(
+                    user_lat=gps.get("latitude"),
+                    user_lng=gps.get("longitude"),
+                    event_lat=gps.get("latitude"),
+                    event_lng=gps.get("longitude"),
+                    event_type=event['eventType'],
+                    severity=event['severity']
+                )
+                
+                if should_warn:
+                    warning_message = warning_generator.create_warning_message(
+                        event['eventType'],
+                        event['severity'],
+                        distance
+                    )
+                    
+                    warning_doc = {
+                        "id": str(uuid.uuid4()),
+                        "deviceId": device_id,
+                        "eventType": event['eventType'],
+                        "severity": event['severity'],
+                        "latitude": gps.get("latitude"),
+                        "longitude": gps.get("longitude"),
+                        "distance": distance,
+                        "message": warning_message,
+                        "expiresAt": datetime.utcnow() + timedelta(minutes=5),
+                        "created_at": datetime.utcnow()
+                    }
+                    user_warnings.append(warning_doc)
+                    print(f"   ⚠️  Предупреждение: {warning_message}")
+        
+        # Сохраняем в базу данных
+        if raw_documents:
+            await db.raw_sensor_data.insert_many(raw_documents)
+            print(f"✅ Сохранено {len(raw_documents)} сырых записей")
+        
+        if processed_events:
+            await db.processed_events.insert_many(processed_events)
+            print(f"✅ Классифицировано {len(processed_events)} событий")
+        
+        if user_warnings:
+            await db.user_warnings.insert_many(user_warnings)
+            print(f"✅ Создано {len(user_warnings)} предупреждений")
+        
+        return {
+            "message": "Raw data processed successfully",
+            "rawDataSaved": len(raw_documents),
+            "eventsDetected": len(processed_events),
+            "warningsGenerated": len(user_warnings)
+        }
+        
+    except Exception as e:
+        logging.error(f"Error processing raw data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing raw data: {str(e)}")
+
+@api_router.get("/warnings/{device_id}")
+async def get_active_warnings(device_id: str):
+    """
+    Получить активные предупреждения для устройства
+    """
+    try:
+        now = datetime.utcnow()
+        
+        # Находим активные предупреждения (не истекшие)
+        warnings = await db.user_warnings.find({
+            "deviceId": device_id,
+            "expiresAt": {"$gt": now}
+        }).sort("created_at", -1).to_list(length=10)
+        
+        # Преобразуем ObjectId в строку
+        for warning in warnings:
+            warning["_id"] = str(warning["_id"])
+        
+        return {
+            "deviceId": device_id,
+            "count": len(warnings),
+            "warnings": warnings
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/warnings/{warning_id}")
+async def dismiss_warning(warning_id: str):
+    """
+    Удалить/отклонить предупреждение
+    """
+    try:
+        result = await db.user_warnings.delete_one({"id": warning_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Warning not found")
+        
+        return {"message": "Warning dismissed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==============================================================================
 # НОВЫЕ ADMIN ENDPOINTS ДЛЯ НОВОЙ АРХИТЕКТУРЫ
 # ==============================================================================
@@ -239,10 +995,7 @@ async def get_v2_analytics():
         raise HTTPException(status_code=500, detail=f"Error retrieving v2 analytics: {str(e)}")
 
 @api_router.get("/admin/v2/raw-data")
-async def get_raw_data(
-    limit: int = Query(100, ge=1, le=50000, description="Максимальное количество записей (1-50000)"),
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска")
-):
+async def get_raw_data(limit: int = 100, skip: int = 0):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
         total = await db.raw_sensor_data.count_documents({})
@@ -264,8 +1017,8 @@ async def get_raw_data(
 
 @api_router.get("/admin/v2/events")
 async def get_processed_events(
-    limit: int = Query(100, ge=1, le=50000, description="Максимальное количество событий (1-50000)"),
-    skip: int = Query(0, ge=0, description="Количество событий для пропуска"),
+    limit: int = 100,
+    skip: int = 0,
     event_type: str = None
 ):
     """Получить обработанные события из коллекции processed_events"""
@@ -291,256 +1044,9 @@ async def get_processed_events(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving events: {str(e)}")
 
-@api_router.get("/admin/v2/clusters")
-async def get_obstacle_clusters(
-    limit: Optional[int] = Query(None, ge=1, le=100000, description="Максимальное количество кластеров"),
-    status: str = "active",
-    min_reports: int = 0
-):
-    limits = await get_limits_from_db()
-    limit = limit or limits.clusters_default_limit
-    limit = min(limit, limits.clusters_max_limit)
-    try:
-        if not obstacle_clusterer:
-            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        await obstacle_clusterer.expire_old_clusters()
-        query = {"status": status}
-        if status == "active":
-            query["expiresAt"] = {"$gt": datetime.utcnow()}
-        if min_reports > 0:
-            query["reportCount"] = {"$gte": min_reports}
-        clusters = await db.obstacle_clusters.find(
-            query,
-            {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1,
-             "confidence": 1, "reportCount": 1, "devices": 1,
-             "firstReported": 1, "lastReported": 1, "status": 1,
-             "expiresAt": 1, "roadInfo": 1}
-        ).sort("lastReported", -1).limit(limit).to_list(limit)
-        for cluster in clusters:
-            cluster['clusterId'] = cluster.pop('_id')
-            cluster['firstReported'] = cluster['firstReported'].isoformat() if cluster.get('firstReported') else None
-            cluster['lastReported'] = cluster['lastReported'].isoformat() if cluster.get('lastReported') else None
-            cluster['expiresAt'] = cluster['expiresAt'].isoformat() if cluster.get('expiresAt') else None
-            if 'severity' in cluster and 'history' in cluster['severity']:
-                del cluster['severity']['history']
-            if 'roadInfo' in cluster and 'speeds' in cluster['roadInfo']:
-                del cluster['roadInfo']['speeds']
-        return {"total": len(clusters), "clusters": clusters}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving clusters: {str(e)}")
-
-@api_router.post("/admin/recalculate-clusters")
-async def recalculate_all_clusters():
-    """
-    🔄 Удалить все кластеры и пересоздать их заново на основе событий
-    
-    Используется после изменения параметров кластеризации
-    """
-    try:
-        if not obstacle_clusterer:
-            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        
-        logger.info("Удаление всех существующих кластеров...")
-        
-        # Удаляем все кластеры
-        delete_result = await db.obstacle_clusters.delete_many({})
-        deleted_count = delete_result.deleted_count
-        
-        logger.info("Удалено кластеров: %s", deleted_count)
-        
-        # Получаем ВСЕ события (используем cursor для больших объёмов)
-        logger.info("Получение всех событий...")
-        
-        # Подсчитываем сначала
-        total_events = await db.processed_events.count_documents({})
-        logger.info("Всего событий в БД: %d", total_events)
-        
-        # Получаем все события батчами
-        all_events = []
-        cursor = db.processed_events.find({})
-        async for event in cursor:
-            all_events.append(event)
-        
-        logger.info("Получено событий для обработки: %d", len(all_events))
-        
-        # Пересоздаём кластеры
-        logger.info("🔄 Создание кластеров с новыми параметрами...")
-        created_count = 0
-        error_count = 0
-        
-        for event in all_events:
-            try:
-                # Используем функцию process_event
-                await obstacle_clusterer.process_event(
-                    event_id=str(event['_id']),
-                    event_type=event.get('eventType'),
-                    latitude=event.get('latitude'),
-                    longitude=event.get('longitude'),
-                    severity=event.get('severity', 3),
-                    confidence=event.get('confidence', 0.7),
-                    speed=event.get('speed', 0),
-                    timestamp=event.get('timestamp'),
-                    device_id=event.get('deviceId')
-                )
-                created_count += 1
-                
-                if created_count % 500 == 0:
-                    logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
-                    
-            except Exception as e:
-                logger.error(f"Ошибка обработки события {event.get('_id')}: {str(e)}")
-                error_count += 1
-                continue
-        
-        # Подсчитываем итоговое количество кластеров
-        final_clusters = await db.obstacle_clusters.count_documents({})
-        
-        logger.info("Пересоздание завершено")
-        logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
-        logger.info(f"  Создано кластеров: {final_clusters}")
-        
-        return {
-            "success": True,
-            "deleted_clusters": deleted_count,
-            "processed_events": created_count,
-            "total_events": len(all_events),
-            "final_clusters": final_clusters,
-            "message": f"Пересоздано кластеров: {final_clusters} (было: {deleted_count})"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error recalculating clusters: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error recalculating clusters: {str(e)}")
-
-@api_router.post("/admin/cleanup-old-data")
-async def cleanup_old_data(
-    days: int = 30,
-    delete_events: bool = False,
-    delete_clusters: bool = False,
-    delete_raw_data: bool = True
-):
-    """
-    Очистить старые данные
-    
-    Args:
-        days: Удалить данные старше N дней
-        delete_events: Удалить старые события
-        delete_clusters: Удалить старые кластеры
-        delete_raw_data: Удалить старые сырые данные (по умолчанию True)
-    """
-    try:
-        from datetime import datetime, timedelta
-        
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        cutoff_str = cutoff_date.strftime('%Y-%m-%d')
-        logger.info("Очистка данных старше %s", cutoff_str)
-        
-        results = {
-            "cutoff_date": cutoff_date.isoformat(),
-            "days": days
-        }
-        
-        if delete_raw_data:
-            raw_result = await db.raw_sensor_data.delete_many({
-                "created_at": {"$lt": cutoff_date}
-            })
-            results["deleted_raw_data"] = raw_result.deleted_count
-            logger.info("Удалено сырых данных: %d", raw_result.deleted_count)
-        
-        if delete_events:
-            events_result = await db.processed_events.delete_many({
-                "timestamp": {"$lt": cutoff_date}
-            })
-            results["deleted_events"] = events_result.deleted_count
-            logger.info("Удалено событий: %d", events_result.deleted_count)
-        
-        if delete_clusters:
-            clusters_result = await db.obstacle_clusters.delete_many({
-                "created_at": {"$lt": cutoff_date}
-            })
-            results["deleted_clusters"] = clusters_result.deleted_count
-            logger.info("Удалено кластеров: %d", clusters_result.deleted_count)
-        
-        # Статистика после очистки
-        remaining_raw = await db.raw_sensor_data.count_documents({})
-        remaining_events = await db.processed_events.count_documents({})
-        remaining_clusters = await db.obstacle_clusters.count_documents({})
-        
-        results["remaining"] = {
-            "raw_data": remaining_raw,
-            "events": remaining_events,
-            "clusters": remaining_clusters
-        }
-        
-        logger.info("Очистка завершена. Осталось: raw=%d, events=%d, clusters=%d", remaining_raw, remaining_events, remaining_clusters)
-        
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error cleaning up old data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error cleaning up: {str(e)}")
-
-@api_router.post("/admin/delete-all-data")
-async def delete_all_data(
-    confirm: str = None,
-    delete_events: bool = False,
-    delete_clusters: bool = False,
-    delete_raw_data: bool = False
-):
-    """
-     Удалить ВСЕ данные (требует подтверждение)
-    
-    Args:
-        confirm: Должно быть "DELETE_ALL_DATA"
-        delete_events: Удалить все события
-        delete_clusters: Удалить все кластеры
-        delete_raw_data: Удалить все сырые данные
-    """
-    try:
-        if confirm != "DELETE_ALL_DATA":
-            raise HTTPException(
-                status_code=400,
-                detail="Требуется подтверждение: confirm='DELETE_ALL_DATA'"
-            )
-        
-        logger.warning("УДАЛЕНИЕ ВСЕХ ДАННЫХ!")
-        
-        results = {}
-        
-        if delete_raw_data:
-            raw_result = await db.raw_sensor_data.delete_many({})
-            results["deleted_raw_data"] = raw_result.deleted_count
-            logger.warning("Удалено всех сырых данных: %d", raw_result.deleted_count)
-        
-        if delete_events:
-            events_result = await db.processed_events.delete_many({})
-            results["deleted_events"] = events_result.deleted_count
-            logger.warning("Удалено всех событий: %d", events_result.deleted_count)
-        
-        if delete_clusters:
-            clusters_result = await db.obstacle_clusters.delete_many({})
-            results["deleted_clusters"] = clusters_result.deleted_count
-            logger.warning("Удалено всех кластеров: %d", clusters_result.deleted_count)
-        
-        return {
-            "success": True,
-            "deleted": results,
-            "message": "Данные успешно удалены"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting all data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting data: {str(e)}")
-
 @api_router.get("/admin/v2/heatmap")
-async def get_heatmap_data_simple():
-    """Получить данные для heatmap из processed_events (упрощенная версия)"""
+async def get_heatmap_data():
+    """Получить данные для heatmap из processed_events"""
     try:
         events = await db.processed_events.find(
             {"latitude": {"$ne": None}, "longitude": {"$ne": None}},
@@ -563,90 +1069,6 @@ async def get_heatmap_data_simple():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving heatmap data: {str(e)}")
-
-@api_router.get("/obstacles/nearby")
-async def get_nearby_obstacles(
-    latitude: float,
-    longitude: float,
-    radius: float = 5000,  # 5 км по умолчанию
-    min_confirmations: int = 1
-):
-    """
-    Получить препятствия рядом с текущей позицией (для мобильного приложения)
-    
-    Args:
-        latitude: Широта текущей позиции
-        longitude: Долгота текущей позиции
-        radius: Радиус поиска в метрах (по умолчанию 5000м = 5км)
-        min_confirmations: Минимальное количество подтверждений (по умолчанию 1)
-    
-    Returns:
-        Список активных кластеров препятствий отсортированных по приоритету
-    """
-    try:
-        if not obstacle_clusterer:
-            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        
-        # Получаем все активные кластеры
-        all_clusters = await db.obstacle_clusters.find({
-            "status": "active",
-            "expiresAt": {"$gt": datetime.utcnow()},
-            "reportCount": {"$gte": min_confirmations}
-        }).to_list(1000)
-        
-        # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
-        nearby_obstacles = []
-        for cluster in all_clusters:
-            distance = obstacle_clusterer.haversine_distance(
-                latitude, longitude,
-                cluster['location']['latitude'],
-                cluster['location']['longitude']
-            )
-            
-            if distance <= radius:
-                # Оптимизированный формат для мобильного приложения
-                obstacle = {
-                    "id": str(cluster['_id']),
-                    "type": cluster['obstacleType'],
-                    "latitude": cluster['location']['latitude'],
-                    "longitude": cluster['location']['longitude'],
-                    "distance": round(distance, 1),  # метры
-                    "severity": {
-                        "average": round(cluster['severity']['average'], 1),
-                        "max": cluster['severity']['max']
-                    },
-                    "confidence": round(cluster['confidence'], 2),
-                    "confirmations": cluster['reportCount'],
-                    "avgSpeed": round(cluster['roadInfo']['avgSpeed'] * 3.6, 1),  # м/с -> км/ч
-                    "lastReported": cluster['lastReported'].isoformat()
-                }
-                
-                # Вычисляем приоритет для сортировки
-                # Приоритет = confirmations * 100 + (1 / (distance + 1)) * 10
-                # Чем больше подтверждений и ближе - тем выше приоритет
-                priority = cluster['reportCount'] * 100 + (1 / (distance + 1)) * 10
-                obstacle['priority'] = round(priority, 2)
-                
-                nearby_obstacles.append(obstacle)
-        
-        # Сортируем по приоритету (убывание)
-        nearby_obstacles.sort(key=lambda x: x['priority'], reverse=True)
-        
-        return {
-            "userLocation": {
-                "latitude": latitude,
-                "longitude": longitude
-            },
-            "searchRadius": radius,
-            "minConfirmations": min_confirmations,
-            "total": len(nearby_obstacles),
-            "obstacles": nearby_obstacles
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving nearby obstacles: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving nearby obstacles: {str(e)}")
 
 @api_router.get("/road-conditions")
 async def get_road_conditions(
@@ -753,7 +1175,7 @@ class AdminAnalytics(BaseModel):
     date_range: str
 
 
-# ML Configuration Models
+# 🆕 ML Configuration Models
 class MLThresholdsUpdate(BaseModel):
     """Модель для обновления порогов ML классификатора"""
     pothole: Optional[Dict[str, float]] = None
@@ -761,7 +1183,7 @@ class MLThresholdsUpdate(BaseModel):
     bump: Optional[Dict[str, float]] = None
     vibration: Optional[Dict[str, float]] = None
 
-# API для управления порогами ML
+# 🆕 API для управления порогами ML
 @api_router.get("/admin/v2/ml-thresholds")
 async def get_ml_thresholds():
     """Получить текущие пороги ML классификатора"""
@@ -805,99 +1227,7 @@ async def update_ml_thresholds(update: MLThresholdsUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-class MLPredictRequest(BaseModel):
-    accelerometer: List[Dict[str, float]]
-    speed: float = 0.0
-    device_id: str = "admin-test"
-
-
-@api_router.get("/admin/v2/ml-model/status")
-async def ml_model_status():
-    """Статус загруженной нейросетевой модели."""
-    return event_classifier.neural_classifier.get_model_info()
-
-
-@api_router.get("/admin/v2/ml-model/stats")
-async def ml_model_stats():
-    """Статистика работы модели (runtime + MongoDB за 24ч)."""
-    tracker = get_ml_stats_tracker()
-    runtime = tracker.snapshot() if tracker else {}
-    db_stats = {}
-    if db and mongodb_connected:
-        since = datetime.utcnow() - timedelta(hours=24)
-        pipeline = [
-            {"$match": {"timestamp": {"$gte": since}}},
-            {
-                "$group": {
-                    "_id": None,
-                    "count": {"$sum": 1},
-                    "avg_confidence": {"$avg": "$neuralConfidence"},
-                    "avg_latency": {"$avg": "$latencyMs"},
-                }
-            },
-        ]
-        agg = await db.ml_inference_logs.aggregate(pipeline).to_list(1)
-        if agg:
-            db_stats = agg[0]
-            db_stats.pop("_id", None)
-        by_type = await db.ml_inference_logs.aggregate(
-            [
-                {"$match": {"timestamp": {"$gte": since}, "neuralType": {"$ne": None}}},
-                {"$group": {"_id": "$neuralType", "count": {"$sum": 1}}},
-            ]
-        ).to_list(20)
-        db_stats["by_predicted_24h"] = {r["_id"]: r["count"] for r in by_type}
-    return {"runtime": runtime, "database_24h": db_stats}
-
-
-@api_router.get("/admin/v2/ml-model/recent")
-async def ml_model_recent(limit: int = Query(50, ge=1, le=200)):
-    """Последние предсказания модели."""
-    tracker = get_ml_stats_tracker()
-    if tracker:
-        return {"items": tracker.recent_list(limit)}
-    return {"items": []}
-
-
-@api_router.post("/admin/v2/ml-model/predict")
-async def ml_model_predict(body: MLPredictRequest):
-    """Тестовый инференс из админки."""
-    import time as _time
-
-    acc = body.accelerometer
-    if len(acc) < 3:
-        raise HTTPException(status_code=400, detail="Need at least 3 accelerometer points")
-
-    t0 = _time.perf_counter()
-    neural = None
-    if event_classifier.neural_classifier.is_available():
-        neural = event_classifier.neural_classifier.classify_with_neural_network(
-            acc, body.speed
-        )
-    latency_ms = (_time.perf_counter() - t0) * 1000
-
-    stats = event_classifier._compute_accelerometer_stats(
-        [p["x"] for p in acc],
-        [p["y"] for p in acc],
-        [p["z"] for p in acc],
-    )
-    heuristic = event_classifier._classify_from_stats(stats, body.speed)
-
-    min_conf = float(os.environ.get("NEURAL_MIN_CONFIDENCE", "0.35"))
-    neural_used = neural if neural and neural.get("confidence", 0) >= min_conf else None
-    final = neural_used or heuristic
-
-    return {
-        "neural": neural,
-        "heuristic": heuristic,
-        "final": final,
-        "latency_ms": latency_ms,
-        "min_confidence_threshold": min_conf,
-    }
-
-
-# API для редактирования событий
+# 🆕 API для редактирования событий
 @api_router.put("/admin/v2/events/{event_id}")
 async def update_event(event_id: str, update_data: Dict):
     """Обновить событие по ID"""
@@ -931,7 +1261,7 @@ async def delete_event(event_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# API для очистки базы данных (работает с любой подключенной БД)
+# 🆕 API для очистки базы данных (работает с любой подключенной БД)
 @api_router.delete("/admin/clear-database")
 async def clear_database(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
@@ -968,6 +1298,7 @@ async def clear_database(
         ]
         
         # Определяем фильтр по дате
+        delete_filter = {}
         if days is not None and days > 0:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             # Для коллекций с полем timestamp (datetime)
@@ -1013,7 +1344,7 @@ async def clear_database(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# API для очистки базы данных V2 с фильтром по диапазону дат
+# 🆕 API для очистки базы данных V2 с фильтром по диапазону дат
 @api_router.delete("/admin/clear-database-v2")
 async def clear_database_v2(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
@@ -1121,7 +1452,7 @@ async def clear_database_v2(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# API для редактирования raw data
+# 🆕 API для редактирования raw data
 @api_router.delete("/admin/v2/raw-data/{data_id}")
 async def delete_raw_data(data_id: str):
     """Удалить raw data по ID"""
@@ -1140,14 +1471,14 @@ async def delete_raw_data(data_id: str):
 
 @api_router.get("/admin/sensor-data")
 async def get_all_sensor_data(
-    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей"),
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
+    limit: int = Query(1000, description="Maximum number of records to return"),
+    skip: int = Query(0, description="Number of records to skip"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
 ):
-    limits = await get_limits_from_db()
-    limit = limit or limits.sensor_data_default_limit
-    limit = min(limit, limits.sensor_data_max_limit)
+    """
+    Get all sensor data for administrative analysis
+    """
     try:
         # Build query filters
         query = {}
@@ -1854,7 +2185,7 @@ async def count_data_by_filters(filters: BulkDeleteFilters):
         
         return {
             "count": count,
-            "filters_applied": {k: v for k, v in filters.model_dump().items() if v is not None},
+            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None},
             "sample_records": sample_data
         }
         
@@ -1901,7 +2232,7 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
             "deleted_count": result.deleted_count,
             "matched_count": count_before,
             "remaining_records": remaining_count,
-            "filters_applied": {k: v for k, v in filters.model_dump().items() if v is not None}
+            "filters_applied": {k: v for k, v in filters.dict().items() if v is not None}
         }
         
     except Exception as e:
@@ -1910,13 +2241,13 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
 
 @api_router.get("/admin/sensor-data/export/csv")
 async def export_sensor_data_csv(
-    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта")
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    limit: int = Query(10000, description="Maximum records to export")
 ):
-    limits = await get_limits_from_db()
-    limit = limit or limits.csv_export_default_limit
-    limit = min(limit, limits.csv_export_max_limit)
+    """
+    Export sensor data as CSV file
+    """
     try:
         # Build query
         query = {}
@@ -2146,220 +2477,52 @@ async def cleanup_zero_coordinates():
         raise HTTPException(status_code=500, detail=f"Error during zero coordinate cleanup: {str(e)}")
 
 
-# Health check is defined earlier in the file (line ~356)
+# Admin Dashboard Route - accessible via /api/admin/dashboard
+@api_router.api_route("/admin/dashboard", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def admin_dashboard_api(request: Request):
+    """Serve the admin dashboard web interface via API route"""
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
-# Admin Dashboard v3 Routes
-@app.get("/admin/dashboard/v3", response_class=HTMLResponse)
-async def admin_dashboard_v3(request: Request):
-    """Serve the admin dashboard v4 page with integrated editor"""
-    return templates.TemplateResponse("admin_dashboard_v4.html", {"request": request})
-
-@api_router.get("/admin/dashboard/v3", response_class=HTMLResponse)
-async def admin_dashboard_v3_api(request: Request):
-    """Serve the admin dashboard v4 page through /api route"""
-    return templates.TemplateResponse("admin_dashboard_v4.html", {"request": request})
-
-
-@api_router.put("/admin/editor/events/{event_id}")
-async def update_event(event_id: str, data: dict):
-    """
-    Обновление события по ID для админ-панели v3
-    """
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for production monitoring"""
     try:
-        update_data = {}
-        if 'eventType' in data:
-            update_data['eventType'] = data['eventType']
-        if 'severity' in data:
-            update_data['severity'] = data['severity']
-        if 'confidence' in data:
-            update_data['confidence'] = data['confidence']
-        if 'notes' in data:
-            update_data['notes'] = data['notes']
-        
-        if not update_data:
-            raise HTTPException(status_code=400, detail="No data to update")
-        
-        result = await db.processed_events.update_one(
-            {"id": event_id},
-            {"$set": update_data}
-        )
-        
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Event not found")
-        
-        return {"success": True, "message": "Event updated successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating event: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating event: {str(e)}")
-
-@api_router.put("/admin/editor/clusters/{cluster_id}")
-async def update_cluster(cluster_id: str, data: dict):
-    """
-    Обновление кластера по ID для админ-панели v3
-    """
-    try:
-        update_data = {}
-        if 'obstacleType' in data:
-            update_data['obstacleType'] = data['obstacleType']
-        if 'severity_max' in data:
-            update_data['severity.max'] = data['severity_max']
-        if 'confidence' in data:
-            update_data['confidence'] = data['confidence']
-        if 'status' in data:
-            update_data['status'] = data['status']
-        if 'notes' in data:
-            update_data['notes'] = data['notes']
-        
-        if not update_data:
-            raise HTTPException(status_code=400, detail="No data to update")
-        
-        result = await db.obstacle_clusters.update_one(
-            {"_id": cluster_id},
-            {"$set": update_data}
-        )
-        
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Cluster not found")
-        
-        return {"success": True, "message": "Cluster updated successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating cluster: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating cluster: {str(e)}")
-
-@api_router.delete("/admin/editor/events/{event_id}")
-async def delete_event(event_id: str):
-    """
-    Удаление события по ID для админ-панели v3
-    """
-    try:
-        result = await db.processed_events.delete_one({"id": event_id})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Event not found")
-        return {"success": True, "message": "Event deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting event: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting event: {str(e)}")
-
-@api_router.delete("/admin/editor/clusters/{cluster_id}")
-async def delete_cluster(cluster_id: str):
-    """
-    Удаление кластера по ID для админ-панели v3
-    """
-    try:
-        result = await db.obstacle_clusters.delete_one({"_id": cluster_id})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Cluster not found")
-        return {"success": True, "message": "Cluster deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting cluster: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting cluster: {str(e)}")
-
-@api_router.post("/admin/editor/events/bulk-delete")
-async def bulk_delete_events(ids_data: dict):
-    """
-    Массовое удаление событий для админ-панели v3
-    """
-    try:
-        ids = ids_data.get("ids", [])
-        if not ids:
-            raise HTTPException(status_code=400, detail="No IDs provided")
-        
-        result = await db.processed_events.delete_many({"id": {"$in": ids}})
+        # Test database connection
+        await db.command("ping")
         return {
-            "success": True,
-            "message": f"Deleted {result.deleted_count} events",
-            "deleted_count": result.deleted_count
+            "status": "healthy",
+            "database": "connected",
+            "message": "Good Road API is running"
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error bulk deleting events: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error bulk deleting events: {str(e)}")
-
-@api_router.post("/admin/editor/clusters/bulk-delete")
-async def bulk_delete_clusters(ids_data: dict):
-    """
-    Массовое удаление кластеров для админ-панели v3
-    """
-    try:
-        ids = ids_data.get("ids", [])
-        if not ids:
-            raise HTTPException(status_code=400, detail="No IDs provided")
-        
-        result = await db.obstacle_clusters.delete_many({"_id": {"$in": ids}})
         return {
-            "success": True,
-            "message": f"Deleted {result.deleted_count} clusters",
-            "deleted_count": result.deleted_count
+            "status": "unhealthy",
+            "database": "disconnected", 
+            "error": str(e)
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error bulk deleting clusters: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error bulk deleting clusters: {str(e)}")
 
+# Legacy route for local access
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    """Serve the admin dashboard web interface (local access)"""
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
-@app.get("/admin/settings/limits", response_class=HTMLResponse)
-async def admin_limits_page_direct(request: Request):
-    return templates.TemplateResponse("admin_limits.html", {"request": request})
+@app.get("/admin/dashboard/v2", response_class=HTMLResponse)
+async def admin_dashboard_v2(request: Request):
+    """Serve the NEW admin dashboard v2 for new architecture"""
+    return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
 
-@api_router.get("/admin/settings/limits", response_class=HTMLResponse)
-async def admin_limits_page(request: Request):
-    return templates.TemplateResponse("admin_limits.html", {"request": request})
-
-@api_router.get("/admin/settings/limits/api")
-async def get_limits_api():
-    limits = await get_limits_from_db()
-    return limits.model_dump()
-
-@api_router.post("/admin/settings/limits/api")
-async def save_limits_api(limits: LimitsConfig):
-    saved = await save_limits_to_db(limits)
-    return {"status": "ok", "limits": saved.model_dump()}
+# ВАЖНО: Также добавляем в api_router для доступа через /api/admin/dashboard/v2
+@api_router.get("/admin/dashboard/v2", response_class=HTMLResponse)
+async def admin_dashboard_v2_api(request: Request):
+    """Serve the NEW admin dashboard v2 through /api route (for deployment)"""
+    return templates.TemplateResponse("admin_dashboard_v2.html", {"request": request})
 
 @api_router.get("/admin/settings/v2", response_class=HTMLResponse)
 async def admin_settings_v2_api(request: Request):
     """Serve the ML settings page through /api route"""
     return templates.TemplateResponse("admin_settings_v2.html", {"request": request})
-
-@app.get("/admin/apk-guide", response_class=HTMLResponse)
-async def apk_guide(request: Request):
-    """Serve the APK build guide page"""
-    return templates.TemplateResponse("apk_guide.html", {"request": request})
-
-@api_router.get("/admin/apk-guide", response_class=HTMLResponse)
-async def apk_guide_api(request: Request):
-    """Serve the APK build guide page through /api route"""
-    return templates.TemplateResponse("apk_guide.html", {"request": request})
-
-@app.get("/admin/ml-settings", response_class=HTMLResponse)
-async def ml_settings(request: Request):
-    """Serve the ML settings page"""
-    return templates.TemplateResponse("ml_settings.html", {"request": request})
-
-@api_router.get("/admin/ml-settings", response_class=HTMLResponse)
-async def ml_settings_api(request: Request):
-    """Serve the ML settings page through /api route"""
-    return templates.TemplateResponse("ml_settings.html", {"request": request})
-
-
-@app.get("/admin/ml-dashboard", response_class=HTMLResponse)
-async def ml_dashboard_page(request: Request):
-    """Дашборд статистики нейросетевой модели."""
-    return templates.TemplateResponse("admin_ml_dashboard.html", {"request": request})
-
-
-@api_router.get("/admin/ml-dashboard", response_class=HTMLResponse)
-async def ml_dashboard_page_api(request: Request):
-    return templates.TemplateResponse("admin_ml_dashboard.html", {"request": request})
 
 
 # Admin Index - Main navigation page
@@ -2397,44 +2560,13 @@ async def expo_qr_page_api(request: Request):
     """Serve QR codes page via API route (for deployment)"""
     return templates.TemplateResponse("expo_qr_page.html", {"request": request})
 
-# Download endpoint for frontend archive
-@app.get("/download/good-road-frontend.tar.gz")
-async def download_frontend_archive():
-    """Download the frontend archive for local APK building"""
-    import os
-    from fastapi.responses import FileResponse
-    
-    archive_path = "/app/good-road-frontend.tar.gz"
-    
-    if not os.path.exists(archive_path):
-        raise HTTPException(status_code=404, detail="Archive not found")
-    
-    return FileResponse(
-        path=archive_path,
-        media_type="application/gzip",
-        filename="good-road-frontend.tar.gz"
-    )
-
 # Include the router in the main app
 app.include_router(api_router)
-app.include_router(nn_admin_router)
-app.include_router(external_training_router)
-
-# Include admin editor router
-from admin_api import get_admin_editor_router
-admin_editor_router = get_admin_editor_router(db)
-app.include_router(admin_editor_router)
-
-cors_origins = os.environ.get("CORS_ORIGINS", "*")
-if cors_origins == "*":
-    allowed_origins = ["*"]
-else:
-    allowed_origins = [o.strip() for o in cors_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,0 +1,1 @@
+{"deviceId":"test","data":[{"gps":{"latitude":55.75,"longitude":37.62,"speed":10,"accuracy":5},"accelerometer":[{"x":0,"y":0,"z":9.8,"timestamp":1234567890}],"timestamp":1234567890}]}

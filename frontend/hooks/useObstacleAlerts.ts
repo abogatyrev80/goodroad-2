@@ -150,43 +150,30 @@ export function useObstacleAlerts(
 
   // Проверка и выдача аудио-оповещений с использованием динамической системы
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
-    // Получаем настройки динамической системы
     const settings = dynamicAudioService.getSettings();
-    const alertSettings = alertSettingsService.getSettings();
     const speed = currentSpeedRef.current;
 
     for (const obstacle of obstacleList) {
       const distance = obstacle.distance;
 
-      // Проверяем пределы дистанции
       if (distance < settings.minDistance || distance > settings.maxDistance) {
         continue;
       }
 
-      // 🆕 ПРОВЕРКА СКОРОСТИ - должны ли мы предупреждать?
-      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, speed * 3.6); // м/с → км/ч
-      
-      if (!speedCheck.shouldAlert) {
-        continue; // Скорость нормальная - молчим
-      }
+      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, speed * 3.6);
 
-      // Проверяем, это новое препятствие?
+      // Новое препятствие — всегда beep + голос
       if (!lastAlertedObstacles.current.has(obstacle.id)) {
-        // 🆕 Используем кастомный текст и проверяем нужен ли голос
-        if (alertSettingsService.shouldUseVoice(speedCheck.alertLevel)) {
-          const customText = alertSettingsService.getAlertText(obstacle.type, distance);
-          await dynamicAudioService.announceObstacleWithText(obstacle, customText);
-        }
-        
+        const alertText = alertSettingsService.getAlertText(obstacle.type, distance);
+        await dynamicAudioService.announceObstacleWithText(obstacle, alertText);
+
         lastAlertedObstacles.current.add(obstacle.id);
-        
-        // Сохраняем для отслеживания реакции
+
         alertedObstaclesForReaction.current.set(obstacle.id, {
           obstacle,
           alerted: true,
         });
 
-        // Очищаем через 60 секунд
         setTimeout(() => {
           lastAlertedObstacles.current.delete(obstacle.id);
           dynamicAudioService.clearActiveObstacle();
@@ -194,15 +181,12 @@ export function useObstacleAlerts(
         }, 60000);
       }
 
-      // 🆕 Непрерывные сирены только если нужно (на основе скорости)
-      const shouldUseSiren = alertSettingsService.shouldUseSiren(speedCheck.alertLevel);
-      
-      if (shouldUseSiren) {
+      // Непрерывная сирена только при значительном превышении скорости
+      if (alertSettingsService.shouldUseSiren(speedCheck.alertLevel)) {
         const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, distance);
         await dynamicAudioService.alertDynamicWithFrequency(obstacle, speed, sirenFrequency);
       }
 
-      // Проверяем реакцию водителя
       checkDriverReaction(obstacle);
     }
   };

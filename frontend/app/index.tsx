@@ -34,6 +34,7 @@ import SimpleToast, { showToast } from '../components/SimpleToast';
 
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
+import BackgroundSensorService from '../services/BackgroundSensorService';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
@@ -596,6 +597,7 @@ export default function HomeScreen() {
       appStateSubscription.current.remove();
       appStateSubscription.current = null;
     }
+    BackgroundSensorService.stop().catch(() => {});
 
     // Восстановить яркость и keep-awake при размонтировании (если закрыли приложение во время мониторинга)
     if (Platform.OS !== 'web' && savedBrightnessRef.current != null) {
@@ -733,6 +735,9 @@ export default function HomeScreen() {
       setIsTracking(true);
       isTrackingRef.current = true;
 
+      // Запускаем foreground service для сбора данных в фоне
+      BackgroundSensorService.start().catch(() => {});
+
       // Не выключать экран и минимальная яркость во время мониторинга
       if (Platform.OS !== 'web') {
         try {
@@ -812,6 +817,9 @@ export default function HomeScreen() {
       accelerometerBuffer.current = [];
       syncedDataBuffer.current = [];
       currentLocationRef.current = null;
+
+      // Останавливаем foreground service
+      BackgroundSensorService.stop().catch(() => {});
 
       setIsTracking(false);
       isTrackingRef.current = false;
