@@ -47,37 +47,72 @@ class DatasetExporter:
     ) -> Dict[str, Any]:
         dataset_id = f"ds_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
-        query: Dict[str, Any] = {
-            "eventType": {"$exists": True, "$ne": None},
-            "accelerometer_x": {"$exists": True},
-        }
-        if event_types:
-            query["eventType"] = {"$in": event_types}
+        try:
+            query: Dict[str, Any] = {
+                "eventType": {"$exists": True, "$ne": None},
+            }
+            # Support both flat (accelerometer_x) and nested (accelerometer.x) schemas
+            query["$or"] = [
+                {"accelerometer_x": {"$exists": True}},
+                {"accelerometer.x": {"$exists": True}},
+            ]
+            if event_types:
+                query["eventType"] = {"$in": event_types}
 
-        pipeline = [
-            {"$match": query},
-            {"$group": {
-                "_id": "$eventType",
-                "count": {"$sum": 1},
-                "samples": {
-                    "$push": {
-                        "label": "$eventType",
-                        "accelerometer_data": [
-                            {"x": "$accelerometer_x", "y": "$accelerometer_y", "z": "$accelerometer_z"}
-                        ],
-                        "latitude": "$latitude",
-                        "longitude": "$longitude",
-                        "speed": "$speed",
-                        "severity": "$severity",
-                        "confidence": "$confidence",
-                        "detection_method": "$detection_method",
-                        "timestamp": "$timestamp",
+            pipeline = [
+                {"$match": query},
+                {"$project": {
+                    "eventType": 1,
+                    "label": "$eventType",
+                    # Handle both flat and nested accelerometer fields
+                    "acc_x": {"$ifNull": ["$accelerometer_x", "$accelerometer.x"]},
+                    "acc_y": {"$ifNull": ["$accelerometer_y", "$accelerometer.y"]},
+                    "acc_z": {"$ifNull": ["$accelerometer_z", "$accelerometer.z"]},
+                    "latitude": {"$ifNull": ["$latitude", "$location.latitude"]},
+                    "longitude": {"$ifNull": ["$longitude", "$location.longitude"]},
+                    "speed": {"$ifNull": ["$speed", "$location.speed"]},
+                    "severity": 1,
+                    "confidence": 1,
+                    "detection_method": 1,
+                    "timestamp": 1,
+                }},
+                {"$match": {
+                    "acc_x": {"$exists": True},
+                    "acc_y": {"$exists": True},
+                    "acc_z": {"$exists": True},
+                }},
+                {"$group": {
+                    "_id": "$eventType",
+                    "count": {"$sum": 1},
+                    "samples": {
+                        "$push": {
+                            "label": "$eventType",
+                            "accelerometer_data": [
+                                {"x": "$acc_x", "y": "$acc_y", "z": "$acc_z"}
+                            ],
+                            "latitude": "$latitude",
+                            "longitude": "$longitude",
+                            "speed": "$speed",
+                            "severity": "$severity",
+                            "confidence": "$confidence",
+                            "detection_method": "$detection_method",
+                            "timestamp": "$timestamp",
+                        }
                     }
-                }
-            }},
-        ]
+                }},
+            ]
 
-        groups = await self.db.processed_events.aggregate(pipeline).to_list(100)
+            groups = await self.db.processed_events.aggregate(pipeline).to_list(100)
+
+        except Exception as e:
+            logger.error(f"Aggregation error: {e}")
+            return {
+                "dataset_id": dataset_id,
+                "status": "error",
+                "total_samples": 0,
+                "class_distribution": {},
+                "error": f"Database aggregation failed: {str(e)}",
+            }
 
         class_distribution: Dict[str, int] = {}
         all_samples = []
@@ -126,7 +161,17 @@ class DatasetExporter:
             }
 
         dataset_path = DATASETS_DIR / f"{dataset_id}.json"
-        dataset_path.write_text(json.dumps(all_samples, indent=2, default=str), encoding='utf-8')
+        try:
+            dataset_path.write_text(json.dumps(all_samples, indent=2, default=str), encoding='utf-8')
+        except Exception as e:
+            logger.error(f"Failed to write dataset file: {e}")
+            return {
+                "dataset_id": dataset_id,
+                "status": "error",
+                "total_samples": len(all_samples),
+                "class_distribution": class_distribution,
+                "error": f"File write error: {str(e)}",
+            }
 
         expires_at = datetime.utcnow() + timedelta(hours=DATASET_TTL_HOURS)
 
@@ -144,9 +189,12 @@ class DatasetExporter:
             "skipped_samples": skipped,
         }
 
-        await self.db.datasets.insert_one(meta)
+        try:
+            await self.db.datasets.insert_one(meta)
+        except Exception as e:
+            logger.error(f"Failed to save dataset metadata: {e}")
 
-        logger.info(f"📦 Dataset created: {dataset_id} ({len(all_samples)} samples)")
+        logger.info(f"Dataset created: {dataset_id} ({len(all_samples)} samples)")
         return meta
 
     async def get_dataset(self, dataset_id: str) -> Optional[Dict]:
@@ -186,5 +234,5 @@ class DatasetExporter:
             await self.delete_dataset(ds["dataset_id"])
             deleted += 1
         if deleted:
-            logger.info(f"🗑️ Cleaned up {deleted} expired datasets")
+            logger.info(f"Cleaned up {deleted} expired datasets")
         return deleted
