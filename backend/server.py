@@ -10,7 +10,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from config import (
     ROOT_DIR, templates, client, db, db_name,
