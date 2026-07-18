@@ -30,9 +30,6 @@
         "buildType": "apk",
         "image": "ubuntu-24.04-jdk-17-ndk-r27b"
       },
-      "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://goodroad.su"
-      },
       "channel": "production"
     }
   },
