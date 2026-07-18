@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { backendConfigService } from './BackendConfigService';
 
 interface AccelerometerSample {
   x: number;
@@ -28,7 +29,6 @@ interface CalibrationProfile {
 }
 
 class CalibrationService {
-  private backendUrl: string;
   private deviceId: string;
   private calibrationSamples: AccelerometerSample[] = [];
   private isCalibrating: boolean = false;
@@ -39,10 +39,7 @@ class CalibrationService {
   private readonly MAX_SAMPLES = 100; // Максимум 100 образцов
 
   constructor() {
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
-    this.backendUrl = url.endsWith('/') ? url : url + '/';
     this.deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
-    
   }
 
   // Получить ID устройства
@@ -121,7 +118,7 @@ class CalibrationService {
       };
 
 
-      const response = await fetch(this.backendUrl + 'api/calibration/submit', {
+      const response = await fetch(`${backendConfigService.getActiveUrl()}/api/calibration/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +160,7 @@ class CalibrationService {
     try {
       // Сначала пробуем загрузить с сервера
       const response = await fetch(
-        this.backendUrl + `api/calibration/profile/${this.deviceId}`,
+        `${backendConfigService.getActiveUrl()}/api/calibration/profile/${this.deviceId}`,
         {
           method: 'GET',
           headers: {
@@ -243,7 +240,7 @@ class CalibrationService {
     try {
       // Удаляем с сервера
       const response = await fetch(
-        this.backendUrl + `api/calibration/profile/${this.deviceId}`,
+        `${backendConfigService.getActiveUrl()}/api/calibration/profile/${this.deviceId}`,
         {
           method: 'DELETE',
         }

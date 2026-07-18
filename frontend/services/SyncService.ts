@@ -2,6 +2,7 @@ import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { localDB, LocalSensorData, LocalWarning, SyncStatus } from './LocalDatabase';
+import { backendConfigService } from './BackendConfigService';
 
 interface RegionData {
   code: string;
@@ -16,16 +17,9 @@ interface RegionData {
 }
 
 export class SyncService {
-  private backendUrl: string;
   private syncInterval: NodeJS.Timeout | null = null;
   private isInitialized = false;
   private networkUnsubscribe: (() => void) | null = null;
-
-  constructor() {
-    // Убедимся что URL всегда заканчивается на /
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
-    this.backendUrl = url.endsWith('/') ? url : url + '/';
-  }
 
   async initialize() {
     if (this.isInitialized) return;
@@ -134,7 +128,7 @@ export class SyncService {
           })),
         };
 
-        const response = await fetch(`${this.backendUrl}api/raw-data`, {
+        const response = await fetch(`${backendConfigService.getActiveUrl()}/api/raw-data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(rawBatch),
@@ -163,7 +157,7 @@ export class SyncService {
       
       for (const region of downloadedRegions) {
         const response = await fetch(
-          `${this.backendUrl}api/warnings/region/${region.code}?since=${region.lastSync}`
+          `${backendConfigService.getActiveUrl()}/api/warnings/region/${region.code}?since=${region.lastSync}`
         );
         
         if (response.ok) {
@@ -209,7 +203,7 @@ export class SyncService {
 
 
       const response = await fetch(
-        `${this.backendUrl}api/warnings/region/${regionCode}/full?` +
+        `${backendConfigService.getActiveUrl()}/api/warnings/region/${regionCode}/full?` +
         `north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`
       );
 
@@ -250,7 +244,7 @@ export class SyncService {
         return [];
       }
 
-      const response = await fetch(`${this.backendUrl}api/regions/available`);
+      const response = await fetch(`${backendConfigService.getActiveUrl()}/api/regions/available`);
       if (!response.ok) return [];
 
       return await response.json();

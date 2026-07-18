@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { syncService } from '../services/SyncService';
+import backendConfigService from '../services/BackendConfigService';
 
 // Локальная статистика устройства
 interface LocalStats {
@@ -94,9 +95,7 @@ export default function AdminPanelSimple() {
   };
 
   const handleOpenWebAdmin = async () => {
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ||
-      Constants.expoConfig?.extra?.backendUrl ||
-      'https://goodroad.su';
+    const backendUrl = backendConfigService.getActiveUrl();
     const adminUrl = backendUrl.endsWith('/')
       ? `${backendUrl}api/admin/dashboard/v3`
       : `${backendUrl}/api/admin/dashboard/v3`;

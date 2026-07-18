@@ -36,6 +36,7 @@ import SimpleToast, { showToast } from '../components/SimpleToast';
 import RawDataCollector from '../services/RawDataCollector';
 import BackgroundSensorService from '../services/BackgroundSensorService';
 import { clientLogService } from '../services/ClientLogService';
+import { backendConfigService } from '../services/BackendConfigService';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
@@ -126,6 +127,7 @@ export default function HomeScreen() {
 
   // Инициализация при загрузке
   useEffect(() => {
+    backendConfigService.initialize();
     initializeServices();
     alertSettingsService.initialize();
     clientLogService.init(); // 🆕 Client logging
@@ -569,7 +571,7 @@ export default function HomeScreen() {
       // Инициализируем коллектор данных
       if (!rawDataCollector.current) {
         const deviceId = 'mobile-app-' + Date.now();
-        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
+        const backendUrl = backendConfigService.getActiveUrl();
         rawDataCollector.current = new RawDataCollector(
           deviceId,
           backendUrl,
@@ -897,7 +899,7 @@ export default function HomeScreen() {
     }
 
     try {
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+      const backendUrl = backendConfigService.getActiveUrl();
       
       // Отправляем ручную отметку на сервер
       const response = await fetch(`${backendUrl}/api/raw-data`, {

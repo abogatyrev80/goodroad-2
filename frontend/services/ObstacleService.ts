@@ -9,6 +9,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { backendConfigService } from './BackendConfigService';
 
 export interface Obstacle {
   id: string;
@@ -47,7 +48,6 @@ export interface DriverReaction {
 }
 
 class ObstacleService {
-  private backendUrl: string | null = null;
   private cachedObstacles: Obstacle[] = [];
   private lastFetchTime: number = 0;
   private passedObstacles: Set<string> = new Set(); // ID пройденных препятствий
@@ -70,10 +70,6 @@ class ObstacleService {
    */
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
-
-    // Инициализируем URL
-    const url = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
-    this.backendUrl = url.endsWith('/') ? url : url + '/';
 
     // Загружаем реакции водителя
     await this.loadDriverReactions();
@@ -101,7 +97,7 @@ class ObstacleService {
       }
 
       // Запрашиваем с сервера
-      const url = `${this.backendUrl}api/obstacles/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&min_confirmations=${minConfirmations}`;
+      const url = `${backendConfigService.getActiveUrl()}/api/obstacles/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&min_confirmations=${minConfirmations}`;
 
       const response = await fetch(url, {
         method: 'GET',

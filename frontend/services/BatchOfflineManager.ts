@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Network from 'expo-network';
 import Constants from 'expo-constants';
 import { DetectedEvent } from './EventDetector';
+import { backendConfigService } from './BackendConfigService';
 
 const STORAGE_KEY = 'good_road_offline_queue';
 const MAX_OFFLINE_RECORDS = 1000;
@@ -280,9 +281,7 @@ class BatchOfflineManager {
    */
   private async sendPackage(dataPackage: DataPackage): Promise<boolean> {
     try {
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
-                        Constants.expoConfig?.extra?.backendUrl || 
-                        'https://goodroad.su';
+      const backendUrl = backendConfigService.getActiveUrl();
       const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
       
       // Подготовка payload в правильном формате для backend

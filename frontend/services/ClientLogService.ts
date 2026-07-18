@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
+import { backendConfigService } from './BackendConfigService';
 
 interface LogEntry {
   device_id: string;
@@ -17,7 +18,6 @@ interface LogEntry {
 
 const MAX_QUEUE = 100;
 const FLUSH_INTERVAL = 30000;
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://goodroad.su';
 
 class ClientLogService {
   private queue: LogEntry[] = [];
@@ -79,7 +79,8 @@ class ClientLogService {
     this.saveQueue();
 
     try {
-      await fetch(`${BACKEND_URL}/api/client-logs`, {
+      const url = backendConfigService.getActiveUrl();
+      await fetch(`${url}/api/client-logs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toSend),

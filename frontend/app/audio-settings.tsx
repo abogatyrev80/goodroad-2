@@ -18,11 +18,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import dynamicAudioService, { DynamicAudioSettings, CustomSoundItem } from '../services/DynamicAudioAlertService';
 
 import alertSettingsService, { AlertSettings } from '../services/AlertSettingsService';
+import backendConfigService, { BackendMode } from '../services/BackendConfigService';
 
 interface CustomSound extends CustomSoundItem {}
 
@@ -32,6 +34,9 @@ export default function AudioSettingsScreen() {
   const [hasChanges, setHasChanges] = useState(false);
   const [customSounds, setCustomSounds] = useState<CustomSound[]>([]);
   const [playingSound, setPlayingSound] = useState<Audio.Sound | null>(null);
+  const [backendMode, setBackendMode] = useState<BackendMode>('auto');
+  const [backendUrl, setBackendUrl] = useState<string>('');
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -40,8 +45,11 @@ export default function AudioSettingsScreen() {
 
   const loadSettings = async () => {
     await alertSettingsService.initialize();
+    await backendConfigService.initialize();
     setSettings(dynamicAudioService.getSettings());
     setAlertSettings(alertSettingsService.getSettings());
+    setBackendMode(backendConfigService.getMode());
+    setBackendUrl(backendConfigService.getActiveUrl());
   };
 
   const loadCustomSounds = async () => {
@@ -55,6 +63,24 @@ export default function AudioSettingsScreen() {
       }
     } catch (error) {
       console.error('Error loading custom sounds:', error);
+    }
+  };
+
+  const setBackendModeAndRefresh = async (mode: BackendMode) => {
+    await backendConfigService.setMode(mode);
+    setBackendMode(mode);
+    setBackendUrl(backendConfigService.getActiveUrl());
+    setTestResult(null);
+  };
+
+  const testBackendConnection = async () => {
+    setTestResult('Проверка...');
+    const url = backendConfigService.getActiveUrl();
+    const result = await backendConfigService.testConnection(url);
+    if (result.ok) {
+      setTestResult(`OK - ${url} (${result.latencyMs}мс)`);
+    } else {
+      setTestResult(`Ошибка: ${result.error || 'Нет ответа'}`);
     }
   };
 
@@ -135,6 +161,75 @@ export default function AudioSettingsScreen() {
     } catch (error: any) {
       console.error('Error playing sound:', error);
       Alert.alert('Ошибка', `Не удалось воспроизвести звук: ${error?.message || 'Неизвестная ошибка'}`);
+    }
+  };
+
+  const testBeepSound = async () => {
+    try {
+      const themeSounds: Record<string, string> = {
+        'motion-tracker': require('../assets/sounds/motion-tracker.mp3'),
+        'radar-detector': require('../assets/sounds/radar-detector.mp3'),
+        'radar-emergency': require('../assets/sounds/radar-emergency.mp3'),
+        'warning': require('../assets/sounds/warning.mp3'),
+      };
+      const soundUri = themeSounds[settings.soundTheme] || themeSounds['radar-emergency'];
+      await playSound(soundUri);
+    } catch (error) {
+      console.error('Error playing beep:', error);
+      Alert.alert('Ошибка', 'Не удалось воспроизвести звук beep');
+    }
+  };
+
+  const testVoiceSound = async () => {
+    try {
+      await Speech.stop();
+      const text = `${alertSettings.customTexts.pothole || 'Яма через'} 100 метров. Рекомендуемая скорость ${alertSettings.recommendedSpeeds.pothole || 40} километров в час.`;
+      await Speech.speak(text, {
+        language: settings.language === 'ru' ? 'ru-RU' : 'en-US',
+        rate: 1.0,
+        pitch: 1.0,
+        volume: settings.volume || 1.0,
+      });
+    } catch (error) {
+      console.error('Error playing voice:', error);
+      Alert.alert('Ошибка', 'Не удалось воспроизвести речь');
+    }
+  };
+
+  const testFullAlert = async () => {
+    try {
+      // Play beep first
+      const themeSounds: Record<string, string> = {
+        'motion-tracker': require('../assets/sounds/motion-tracker.mp3'),
+        'radar-detector': require('../assets/sounds/radar-detector.mp3'),
+        'radar-emergency': require('../assets/sounds/radar-emergency.mp3'),
+        'warning': require('../assets/sounds/warning.mp3'),
+      };
+      const soundUri = themeSounds[settings.soundTheme] || themeSounds['radar-emergency'];
+      
+      const { Audio } = await import('expo-av');
+      const { sound } = await Audio.Sound.createAsync({ uri: soundUri });
+      await sound.setVolumeAsync(settings.volume || 1.0);
+      await sound.playAsync();
+      
+      // Wait a bit then play voice
+      setTimeout(async () => {
+        try {
+          await Speech.stop();
+          const text = `${alertSettings.customTexts.pothole || 'Яма через'} 100 метров. Рекомендуемая скорость ${alertSettings.recommendedSpeeds.pothole || 40} километров в час.`;
+          await Speech.speak(text, {
+            language: settings.language === 'ru' ? 'ru-RU' : 'en-US',
+            rate: 1.0,
+            pitch: 1.0,
+            volume: settings.volume || 1.0,
+          });
+        } catch (e) {
+          console.error('Voice error:', e);
+        }
+      }, 300);
+    } catch (error) {
+      console.error('Error in full alert test:', error);
+      Alert.alert('Ошибка', 'Не удалось воспроизвести полное предупреждение');
     }
   };
 
@@ -543,6 +638,84 @@ export default function AudioSettingsScreen() {
           </View>
         </View>
 
+        {/* Тестовые кнопки */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Тестирование звука и речи</Text>
+          <Text style={styles.sectionDescription}>
+            Проверьте как звучат предупреждения при текущих настройках
+          </Text>
+
+          <View style={styles.testButtons}>
+            <Pressable style={styles.testButton} onPress={testBeepSound}>
+              <Ionicons name="radio" size={24} color="#fff" />
+              <Text style={styles.testButtonText}>Тест Beep (звук)</Text>
+            </Pressable>
+
+            <Pressable style={styles.testButton} onPress={testVoiceSound}>
+              <Ionicons name="volume-high" size={24} color="#fff" />
+              <Text style={styles.testButtonText}>Тест речи (голос)</Text>
+            </Pressable>
+
+            <Pressable style={[styles.testButton, styles.testButtonFull]} onPress={testFullAlert}>
+              <Ionicons name="alert-circle" size={24} color="#fff" />
+              <Text style={styles.testButtonText}>Полное предупреждение</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Бэкенд */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Бэкенд сервер</Text>
+          <Text style={styles.sectionDescription}>
+            Выберите сервер для отправки данных. Автоматический режим проверяет локальный сервер (192.168.8.213:8000) и переключается на production при недоступности.
+          </Text>
+
+          <View style={styles.themeButtons}>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'auto' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('auto')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'auto' && styles.themeButtonTextActive]}>
+                Авто
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'local' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('local')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'local' && styles.themeButtonTextActive]}>
+                Локальный
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'prod' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('prod')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'prod' && styles.themeButtonTextActive]}>
+                Production
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.sliderDescription, { marginTop: 12 }]}>
+            Текущий URL: {backendUrl}
+          </Text>
+
+          {testResult && (
+            <Text style={[styles.sliderDescription, { color: testResult.startsWith('OK') ? '#22c55e' : '#ef4444', marginTop: 4 }]}>
+              {testResult}
+            </Text>
+          )}
+
+          <Pressable
+            style={[styles.testButton, { marginTop: 12 }]}
+            onPress={testBackendConnection}
+          >
+            <Ionicons name="wifi" size={20} color="#fff" />
+            <Text style={styles.testButtonText}>Проверить соединение</Text>
+          </Pressable>
+        </View>
+
         {/* Кнопки */}
         <View style={styles.buttonContainer}>
           <Pressable
@@ -812,5 +985,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     paddingVertical: 20,
+  },
+  testButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  testButton: {
+    flex: 1,
+    minWidth: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1e3a5f',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#00d4ff',
+  },
+  testButtonFull: {
+    minWidth: '100%',
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  testButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
