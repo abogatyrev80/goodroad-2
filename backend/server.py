@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from config import (
-    ROOT_DIR, templates, client, db, mongodb_connected,
+    ROOT_DIR, templates, client, db, mongodb_connected, mongodb_connecting,
     obstacle_clusterer, event_classifier, warning_generator,
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
@@ -123,6 +123,16 @@ async def readiness_check():
     Readiness probe - returns 200 only if all dependencies are ready
     Checks MongoDB connection and other critical dependencies
     """
+    if mongodb_connecting:
+        logger.info("Readiness check: MongoDB connection in progress")
+        return {
+            "status": "connecting",
+            "service": "Good Road API",
+            "mongodb": "connecting",
+            "database": db_name,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
     if not mongodb_connected:
         logger.warning("Readiness check failed: MongoDB not connected")
         raise HTTPException(status_code=503, detail="MongoDB not connected")

@@ -36,6 +36,7 @@ templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
 client: Optional[AsyncIOMotorClient] = None
 db = None
 mongodb_connected = False
+mongodb_connecting = False
 obstacle_clusterer: Optional[ObstacleClusterer] = None
 event_classifier = EventClassifier()
 warning_generator = WarningGenerator()
@@ -75,7 +76,8 @@ def check_rate_limit(device_id: str) -> bool:
 
 
 async def connect_to_mongodb(max_retries=5, retry_delay=5):
-    global client, db, mongodb_connected, obstacle_clusterer
+    global client, db, mongodb_connected, mongodb_connecting, obstacle_clusterer
+    mongodb_connecting = True
     logger.info("Attempting to connect to MongoDB database: %s", db_name)
     logger.info("MongoDB URL pattern: %s",
                 mongo_url.split('@')[-1] if '@' in mongo_url else 'localhost')
@@ -96,6 +98,7 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             db = client[db_name]
             await client.admin.command('ping')
             mongodb_connected = True
+            mongodb_connecting = False
             logger.info("Successfully connected to MongoDB database: %s", db_name)
 
             tracker = init_ml_stats_tracker(db)
@@ -126,15 +129,17 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
                 await asyncio.sleep(retry_delay)
             else:
                 logger.critical("Failed to connect to MongoDB after %d attempts", max_retries)
+                mongodb_connecting = False
                 raise Exception(f"MongoDB connection failed after {max_retries} attempts: {e}")
 
 
 async def close_mongodb_connection():
-    global client, mongodb_connected
+    global client, mongodb_connected, mongodb_connecting
     if client:
         logger.info("Closing MongoDB connection...")
         client.close()
         mongodb_connected = False
+        mongodb_connecting = False
         logger.info("MongoDB connection closed")
 
 
