@@ -60,11 +60,12 @@ async def startup_event():
     Initialize services on startup
     Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
+    import asyncio
     logger.info("Starting Good Road API...")
-    try:
+
+    async def _init_after_mongo():
         await connect_to_mongodb()
 
-        # Initialize neural network monitoring and external training
         from config import db as _db
         if _db is not None:
             dataset_exporter = DatasetExporter(_db)
@@ -84,11 +85,8 @@ async def startup_event():
         else:
             logger.warning("Neural model not found at %s", model_path)
         logger.info("All services initialized successfully")
-    except Exception as e:
-        logger.error("Failed to connect to MongoDB during startup: %s", e)
-        logger.warning("API will start in degraded mode. Health checks will fail until database is available.")
-        # Don't raise - let the app start and retry connections via readiness probe
-        _config.mongodb_connected = False
+
+    asyncio.create_task(_init_after_mongo())
 
 @app.on_event("shutdown")
 async def shutdown_event():
