@@ -13,11 +13,12 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from config import (
-    ROOT_DIR, templates, client, db, mongodb_connected, mongodb_connecting,
+    ROOT_DIR, templates, client, db, db_name,
     obstacle_clusterer, event_classifier, warning_generator,
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
 )
+import config as _config
 from pydantic import BaseModel
 from models import (
     AccelerometerReading, RawSensorData, RawDataBatch,
@@ -87,8 +88,7 @@ async def startup_event():
         logger.error("Failed to connect to MongoDB during startup: %s", e)
         logger.warning("API will start in degraded mode. Health checks will fail until database is available.")
         # Don't raise - let the app start and retry connections via readiness probe
-        global mongodb_connected
-        mongodb_connected = False
+        _config.mongodb_connected = False
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -123,7 +123,7 @@ async def readiness_check():
     Readiness probe - returns 200 only if all dependencies are ready
     Checks MongoDB connection and other critical dependencies
     """
-    if mongodb_connecting:
+    if _config.mongodb_connecting:
         logger.info("Readiness check: MongoDB connection in progress")
         return {
             "status": "connecting",
@@ -133,7 +133,7 @@ async def readiness_check():
             "timestamp": datetime.utcnow().isoformat()
         }
 
-    if not mongodb_connected:
+    if not _config.mongodb_connected:
         logger.warning("Readiness check failed: MongoDB not connected")
         raise HTTPException(status_code=503, detail="MongoDB not connected")
     
@@ -159,7 +159,7 @@ async def root():
         "message": "Good Road API - Smart Road Monitoring System",
         "version": "2.0.0",
         "status": "operational",
-        "mongodb_connected": mongodb_connected,
+        "mongodb_connected": _config.mongodb_connected,
         "neural_model": event_classifier.neural_classifier.get_model_info(),
     }
 
@@ -845,7 +845,7 @@ async def ml_model_stats():
     tracker = get_ml_stats_tracker()
     runtime = tracker.snapshot() if tracker else {}
     db_stats = {}
-    if db and mongodb_connected:
+    if db and _config.mongodb_connected:
         since = datetime.utcnow() - timedelta(hours=24)
         pipeline = [
             {"$match": {"timestamp": {"$gte": since}}},
