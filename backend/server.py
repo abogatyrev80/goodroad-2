@@ -2426,6 +2426,58 @@ async def download_frontend_archive():
         filename="good-road-frontend.tar.gz"
     )
 
+# ─── Client Log Endpoint ────────────────────────────────────────────
+class ClientLogEntry(BaseModel):
+    device_id: str
+    app_version: str = "2.0.1"
+    platform: str = "android"
+    timestamp: int
+    level: str  # "error", "warn", "info", "debug"
+    message: str
+    stack_trace: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+@api_router.post("/client-logs")
+async def ingest_client_logs(entries: List[ClientLogEntry]):
+    """Receive and store client-side logs (crashes, errors, warnings)"""
+    try:
+        docs = []
+        for entry in entries:
+            doc = entry.dict()
+            doc["received_at"] = datetime.utcnow()
+            docs.append(doc)
+        
+        if docs:
+            await db.client_logs.insert_many(docs)
+        
+        return {"status": "ok", "stored": len(docs)}
+    except Exception as e:
+        logger.error(f"Failed to store client logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/client-logs")
+async def get_client_logs(
+    limit: int = Query(100, ge=1, le=1000),
+    device_id: Optional[str] = None,
+    level: Optional[str] = None,
+    hours: int = Query(24, ge=1, le=168)
+):
+    """Query stored client logs"""
+    try:
+        from datetime import timedelta
+        query = {
+            "received_at": {"$gte": datetime.utcnow() - timedelta(hours=hours)}
+        }
+        if device_id:
+            query["device_id"] = device_id
+        if level:
+            query["level"] = level
+        
+        logs = await db.client_logs.find(query, {"_id": 0}).sort("received_at", -1).limit(limit).to_list(limit)
+        return {"logs": logs, "count": len(logs)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(nn_admin_router)

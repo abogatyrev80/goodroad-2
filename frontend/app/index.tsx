@@ -35,6 +35,7 @@ import SimpleToast, { showToast } from '../components/SimpleToast';
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
 import BackgroundSensorService from '../services/BackgroundSensorService';
+import { clientLogService } from '../services/ClientLogService';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
@@ -101,10 +102,33 @@ export default function HomeScreen() {
     return () => clearTimeout(timeout);
   }, []);
 
+  // 🆕 Global error handler
+  useEffect(() => {
+    const handleError = (error: Error, isFatal: boolean) => {
+      clientLogService.error('Global error', error, { fatal: isFatal });
+      clientLogService.flush?.();
+    };
+    
+    // Capture console.error
+    const originalError = console.error;
+    console.error = (...args) => {
+      originalError.apply(console, args);
+      const message = args.join(' ');
+      if (message.includes('Error') || message.includes('Exception') || message.includes('crash')) {
+        clientLogService.error('Console error', undefined, { message });
+      }
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, []);
+
   // Инициализация при загрузке
   useEffect(() => {
     initializeServices();
-    alertSettingsService.initialize(); // 🆕 Инициализация настроек предупреждений
+    alertSettingsService.initialize();
+    clientLogService.init(); // 🆕 Client logging
     return () => {
       cleanup();
     };
