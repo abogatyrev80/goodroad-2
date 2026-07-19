@@ -2501,6 +2501,109 @@ async def get_client_logs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ─── LLM (Ollama) Endpoints ───────────────────────────────────────
+class LLMRequest(BaseModel):
+    prompt: str
+    system: str = ""
+    model: str = ""
+
+class DataQualityRequest(BaseModel):
+    limit: int = 100
+    collection: str = "processed_events"
+
+class SyntheticRequest(BaseModel):
+    label: str
+    count: int = 5
+    window_size: int = 32
+
+class ClassifyRequest(BaseModel):
+    samples: list
+
+class ReportRequest(BaseModel):
+    region: str = ""
+    include_clusters: bool = True
+
+@api_router.post("/llm/analyze-quality")
+async def llm_analyze_quality(req: DataQualityRequest):
+    try:
+        from llm_data_quality import analyze_batch, analyze_dataset_overview
+        cursor = _config.db[req.collection].find().sort("timestamp", -1).limit(req.limit)
+        samples = await cursor.to_list(length=req.limit)
+        for s in samples:
+            s.pop("_id", None)
+        result = await analyze_batch(samples)
+        if not result:
+            raise HTTPException(status_code=503, detail="Ollama not available")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/llm/analyze-dataset")
+async def llm_analyze_dataset(req: DataQualityRequest):
+    try:
+        from llm_data_quality import analyze_dataset_overview
+        result = await analyze_dataset_overview(_config.db, db_name, req.collection)
+        if not result:
+            raise HTTPException(status_code=503, detail="Ollama not available")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/llm/generate-synthetic")
+async def llm_generate_synthetic(req: SyntheticRequest):
+    try:
+        from llm_synthetic import generate_samples
+        samples = await generate_samples(req.label, count=req.count, window_size=req.window_size)
+        if not samples:
+            raise HTTPException(status_code=503, detail="Ollama not available")
+        return {"samples": samples, "count": len(samples)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/llm/classify")
+async def llm_classify(req: ClassifyRequest):
+    try:
+        from llm_classifier import classify_batch
+        result = await classify_batch(req.samples)
+        if not result:
+            raise HTTPException(status_code=503, detail="Ollama not available")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/llm/generate-report")
+async def llm_generate_report(req: ReportRequest):
+    try:
+        from llm_reports import generate_road_report, generate_road_report_json
+        pipeline = [
+            {"$group": {
+                "_id": {"type": "$obstacle_type", "status": "$status", "severity_max": "$severity_max"},
+                "count": {"$sum": 1},
+                "location": {"$first": "$location"}
+            }}
+        ]
+        cursor = _config.db.obstacle_clusters.aggregate(pipeline)
+        clusters = await cursor.to_list(length=100)
+        report_text = await generate_road_report(clusters, region=req.region)
+        report_json = await generate_road_report_json(clusters, region=req.region)
+        return {"text": report_text, "data": report_json}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/llm/health")
+async def llm_health():
+    from llm_service import generate
+    result = await generate("Say OK", system="Reply with one word: OK", max_tokens=5)
+    return {"ollama_available": result is not None, "response": result}
+
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(nn_admin_router)

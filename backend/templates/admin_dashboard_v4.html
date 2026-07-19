@@ -136,6 +136,7 @@ tr:hover{background:#1e293b}
   <div class="tab" onclick="switchTab('logs')">📜 Real-time Logs</div>
   <div class="tab" onclick="switchTab('external')">🌐 External Training</div>
   <div class="tab" onclick="switchTab('map')">🗺️ Map</div>
+  <div class="tab" onclick="switchTab('llm')">🤖 LLM</div>
 </div>
 
 <!-- TAB 1: Inference Monitor -->
@@ -514,6 +515,90 @@ tr:hover{background:#1e293b}
       <span>Clusters: <b id="map-clusters-count">0</b></span>
       <span>Selected: <b id="map-selected-count">0</b></span>
     </div>
+  </div>
+</div>
+
+<!-- TAB 7: LLM (Ollama) -->
+<div class="content" id="tab-llm">
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Ollama Status</h3>
+      <div class="value" id="llm-status">—</div>
+      <div class="sub">подключение к Ollama</div>
+    </div>
+    <div class="card">
+      <h3>Model</h3>
+      <div class="value" id="llm-model" style="font-size:14px">—</div>
+      <div class="sub">qwopus3.5-tools</div>
+    </div>
+    <div class="card">
+      <h3>Last Analysis</h3>
+      <div class="value" id="llm-last-analysis">—</div>
+      <div class="sub">последний анализ</div>
+    </div>
+    <div class="card">
+      <h3>Reports Generated</h3>
+      <div class="value" id="llm-reports-count">0</div>
+      <div class="sub">отчётов создано</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Data Quality Analysis</h3>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Analyze dataset quality via LLM</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="llm-quality-collection" style="padding:6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+          <option value="processed_events">processed_events</option>
+          <option value="raw_sensor_data">raw_sensor_data</option>
+        </select>
+        <input type="number" id="llm-quality-limit" value="100" min="10" max="1000" style="width:80px;padding:6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+        <button class="btn" onclick="llmAnalyzeQuality()">Analyze</button>
+      </div>
+      <div id="llm-quality-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1"></div>
+    </div>
+
+    <div class="card">
+      <h3>Dataset Overview</h3>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Full dataset statistics via LLM</p>
+      <button class="btn" onclick="llmAnalyzeDataset()" style="margin-bottom:12px">Analyze Dataset</button>
+      <div id="llm-dataset-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1"></div>
+    </div>
+
+    <div class="card">
+      <h3>Synthetic Data Generation</h3>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Generate synthetic training samples</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="llm-synth-label" style="padding:6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+          <option value="pothole">pothole</option>
+          <option value="speed_bump">speed_bump</option>
+          <option value="bump">bump</option>
+          <option value="braking">braking</option>
+          <option value="vibration">vibration</option>
+          <option value="wave">wave</option>
+        </select>
+        <input type="number" id="llm-synth-count" value="5" min="1" max="50" style="width:60px;padding:6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+        <button class="btn" onclick="llmGenerateSynthetic()">Generate</button>
+      </div>
+      <div id="llm-synth-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1"></div>
+    </div>
+
+    <div class="card">
+      <h3>Road Condition Report</h3>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Generate report from cluster data</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="llm-report-region" placeholder="Region (optional)" style="flex:1;padding:6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+        <button class="btn" onclick="llmGenerateReport()">Generate</button>
+      </div>
+      <div id="llm-report-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1;white-space:pre-wrap"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>LLM Classification Test</h3>
+    <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Test LLM classification on recent events</p>
+    <button class="btn" onclick="llmClassifyRecent()" style="margin-bottom:12px">Classify Recent Events</button>
+    <div id="llm-classify-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1"></div>
   </div>
 </div>
 
@@ -1471,6 +1556,129 @@ function switchTab(tab) {
       if (map) map.invalidateSize();
       loadMapData();
     }, 200);
+  }
+  if (tab === 'llm') {
+    setTimeout(() => llmCheckHealth(), 100);
+  }
+}
+
+// ─── LLM Tab Functions ────────────────────────────────────────────
+let llmReportsCount = 0;
+
+async function llmCheckHealth() {
+  const el = document.getElementById('llm-status');
+  try {
+    const r = await fetch('/api/llm/health');
+    const data = await r.json();
+    el.textContent = data.ollama_available ? 'Connected' : 'Offline';
+    el.style.color = data.ollama_available ? '#22c55e' : '#ef4444';
+  } catch(e) {
+    el.textContent = 'Error';
+    el.style.color = '#ef4444';
+  }
+}
+
+async function llmAnalyzeQuality() {
+  const el = document.getElementById('llm-quality-result');
+  el.innerHTML = '<span style="color:#f59e0b">Analyzing...</span>';
+  const collection = document.getElementById('llm-quality-collection').value;
+  const limit = parseInt(document.getElementById('llm-quality-limit').value) || 100;
+  try {
+    const r = await fetch('/api/llm/analyze-quality', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({collection, limit})
+    });
+    const data = await r.json();
+    document.getElementById('llm-last-analysis').textContent = new Date().toLocaleTimeString('ru-RU');
+    el.innerHTML = '<pre style="margin:0;white-space:pre-wrap">' + JSON.stringify(data, null, 2) + '</pre>';
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+}
+
+async function llmAnalyzeDataset() {
+  const el = document.getElementById('llm-dataset-result');
+  el.innerHTML = '<span style="color:#f59e0b">Analyzing...</span>';
+  try {
+    const r = await fetch('/api/llm/analyze-dataset', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({collection: 'processed_events', limit: 500})
+    });
+    const data = await r.json();
+    el.innerHTML = '<pre style="margin:0;white-space:pre-wrap">' + JSON.stringify(data, null, 2) + '</pre>';
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+}
+
+async function llmGenerateSynthetic() {
+  const el = document.getElementById('llm-synth-result');
+  el.innerHTML = '<span style="color:#f59e0b">Generating...</span>';
+  const label = document.getElementById('llm-synth-label').value;
+  const count = parseInt(document.getElementById('llm-synth-count').value) || 5;
+  try {
+    const r = await fetch('/api/llm/generate-synthetic', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({label, count, window_size: 32})
+    });
+    const data = await r.json();
+    el.innerHTML = `<div style="margin-bottom:8px;color:#22c55e">Generated ${data.count} samples</div>` +
+      '<pre style="margin:0;white-space:pre-wrap;font-size:11px">' + JSON.stringify(data.samples?.slice(0,2), null, 2) + '</pre>';
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+}
+
+async function llmGenerateReport() {
+  const el = document.getElementById('llm-report-result');
+  el.innerHTML = '<span style="color:#f59e0b">Generating report...</span>';
+  const region = document.getElementById('llm-report-region').value;
+  try {
+    const r = await fetch('/api/llm/generate-report', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({region, include_clusters: true})
+    });
+    const data = await r.json();
+    llmReportsCount++;
+    document.getElementById('llm-reports-count').textContent = llmReportsCount;
+    el.textContent = data.text || JSON.stringify(data.data, null, 2);
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+}
+
+async function llmClassifyRecent() {
+  const el = document.getElementById('llm-classify-result');
+  el.innerHTML = '<span style="color:#f59e0b">Classifying...</span>';
+  try {
+    const r = await fetch('/api/admin/editor/events/filtered', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({limit: 10, sort_by: 'timestamp', sort_order: -1})
+    });
+    const eventsData = await r.json();
+    const events = eventsData.events || [];
+    if (events.length === 0) {
+      el.innerHTML = '<span style="color:#94a3b8">No events to classify</span>';
+      return;
+    }
+    const samples = events.map(e => ({
+      accelerometer_data: e.accelerometer_data || [],
+      label: e.event_type || 'unknown'
+    }));
+    const cr = await fetch('/api/llm/classify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({samples})
+    });
+    const result = await cr.json();
+    el.innerHTML = '<pre style="margin:0;white-space:pre-wrap">' + JSON.stringify(result, null, 2) + '</pre>';
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
   }
 }
 </script>
