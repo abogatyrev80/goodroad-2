@@ -878,15 +878,31 @@ let map, eventsMarkers = [], clustersMarkers = [];
 
 function initMap() {
   if (map) return;
-  map = L.map('map').setView([55.7558, 37.6173], 10);
+  map = L.map('map').setView([55.7558, 37.6173], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
 }
 
+function fitMapToMarkers() {
+  const allMarkers = [...eventsMarkers, ...clustersMarkers];
+  if (allMarkers.length === 0) {
+    map.setView([55.7558, 37.6173], 5);
+    return;
+  }
+  if (allMarkers.length === 1) {
+    const latlng = allMarkers[0].getLatLng();
+    map.setView(latlng, 14);
+    return;
+  }
+  const group = new L.featureGroup(allMarkers);
+  map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 16 });
+}
+
 async function loadMapData() {
   if (!map) initMap();
+  map.invalidateSize();
   
   try {
     // Load processed events
@@ -944,12 +960,7 @@ async function loadMapData() {
       });
     }
 
-    // Fit bounds if there are markers
-    const allMarkers = [...eventsMarkers, ...clustersMarkers];
-    if (allMarkers.length > 0) {
-      const group = new L.featureGroup(allMarkers);
-      map.fitBounds(group.getBounds().pad(0.1));
-    }
+    fitMapToMarkers();
   } catch (e) {
     console.error('Map data load error:', e);
   }
@@ -963,7 +974,10 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   
   if (tab === 'map') {
-    setTimeout(loadMapData, 100); // wait for tab to render
+    setTimeout(() => {
+      if (map) map.invalidateSize();
+      loadMapData();
+    }, 200);
   }
 }
 </script>
