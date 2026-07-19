@@ -391,17 +391,19 @@ async def recalculate_all_clusters():
         
         for event in all_events:
             try:
-                # Используем функцию process_event
+                cluster_event = {
+                    '_id': str(event['_id']),
+                    'eventType': event.get('eventType'),
+                    'latitude': event.get('latitude'),
+                    'longitude': event.get('longitude'),
+                    'severity': event.get('severity', 3),
+                    'confidence': event.get('confidence', 0.7),
+                    'speed': event.get('speed', 0),
+                    'timestamp': event.get('timestamp'),
+                }
                 await _config.obstacle_clusterer.process_event(
-                    event_id=str(event['_id']),
-                    event_type=event.get('eventType'),
-                    latitude=event.get('latitude'),
-                    longitude=event.get('longitude'),
-                    severity=event.get('severity', 3),
-                    confidence=event.get('confidence', 0.7),
-                    speed=event.get('speed', 0),
-                    timestamp=event.get('timestamp'),
-                    device_id=event.get('deviceId')
+                    event=cluster_event,
+                    device_id=event.get('deviceId', 'unknown')
                 )
                 created_count += 1
                 
