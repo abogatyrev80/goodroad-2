@@ -78,6 +78,19 @@ async def startup_event():
             await auto_trainer.start()
             logger.info("InferenceWorker and AutoTrainer started")
 
+            async def _periodic_maintenance():
+                from external_training_api import timeout_stale_training_runs, cleanup_expired_datasets_task
+                while True:
+                    try:
+                        await timeout_stale_training_runs()
+                        await cleanup_expired_datasets_task()
+                    except Exception as e:
+                        logger.error("Periodic maintenance error: %s", e)
+                    await asyncio.sleep(3600)
+
+            asyncio.create_task(_periodic_maintenance())
+            logger.info("Periodic maintenance started (hourly)")
+
         model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
         if os.path.exists(model_path):
             info = event_classifier.neural_classifier.reload(model_path)

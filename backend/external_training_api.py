@@ -6,6 +6,7 @@ Endpoints для интеграции с внешним GPU-сервером д�
 import logging
 import os
 import uuid
+import httpx
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Query, HTTPException, UploadFile, File, Form, Header, Request
@@ -323,7 +324,41 @@ async def webhook_training_complete(body: WebhookTrainingComplete, request: Requ
     if _db is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    logger.info(f"📥 Webhook received: dataset={body.dataset_id}, status={body.status}")
+    logger.info("Webhook received: dataset=%s, status=%s", body.dataset_id, body.status)
+
+    model_id = body.model_id
+
+    if body.status == "completed" and body.model_download_url and _model_registry:
+        try:
+            logger.info("Downloading model from %s", body.model_download_url)
+            async with httpx.AsyncClient(timeout=300) as client:
+                resp = await client.get(body.model_download_url)
+                resp.raise_for_status()
+                model_bytes = resp.content
+
+            filename = body.model_download_url.split("/")[-1] or "model.keras"
+            upload_result = await _model_registry.upload_model(
+                model_file_bytes=model_bytes,
+                filename=filename,
+                dataset_id=body.dataset_id,
+                accuracy=body.accuracy,
+                val_accuracy=body.val_accuracy,
+                notes=f"Auto-uploaded via webhook. {body.notes or ''}",
+            )
+            model_id = upload_result.get("model_id")
+            logger.info("Model uploaded: %s", model_id)
+
+            if body.accuracy is not None:
+                active = await _model_registry.get_active_model()
+                current_acc = active.get("accuracy") if active else 0
+                if body.accuracy > (current_acc or 0):
+                    await _model_registry.activate_model(model_id)
+                    logger.info("Auto-activated model %s (accuracy=%.3f > current=%.3f)",
+                                model_id, body.accuracy, current_acc or 0)
+
+        except Exception as e:
+            logger.error("Failed to download/upload model: %s", e)
+            model_id = model_id or None
 
     await _db.training_runs.update_one(
         {"dataset_id": body.dataset_id, "trigger": "external_api"},
@@ -332,11 +367,35 @@ async def webhook_training_complete(body: WebhookTrainingComplete, request: Requ
             "status": body.status,
             "accuracy": body.accuracy,
             "val_accuracy": body.val_accuracy,
+            "model_id": model_id,
+            "training_time_seconds": body.training_time_seconds,
             "logs": [f"Webhook: {body.notes or body.status}"],
         }}
     )
 
-    if body.status == "completed" and body.model_download_url:
-        logger.info(f"✅ External training completed: {body.dataset_id}")
+    return {"message": "Webhook processed", "dataset_id": body.dataset_id, "model_id": model_id}
 
-    return {"message": "Webhook processed", "dataset_id": body.dataset_id}
+
+# ─── Background Tasks ────────────────────────────────────────────────────────
+
+async def timeout_stale_training_runs():
+    """Mark training runs as failed if pending for >2 hours."""
+    if _db is None:
+        return
+    cutoff = datetime.utcnow().replace(hour=datetime.utcnow().hour - 2)
+    result = await _db.training_runs.update_many(
+        {"status": {"$in": ["pending", "pending_webhook"]}, "started_at": {"$lt": cutoff}},
+        {"$set": {"status": "failed", "logs": ["Auto-timeout: GPU server did not respond within 2 hours"]}}
+    )
+    if result.modified_count > 0:
+        logger.warning("Timed out %d stale training runs", result.modified_count)
+
+
+async def cleanup_expired_datasets_task():
+    """Remove expired dataset files and metadata."""
+    if _dataset_exporter is None:
+        return
+    try:
+        await _dataset_exporter.cleanup_expired()
+    except Exception as e:
+        logger.error("Dataset cleanup failed: %s", e)
