@@ -338,13 +338,6 @@ let logEntries = [];
 let refreshInterval;
 const API = '/api/admin/nn';
 
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-}
-
 async function fetchJSON(url) {
   try {
     const r = await fetch(url);
@@ -390,7 +383,7 @@ function makeChart(id, config) {
 
 const EVENT_COLORS = {
   pothole: '#ef4444', speed_bump: '#f59e0b', bump: '#f97316',
-  braking: '#3b82f6', vibration: '#8b5cf6'
+  braking: '#3b82f6', vibration: '#8b5cf6', unknown: '#6b7280'
 };
 
 async function loadInferenceMonitor() {
@@ -973,16 +966,6 @@ function switchTab(tab) {
     setTimeout(loadMapData, 100); // wait for tab to render
   }
 }
-
-// Event colors for map markers
-const EVENT_COLORS = {
-  pothole: '#dc2626',
-  speed_bump: '#f59e0b',
-  bump: '#f97316',
-  braking: '#3b82f6',
-  vibration: '#8b5cf6',
-  unknown: '#6b7280'
-};
 </script>
 </body>
 </html>
