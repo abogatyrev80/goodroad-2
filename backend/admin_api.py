@@ -36,6 +36,31 @@ class BulkDeleteRequest(BaseModel):
     ids: List[str]
     reason: Optional[str] = None
 
+class BulkUpdateEventsRequest(BaseModel):
+    """Массовое обновление событий"""
+    ids: List[str]
+    eventType: Optional[str] = None
+    severity: Optional[int] = None
+    notes: Optional[str] = None
+
+class BulkUpdateClustersRequest(BaseModel):
+    """Массовое обновление кластеров"""
+    ids: List[str]
+    obstacleType: Optional[str] = None
+    status: Optional[str] = None
+    severity_max: Optional[int] = None
+    notes: Optional[str] = None
+
+class FilteredQueryRequest(BaseModel):
+    """Запрос с фильтрами для выборки"""
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    event_types: Optional[List[str]] = None
+    min_severity: Optional[int] = None
+    max_severity: Optional[int] = None
+    min_confidence: Optional[float] = None
+    limit: int = 50000
+
 class SeverityMetrics(BaseModel):
     """Метрики для понимания severity"""
     severity_level: int
@@ -301,6 +326,119 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         return {
             "success": True,
             "deleted_count": result.deleted_count
+        }
+    
+    @admin_editor_router.post("/events/bulk-update")
+    async def bulk_update_events(request: BulkUpdateEventsRequest):
+        """Массовое обновление событий (тип, severity, заметки)"""
+        if not request.ids:
+            raise HTTPException(status_code=400, detail="No IDs provided")
+        
+        update_fields = {}
+        if request.eventType is not None:
+            update_fields['eventType'] = request.eventType
+        if request.severity is not None:
+            update_fields['severity'] = request.severity
+        if request.notes is not None:
+            update_fields['notes'] = request.notes
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        update_fields['lastModified'] = datetime.utcnow()
+        update_fields['manuallyEdited'] = True
+        
+        result = await database.processed_events.update_many(
+            {"id": {"$in": request.ids}},
+            {"$set": update_fields}
+        )
+        
+        logger.info("Bulk updated %d events: %s", result.modified_count, list(update_fields.keys()))
+        
+        return {
+            "success": True,
+            "modified_count": result.modified_count,
+            "updated_fields": list(update_fields.keys())
+        }
+    
+    @admin_editor_router.post("/clusters/bulk-update")
+    async def bulk_update_clusters(request: BulkUpdateClustersRequest):
+        """Массовое обновление кластеров (тип, статус, severity)"""
+        if not request.ids:
+            raise HTTPException(status_code=400, detail="No IDs provided")
+        
+        update_fields = {}
+        if request.obstacleType is not None:
+            update_fields['obstacleType'] = request.obstacleType
+        if request.status is not None:
+            update_fields['status'] = request.status
+        if request.notes is not None:
+            update_fields['notes'] = request.notes
+        
+        severity_update = {}
+        if request.severity_max is not None:
+            severity_update['max'] = request.severity_max
+        
+        if not update_fields and not severity_update:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        update_fields['lastModified'] = datetime.utcnow()
+        update_fields['manuallyEdited'] = True
+        
+        if severity_update:
+            update_fields['severity'] = severity_update
+        
+        result = await database.obstacle_clusters.update_many(
+            {"_id": {"$in": request.ids}},
+            {"$set": update_fields}
+        )
+        
+        logger.info("Bulk updated %d clusters: %s", result.modified_count, list(update_fields.keys()))
+        
+        return {
+            "success": True,
+            "modified_count": result.modified_count,
+            "updated_fields": list(update_fields.keys())
+        }
+    
+    @admin_editor_router.post("/events/filtered")
+    async def get_filtered_events(query: FilteredQueryRequest):
+        """Получить события с фильтрами (дата, типы, severity)"""
+        mongo_query = {}
+        
+        if query.date_from or query.date_to:
+            ts_filter = {}
+            if query.date_from:
+                ts_filter['$gte'] = query.date_from
+            if query.date_to:
+                ts_filter['$lte'] = query.date_to + 'T23:59:59'
+            mongo_query['timestamp'] = ts_filter
+        
+        if query.event_types:
+            mongo_query['eventType'] = {'$in': query.event_types}
+        
+        if query.min_severity is not None or query.max_severity is not None:
+            sev_filter = {}
+            if query.min_severity is not None:
+                sev_filter['$gte'] = query.min_severity
+            if query.max_severity is not None:
+                sev_filter['$lte'] = query.max_severity
+            mongo_query['severity'] = sev_filter
+        
+        if query.min_confidence is not None:
+            mongo_query['confidence'] = {'$gte': query.min_confidence}
+        
+        limit = min(query.limit, 50000)
+        events = await database.processed_events.find(mongo_query).limit(limit).to_list(limit)
+        
+        for ev in events:
+            if '_id' in ev:
+                ev['_id'] = str(ev['_id'])
+        
+        return {
+            "total": await database.processed_events.count_documents(mongo_query),
+            "returned": len(events),
+            "events": events
         }
     
     # ====================================
