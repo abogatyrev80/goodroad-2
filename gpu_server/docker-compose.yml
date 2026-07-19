@@ -1,0 +1,33 @@
+services:
+  gpu-server:
+    build: .
+    container_name: goodroad-gpu-server
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+      - render
+    environment:
+      - HSA_OVERRIDE_GFX_VERSION=10.3.0
+      - HIP_VISIBLE_DEVICES=0
+      - MAIN_SERVER_URL=${MAIN_SERVER_URL:-https://goodroad.su}
+      - EXTERNAL_TRAINING_API_KEY=${EXTERNAL_TRAINING_API_KEY:-your-api-key-change-me}
+      - EXTERNAL_TRAINING_WEBHOOK_SECRET=${EXTERNAL_TRAINING_WEBHOOK_SECRET:-your-webhook-secret-change-me}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - POLL_INTERVAL=300
+      - GPU_DEVICE=auto
+      - MODEL_OUTPUT_DIR=/data/models
+    volumes:
+      - gpu-models:/data/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  gpu-models:
