@@ -2493,7 +2493,7 @@ app.include_router(external_training_router)
 
 # Include admin editor router
 from admin_api import get_admin_editor_router
-admin_editor_router = get_admin_editor_router(_config.db)
+admin_editor_router = get_admin_editor_router()
 app.include_router(admin_editor_router)
 
 cors_origins = os.environ.get("CORS_ORIGINS", "*")

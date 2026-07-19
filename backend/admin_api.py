@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
+import config as _config
 
 logger = logging.getLogger(__name__)
 
@@ -150,19 +151,19 @@ async def get_severity_metrics():
 # CLUSTERS - Управление кластерами
 # ====================================
 
-def init_admin_editor_routes(database: AsyncIOMotorDatabase):
-    """Инициализация с доступом к БД"""
+def init_admin_editor_routes():
+    """Инициализация маршрутов (БД берётся из config через _config.db)"""
     
     @admin_editor_router.get("/clusters/{cluster_id}")
     async def get_cluster_detail(cluster_id: str):
         """Получить детальную информацию о кластере"""
-        cluster = await database.obstacle_clusters.find_one({"_id": cluster_id})
+        cluster = await _config.db.obstacle_clusters.find_one({"_id": cluster_id})
         
         if not cluster:
             raise HTTPException(status_code=404, detail="Cluster not found")
         
         # Получаем связанные события
-        events = await database.processed_events.find(
+        events = await _config.db.processed_events.find(
             {"clusterId": cluster_id}
         ).sort("timestamp", -1).to_list(100)
         
@@ -198,7 +199,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             if severity_update:
                 update_data['severity'] = severity_update
         
-        result = await database.obstacle_clusters.update_one(
+        result = await _config.db.obstacle_clusters.update_one(
             {"_id": cluster_id},
             {"$set": update_data}
         )
@@ -214,16 +215,16 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     async def delete_cluster(cluster_id: str, reason: Optional[str] = None):
         """Удалить кластер"""
         # Сначала получаем кластер для логирования
-        cluster = await database.obstacle_clusters.find_one({"_id": cluster_id})
+        cluster = await _config.db.obstacle_clusters.find_one({"_id": cluster_id})
         
         if not cluster:
             raise HTTPException(status_code=404, detail="Cluster not found")
         
         # Удаляем кластер
-        await database.obstacle_clusters.delete_one({"_id": cluster_id})
+        await _config.db.obstacle_clusters.delete_one({"_id": cluster_id})
         
         # Убираем clusterId из связанных событий
-        await database.processed_events.update_many(
+        await _config.db.processed_events.update_many(
             {"clusterId": cluster_id},
             {"$unset": {"clusterId": ""}}
         )
@@ -239,12 +240,12 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             raise HTTPException(status_code=400, detail="No IDs provided")
         
         # Удаляем кластеры
-        result = await database.obstacle_clusters.delete_many(
+        result = await _config.db.obstacle_clusters.delete_many(
             {"_id": {"$in": request.ids}}
         )
         
         # Убираем clusterId из событий
-        await database.processed_events.update_many(
+        await _config.db.processed_events.update_many(
             {"clusterId": {"$in": request.ids}},
             {"$unset": {"clusterId": ""}}
         )
@@ -263,14 +264,14 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     @admin_editor_router.get("/events/{event_id}")
     async def get_event_detail(event_id: str):
         """Получить детальную информацию о событии"""
-        event = await database.processed_events.find_one({"id": event_id})
+        event = await _config.db.processed_events.find_one({"id": event_id})
         
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
         
         # Получаем связанный кластер если есть
         if event.get('clusterId'):
-            cluster = await database.obstacle_clusters.find_one({"_id": event['clusterId']})
+            cluster = await _config.db.obstacle_clusters.find_one({"_id": event['clusterId']})
             if cluster:
                 event['cluster'] = cluster
         
@@ -287,7 +288,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         update_data['lastModified'] = datetime.utcnow()
         update_data['manuallyEdited'] = True
         
-        result = await database.processed_events.update_one(
+        result = await _config.db.processed_events.update_one(
             {"id": event_id},
             {"$set": update_data}
         )
@@ -302,7 +303,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     @admin_editor_router.delete("/events/{event_id}")
     async def delete_event(event_id: str, reason: Optional[str] = None):
         """Удалить событие"""
-        result = await database.processed_events.delete_one({"id": event_id})
+        result = await _config.db.processed_events.delete_one({"id": event_id})
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Event not found")
@@ -317,7 +318,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if not request.ids:
             raise HTTPException(status_code=400, detail="No IDs provided")
         
-        result = await database.processed_events.delete_many(
+        result = await _config.db.processed_events.delete_many(
             {"id": {"$in": request.ids}}
         )
         
@@ -348,7 +349,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         update_fields['lastModified'] = datetime.utcnow()
         update_fields['manuallyEdited'] = True
         
-        result = await database.processed_events.update_many(
+        result = await _config.db.processed_events.update_many(
             {"id": {"$in": request.ids}},
             {"$set": update_fields}
         )
@@ -388,7 +389,7 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if severity_update:
             update_fields['severity'] = severity_update
         
-        result = await database.obstacle_clusters.update_many(
+        result = await _config.db.obstacle_clusters.update_many(
             {"_id": {"$in": request.ids}},
             {"$set": update_fields}
         )
@@ -429,14 +430,14 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
             mongo_query['confidence'] = {'$gte': query.min_confidence}
         
         limit = min(query.limit, 50000)
-        events = await database.processed_events.find(mongo_query).limit(limit).to_list(limit)
+        events = await _config.db.processed_events.find(mongo_query).limit(limit).to_list(limit)
         
         for ev in events:
             if '_id' in ev:
                 ev['_id'] = str(ev['_id'])
         
         return {
-            "total": await database.processed_events.count_documents(mongo_query),
+            "total": await _config.db.processed_events.count_documents(mongo_query),
             "returned": len(events),
             "events": events
         }
@@ -483,10 +484,10 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         if verified_only:
             query['status'] = 'verified'
         
-        clusters = await database.obstacle_clusters.find(query).limit(limit).to_list(limit)
+        clusters = await _config.db.obstacle_clusters.find(query).limit(limit).to_list(limit)
         
         return {
-            "total": await database.obstacle_clusters.count_documents(query),
+            "total": await _config.db.obstacle_clusters.count_documents(query),
             "returned": len(clusters),
             "clusters": clusters
         }
@@ -494,6 +495,6 @@ def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     return admin_editor_router
 
 # Функция для подключения роутера
-def get_admin_editor_router(db: AsyncIOMotorDatabase):
-    """Получить роутер с доступом к БД"""
-    return init_admin_editor_routes(db)
+def get_admin_editor_router():
+    """Получить роутер (БД берётся из config через _config.db)"""
+    return init_admin_editor_routes()
