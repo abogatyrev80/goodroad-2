@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 
 from config import (
-    ROOT_DIR, templates, client, db, db_name,
-    obstacle_clusterer, event_classifier, warning_generator,
+    ROOT_DIR, templates, db_name,
+    event_classifier, warning_generator,
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
 )
@@ -71,7 +71,7 @@ async def startup_event():
             dataset_exporter = DatasetExporter(_db)
             model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
             init_external_training(_db, dataset_exporter, model_registry)
-            inference_worker = InferenceWorker(_db, event_classifier, obstacle_clusterer)
+            inference_worker = InferenceWorker(_db, event_classifier, _config.obstacle_clusterer)
             auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
             init_nn_admin(_db, inference_worker, auto_trainer)
             await inference_worker.start()
@@ -137,8 +137,8 @@ async def readiness_check():
     
     try:
         # Quick ping to verify MongoDB is still responsive
-        if client:
-            await client.admin.command('ping')
+        if _config.client:
+            await _config.client.admin.command('ping')
         return {
             "status": "ready",
             "service": "Good Road API",
@@ -184,7 +184,7 @@ async def ingest_raw_data(request: Request):
                 "severity": point.get("severity"),
                 "receivedAt": datetime.utcnow(),
             }
-            await db.raw_sensor_data.insert_one(doc)
+            await _config.db.raw_sensor_data.insert_one(doc)
             inserted += 1
         
         return {"status": "ok", "inserted": inserted}
@@ -208,13 +208,13 @@ async def get_v2_analytics():
     """
     try:
         # Подсчет сырых данных
-        raw_data_count = await db.raw_sensor_data.count_documents({})
+        raw_data_count = await _config.db.raw_sensor_data.count_documents({})
         
         # Подсчет обработанных событий
-        processed_events_count = await db.processed_events.count_documents({})
+        processed_events_count = await _config.db.processed_events.count_documents({})
         
         # Подсчет предупреждений
-        warnings_count = await db.user_warnings.count_documents({})
+        warnings_count = await _config.db.user_warnings.count_documents({})
         
         # Статистика по типам событий
         event_pipeline = [
@@ -225,7 +225,7 @@ async def get_v2_analytics():
                 "avg_confidence": {"$avg": "$confidence"}
             }}
         ]
-        event_stats = await db.processed_events.aggregate(event_pipeline).to_list(100)
+        event_stats = await _config.db.processed_events.aggregate(event_pipeline).to_list(100)
         
         # Статистика по устройствам
         device_pipeline = [
@@ -235,10 +235,10 @@ async def get_v2_analytics():
             }},
             {"$limit": 10}
         ]
-        device_stats = await db.raw_sensor_data.aggregate(device_pipeline).to_list(10)
+        device_stats = await _config.db.raw_sensor_data.aggregate(device_pipeline).to_list(10)
         
         # Последние события
-        recent_events = await db.processed_events.find(
+        recent_events = await _config.db.processed_events.find(
             {},
             {"_id": 0}
         ).sort("timestamp", -1).limit(10).to_list(10)
@@ -264,9 +264,9 @@ async def get_raw_data(
 ):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
-        total = await db.raw_sensor_data.count_documents({})
+        total = await _config.db.raw_sensor_data.count_documents({})
         
-        data = await db.raw_sensor_data.find(
+        data = await _config.db.raw_sensor_data.find(
             {},
             {"_id": 0}
         ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
@@ -293,9 +293,9 @@ async def get_processed_events(
         if event_type:
             query["eventType"] = event_type
         
-        total = await db.processed_events.count_documents(query)
+        total = await _config.db.processed_events.count_documents(query)
         
-        events = await db.processed_events.find(
+        events = await _config.db.processed_events.find(
             query,
             {"_id": 0}
         ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
@@ -320,15 +320,15 @@ async def get_obstacle_clusters(
     limit = limit or limits.clusters_default_limit
     limit = min(limit, limits.clusters_max_limit)
     try:
-        if not obstacle_clusterer:
+        if not _config.obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        await obstacle_clusterer.expire_old_clusters()
+        await _config.obstacle_clusterer.expire_old_clusters()
         query = {"status": status}
         if status == "active":
             query["expiresAt"] = {"$gt": datetime.utcnow()}
         if min_reports > 0:
             query["reportCount"] = {"$gte": min_reports}
-        clusters = await db.obstacle_clusters.find(
+        clusters = await _config.db.obstacle_clusters.find(
             query,
             {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1,
              "confidence": 1, "reportCount": 1, "devices": 1,
@@ -358,13 +358,13 @@ async def recalculate_all_clusters():
     Используется после изменения параметров кластеризации
     """
     try:
-        if not obstacle_clusterer:
+        if not _config.obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
         
         logger.info("Удаление всех существующих кластеров...")
         
         # Удаляем все кластеры
-        delete_result = await db.obstacle_clusters.delete_many({})
+        delete_result = await _config.db.obstacle_clusters.delete_many({})
         deleted_count = delete_result.deleted_count
         
         logger.info("Удалено кластеров: %s", deleted_count)
@@ -373,12 +373,12 @@ async def recalculate_all_clusters():
         logger.info("Получение всех событий...")
         
         # Подсчитываем сначала
-        total_events = await db.processed_events.count_documents({})
+        total_events = await _config.db.processed_events.count_documents({})
         logger.info("Всего событий в БД: %d", total_events)
         
         # Получаем все события батчами
         all_events = []
-        cursor = db.processed_events.find({})
+        cursor = _config.db.processed_events.find({})
         async for event in cursor:
             all_events.append(event)
         
@@ -392,7 +392,7 @@ async def recalculate_all_clusters():
         for event in all_events:
             try:
                 # Используем функцию process_event
-                await obstacle_clusterer.process_event(
+                await _config.obstacle_clusterer.process_event(
                     event_id=str(event['_id']),
                     event_type=event.get('eventType'),
                     latitude=event.get('latitude'),
@@ -414,7 +414,7 @@ async def recalculate_all_clusters():
                 continue
         
         # Подсчитываем итоговое количество кластеров
-        final_clusters = await db.obstacle_clusters.count_documents({})
+        final_clusters = await _config.db.obstacle_clusters.count_documents({})
         
         logger.info("Пересоздание завершено")
         logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
@@ -464,30 +464,30 @@ async def cleanup_old_data(
         }
         
         if delete_raw_data:
-            raw_result = await db.raw_sensor_data.delete_many({
+            raw_result = await _config.db.raw_sensor_data.delete_many({
                 "created_at": {"$lt": cutoff_date}
             })
             results["deleted_raw_data"] = raw_result.deleted_count
             logger.info("Удалено сырых данных: %d", raw_result.deleted_count)
         
         if delete_events:
-            events_result = await db.processed_events.delete_many({
+            events_result = await _config.db.processed_events.delete_many({
                 "timestamp": {"$lt": cutoff_date}
             })
             results["deleted_events"] = events_result.deleted_count
             logger.info("Удалено событий: %d", events_result.deleted_count)
         
         if delete_clusters:
-            clusters_result = await db.obstacle_clusters.delete_many({
+            clusters_result = await _config.db.obstacle_clusters.delete_many({
                 "created_at": {"$lt": cutoff_date}
             })
             results["deleted_clusters"] = clusters_result.deleted_count
             logger.info("Удалено кластеров: %d", clusters_result.deleted_count)
         
         # Статистика после очистки
-        remaining_raw = await db.raw_sensor_data.count_documents({})
-        remaining_events = await db.processed_events.count_documents({})
-        remaining_clusters = await db.obstacle_clusters.count_documents({})
+        remaining_raw = await _config.db.raw_sensor_data.count_documents({})
+        remaining_events = await _config.db.processed_events.count_documents({})
+        remaining_clusters = await _config.db.obstacle_clusters.count_documents({})
         
         results["remaining"] = {
             "raw_data": remaining_raw,
@@ -531,17 +531,17 @@ async def delete_all_data(
         results = {}
         
         if delete_raw_data:
-            raw_result = await db.raw_sensor_data.delete_many({})
+            raw_result = await _config.db.raw_sensor_data.delete_many({})
             results["deleted_raw_data"] = raw_result.deleted_count
             logger.warning("Удалено всех сырых данных: %d", raw_result.deleted_count)
         
         if delete_events:
-            events_result = await db.processed_events.delete_many({})
+            events_result = await _config.db.processed_events.delete_many({})
             results["deleted_events"] = events_result.deleted_count
             logger.warning("Удалено всех событий: %d", events_result.deleted_count)
         
         if delete_clusters:
-            clusters_result = await db.obstacle_clusters.delete_many({})
+            clusters_result = await _config.db.obstacle_clusters.delete_many({})
             results["deleted_clusters"] = clusters_result.deleted_count
             logger.warning("Удалено всех кластеров: %d", clusters_result.deleted_count)
         
@@ -561,7 +561,7 @@ async def delete_all_data(
 async def get_heatmap_data_simple():
     """Получить данные для heatmap из processed_events (упрощенная версия)"""
     try:
-        events = await db.processed_events.find(
+        events = await _config.db.processed_events.find(
             {"latitude": {"$ne": None}, "longitude": {"$ne": None}},
             {"_id": 0, "latitude": 1, "longitude": 1, "eventType": 1, "severity": 1}
         ).to_list(5000)
@@ -603,11 +603,11 @@ async def get_nearby_obstacles(
         Список активных кластеров препятствий отсортированных по приоритету
     """
     try:
-        if not obstacle_clusterer:
+        if not _config.obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
         
         # Получаем все активные кластеры
-        all_clusters = await db.obstacle_clusters.find({
+        all_clusters = await _config.db.obstacle_clusters.find({
             "status": "active",
             "expiresAt": {"$gt": datetime.utcnow()},
             "reportCount": {"$gte": min_confirmations}
@@ -616,7 +616,7 @@ async def get_nearby_obstacles(
         # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
         nearby_obstacles = []
         for cluster in all_clusters:
-            distance = obstacle_clusterer.haversine_distance(
+            distance = _config.obstacle_clusterer.haversine_distance(
                 latitude, longitude,
                 cluster['location']['latitude'],
                 cluster['location']['longitude']
@@ -676,7 +676,7 @@ async def get_road_conditions(
     """Get road conditions near a specific location"""
     try:
         # MongoDB geospatial query would be better, but using simple distance calculation
-        conditions = await db.road_conditions.find({}, {"_id": 0}).to_list(1000)
+        conditions = await _config.db.road_conditions.find({}, {"_id": 0}).to_list(1000)
         
         nearby_conditions = []
         for condition in conditions:
@@ -713,7 +713,7 @@ async def get_road_warnings(
         # Get recent warnings (last 7 days)
         cutoff_date = datetime.utcnow() - timedelta(days=7)
         
-        warnings = await db.road_warnings.find({
+        warnings = await _config.db.road_warnings.find({
             "created_at": {"$gte": cutoff_date}
         }, {"_id": 0}).to_list(1000)
         
@@ -843,7 +843,7 @@ async def ml_model_stats():
     tracker = get_ml_stats_tracker()
     runtime = tracker.snapshot() if tracker else {}
     db_stats = {}
-    if db and _config.mongodb_connected:
+    if _config.db and _config.mongodb_connected:
         since = datetime.utcnow() - timedelta(hours=24)
         pipeline = [
             {"$match": {"timestamp": {"$gte": since}}},
@@ -856,11 +856,11 @@ async def ml_model_stats():
                 }
             },
         ]
-        agg = await db.ml_inference_logs.aggregate(pipeline).to_list(1)
+        agg = await _config.db.ml_inference_logs.aggregate(pipeline).to_list(1)
         if agg:
             db_stats = agg[0]
             db_stats.pop("_id", None)
-        by_type = await db.ml_inference_logs.aggregate(
+        by_type = await _config.db.ml_inference_logs.aggregate(
             [
                 {"$match": {"timestamp": {"$gte": since}, "neuralType": {"$ne": None}}},
                 {"$group": {"_id": "$neuralType", "count": {"$sum": 1}}},
@@ -921,7 +921,7 @@ async def ml_model_predict(body: MLPredictRequest):
 async def update_event(event_id: str, update_data: Dict):
     """Обновить событие по ID"""
     try:
-        result = await db.processed_events.update_one(
+        result = await _config.db.processed_events.update_one(
             {"id": event_id},
             {"$set": update_data}
         )
@@ -939,7 +939,7 @@ async def update_event(event_id: str, update_data: Dict):
 async def delete_event(event_id: str):
     """Удалить событие по ID"""
     try:
-        result = await db.processed_events.delete_one({"id": event_id})
+        result = await _config.db.processed_events.delete_one({"id": event_id})
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Событие не найдено")
@@ -1010,7 +1010,7 @@ async def clear_database(
                 else:
                     filter_to_use = {}
                 
-                result = await db[collection_name].delete_many(filter_to_use)
+                result = await _config.db[collection_name].delete_many(filter_to_use)
                 results[collection_name] = result.deleted_count
                 total_deleted += result.deleted_count
             except Exception as e:
@@ -1109,7 +1109,7 @@ async def clear_database_v2(
                 else:
                     filter_to_use = {}
                 
-                result = await db[collection_name].delete_many(filter_to_use)
+                result = await _config.db[collection_name].delete_many(filter_to_use)
                 results[collection_name] = result.deleted_count
                 total_deleted += result.deleted_count
             except Exception as e:
@@ -1146,7 +1146,7 @@ async def delete_raw_data(data_id: str):
     """Удалить raw data по ID"""
     try:
         from bson import ObjectId
-        result = await db.raw_sensor_data.delete_one({"_id": ObjectId(data_id)})
+        result = await _config.db.raw_sensor_data.delete_one({"_id": ObjectId(data_id)})
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Данные не найдены")
@@ -1180,10 +1180,10 @@ async def get_all_sensor_data(
             query["timestamp"] = date_filter
         
         # Get total count for pagination
-        total_count = await db.sensor_data.count_documents(query)
+        total_count = await _config.db.sensor_data.count_documents(query)
         
         # Get data with sorting (most recent first)
-        cursor = db.sensor_data.find(query).sort("timestamp", -1).skip(skip).limit(limit)
+        cursor = _config.db.sensor_data.find(query).sort("timestamp", -1).skip(skip).limit(limit)
         
         data = []
         async for document in cursor:
@@ -1283,7 +1283,7 @@ async def update_sensor_data_classification(
         update_doc["admin_updated_at"] = datetime.now()
         
         # Update the document
-        result = await db.sensor_data.update_one(
+        result = await _config.db.sensor_data.update_one(
             {"_id": object_id},
             {"$set": update_doc}
         )
@@ -1310,9 +1310,9 @@ async def get_admin_analytics():
     """
     try:
         # Basic statistics
-        total_points = await db.sensor_data.count_documents({})
-        verified_points = await db.sensor_data.count_documents({"is_verified": True})
-        hazard_points = await db.sensor_data.count_documents({"hazard_type": {"$ne": None}})
+        total_points = await _config.db.sensor_data.count_documents({})
+        verified_points = await _config.db.sensor_data.count_documents({"is_verified": True})
+        hazard_points = await _config.db.sensor_data.count_documents({"hazard_type": {"$ne": None}})
         
         # Calculate average road quality
         pipeline = [
@@ -1326,14 +1326,14 @@ async def get_admin_analytics():
         ]
         
         quality_stats = []
-        async for result in db.sensor_data.aggregate(pipeline):
+        async for result in _config.db.sensor_data.aggregate(pipeline):
             quality_stats.append(result)
         
         avg_road_quality = quality_stats[0]["avg_quality"] if quality_stats else 0
         
         # Recent activity (last 7 days)
         week_ago = datetime.now() - timedelta(days=7)
-        recent_points = await db.sensor_data.count_documents({
+        recent_points = await _config.db.sensor_data.count_documents({
             "timestamp": {"$gte": week_ago}
         })
         
@@ -1348,7 +1348,7 @@ async def get_admin_analytics():
         ]
         
         hazard_distribution = []
-        async for result in db.sensor_data.aggregate(hazard_pipeline):
+        async for result in _config.db.sensor_data.aggregate(hazard_pipeline):
             hazard_distribution.append({
                 "hazard_type": result["_id"],
                 "count": result["count"]
@@ -1365,7 +1365,7 @@ async def get_admin_analytics():
         
         quality_distribution = []
         for range_info in quality_ranges:
-            count = await db.sensor_data.count_documents({
+            count = await _config.db.sensor_data.count_documents({
                 "road_quality_score": {
                     "$gte": range_info["min"],
                     "$lte": range_info["max"]
@@ -1472,7 +1472,7 @@ async def get_heatmap_data(
         ]
         
         heatmap_points = []
-        async for point in db.sensor_data.aggregate(pipeline):
+        async for point in _config.db.sensor_data.aggregate(pipeline):
             heatmap_points.append({
                 "lat": point["latitude"],
                 "lng": point["longitude"],
@@ -1503,12 +1503,12 @@ async def cleanup_old_data():
         cutoff_date = datetime.utcnow() - timedelta(days=30)
         
         # Delete old sensor data
-        sensor_result = await db.sensor_data.delete_many({
+        sensor_result = await _config.db.sensor_data.delete_many({
             "timestamp": {"$lt": cutoff_date}
         })
         
         # Delete old warnings
-        warning_result = await db.road_warnings.delete_many({
+        warning_result = await _config.db.road_warnings.delete_many({
             "created_at": {"$lt": cutoff_date}
         })
         
@@ -1537,7 +1537,7 @@ async def delete_sensor_data_point(point_id: str):
             raise HTTPException(status_code=400, detail="Invalid point ID format")
         
         # Delete the document
-        result = await db.sensor_data.delete_one({"_id": object_id})
+        result = await _config.db.sensor_data.delete_one({"_id": object_id})
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Sensor data point not found")
@@ -1566,13 +1566,13 @@ async def cleanup_test_data():
         }
         
         # Count before deletion
-        count_before = await db.sensor_data.count_documents(query)
+        count_before = await _config.db.sensor_data.count_documents(query)
         
         # Delete test records
-        result = await db.sensor_data.delete_many(query)
+        result = await _config.db.sensor_data.delete_many(query)
         
         # Get remaining count
-        remaining_count = await db.sensor_data.count_documents({})
+        remaining_count = await _config.db.sensor_data.count_documents({})
         
         return {
             "message": "Test data cleanup completed",
@@ -1628,7 +1628,7 @@ async def submit_calibration_data(calibration: CalibrationData):
         }
         
         # Check if profile exists
-        existing_profile = await db.calibration_profiles.find_one({"deviceId": calibration.deviceId})
+        existing_profile = await _config.db.calibration_profiles.find_one({"deviceId": calibration.deviceId})
         
         if existing_profile:
             # Update existing profile with weighted average (70% old, 30% new)
@@ -1665,7 +1665,7 @@ async def submit_calibration_data(calibration: CalibrationData):
             }
             
             # Update document
-            await db.calibration_profiles.update_one(
+            await _config.db.calibration_profiles.update_one(
                 {"deviceId": calibration.deviceId},
                 {"$set": {
                     "baseline": updated_baseline,
@@ -1699,7 +1699,7 @@ async def submit_calibration_data(calibration: CalibrationData):
                 "created_at": datetime.now()
             }
             
-            await db.calibration_profiles.insert_one(profile)
+            await _config.db.calibration_profiles.insert_one(profile)
             
             return {
                 "message": "Calibration profile created",
@@ -1721,7 +1721,7 @@ async def get_calibration_profile(device_id: str):
     Get calibration profile for a specific device
     """
     try:
-        profile = await db.calibration_profiles.find_one({"deviceId": device_id})
+        profile = await _config.db.calibration_profiles.find_one({"deviceId": device_id})
         
         if not profile:
             # Return default thresholds if no profile exists
@@ -1756,7 +1756,7 @@ async def reset_calibration_profile(device_id: str):
     Reset/delete calibration profile for a device (forces recalibration)
     """
     try:
-        result = await db.calibration_profiles.delete_one({"deviceId": device_id})
+        result = await _config.db.calibration_profiles.delete_one({"deviceId": device_id})
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Calibration profile not found")
@@ -1779,10 +1779,10 @@ async def get_calibration_stats():
     Get statistics about calibrated devices
     """
     try:
-        total_profiles = await db.calibration_profiles.count_documents({})
+        total_profiles = await _config.db.calibration_profiles.count_documents({})
         
         # Get profiles with most samples
-        top_profiles = await db.calibration_profiles.find({}) \
+        top_profiles = await _config.db.calibration_profiles.find({}) \
             .sort("sample_count", -1) \
             .limit(10) \
             .to_list(10)
@@ -1859,10 +1859,10 @@ async def count_data_by_filters(filters: BulkDeleteFilters):
             query["is_verified"] = filters.is_verified
         
         # Count matching records
-        count = await db.sensor_data.count_documents(query)
+        count = await _config.db.sensor_data.count_documents(query)
         
         # Get sample records (first 5)
-        sample = await db.sensor_data.find(query).limit(5).to_list(5)
+        sample = await _config.db.sensor_data.find(query).limit(5).to_list(5)
         sample_data = []
         for doc in sample:
             sample_data.append({
@@ -1907,13 +1907,13 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
             query["is_verified"] = filters.is_verified
         
         # Count before deletion
-        count_before = await db.sensor_data.count_documents(query)
+        count_before = await _config.db.sensor_data.count_documents(query)
         
         # Delete matching records
-        result = await db.sensor_data.delete_many(query)
+        result = await _config.db.sensor_data.delete_many(query)
         
         # Get remaining count
-        remaining_count = await db.sensor_data.count_documents({})
+        remaining_count = await _config.db.sensor_data.count_documents({})
         
         return {
             "message": "Bulk deletion completed",
@@ -1948,7 +1948,7 @@ async def export_sensor_data_csv(
             query["timestamp"] = date_filter
         
         # Get data
-        cursor = db.sensor_data.find(query).sort("timestamp", -1).limit(limit)
+        cursor = _config.db.sensor_data.find(query).sort("timestamp", -1).limit(limit)
         
         # Create CSV in memory
         output = io.StringIO()
@@ -2077,7 +2077,7 @@ async def import_sensor_data_csv(file: UploadFile = File(...)):
                     "admin_notes": row.get("Admin Notes", "")
                 }
                 
-                await db.sensor_data.insert_one(doc)
+                await _config.db.sensor_data.insert_one(doc)
                 imported_count += 1
                 
             except Exception as row_error:
@@ -2108,7 +2108,7 @@ async def cleanup_zero_coordinates():
         # Since we now extract coordinates from rawData, we need to check rawData structure
         
         # First, let's get all records and check which ones have no valid GPS data
-        cursor = db.sensor_data.find({})
+        cursor = _config.db.sensor_data.find({})
         
         records_to_delete = []
         async for document in cursor:
@@ -2146,7 +2146,7 @@ async def cleanup_zero_coordinates():
         
         # Delete records without valid GPS coordinates
         if records_to_delete:
-            delete_result = await db.sensor_data.delete_many({
+            delete_result = await _config.db.sensor_data.delete_many({
                 "_id": {"$in": records_to_delete}
             })
             deleted_count = delete_result.deleted_count
@@ -2156,8 +2156,8 @@ async def cleanup_zero_coordinates():
         return {
             "message": "Zero coordinate cleanup completed",
             "deleted_records": deleted_count,
-            "analyzed_records": len(records_to_delete) + await db.sensor_data.count_documents({}) if records_to_delete else await db.sensor_data.count_documents({}),
-            "remaining_records": await db.sensor_data.count_documents({})
+            "analyzed_records": len(records_to_delete) + await _config.db.sensor_data.count_documents({}) if records_to_delete else await _config.db.sensor_data.count_documents({}),
+            "remaining_records": await _config.db.sensor_data.count_documents({})
         }
         
     except Exception as e:
@@ -2198,7 +2198,7 @@ async def update_event(event_id: str, data: dict):
         if not update_data:
             raise HTTPException(status_code=400, detail="No data to update")
         
-        result = await db.processed_events.update_one(
+        result = await _config.db.processed_events.update_one(
             {"id": event_id},
             {"$set": update_data}
         )
@@ -2234,7 +2234,7 @@ async def update_cluster(cluster_id: str, data: dict):
         if not update_data:
             raise HTTPException(status_code=400, detail="No data to update")
         
-        result = await db.obstacle_clusters.update_one(
+        result = await _config.db.obstacle_clusters.update_one(
             {"_id": cluster_id},
             {"$set": update_data}
         )
@@ -2255,7 +2255,7 @@ async def delete_event(event_id: str):
     Удаление события по ID для админ-панели v3
     """
     try:
-        result = await db.processed_events.delete_one({"id": event_id})
+        result = await _config.db.processed_events.delete_one({"id": event_id})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Event not found")
         return {"success": True, "message": "Event deleted successfully"}
@@ -2271,7 +2271,7 @@ async def delete_cluster(cluster_id: str):
     Удаление кластера по ID для админ-панели v3
     """
     try:
-        result = await db.obstacle_clusters.delete_one({"_id": cluster_id})
+        result = await _config.db.obstacle_clusters.delete_one({"_id": cluster_id})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Cluster not found")
         return {"success": True, "message": "Cluster deleted successfully"}
@@ -2291,7 +2291,7 @@ async def bulk_delete_events(ids_data: dict):
         if not ids:
             raise HTTPException(status_code=400, detail="No IDs provided")
         
-        result = await db.processed_events.delete_many({"id": {"$in": ids}})
+        result = await _config.db.processed_events.delete_many({"id": {"$in": ids}})
         return {
             "success": True,
             "message": f"Deleted {result.deleted_count} events",
@@ -2313,7 +2313,7 @@ async def bulk_delete_clusters(ids_data: dict):
         if not ids:
             raise HTTPException(status_code=400, detail="No IDs provided")
         
-        result = await db.obstacle_clusters.delete_many({"_id": {"$in": ids}})
+        result = await _config.db.obstacle_clusters.delete_many({"_id": {"$in": ids}})
         return {
             "success": True,
             "message": f"Deleted {result.deleted_count} clusters",
@@ -2456,7 +2456,7 @@ async def ingest_client_logs(entries: List[ClientLogEntry]):
             docs.append(doc)
         
         if docs:
-            await db.client_logs.insert_many(docs)
+            await _config.db.client_logs.insert_many(docs)
         
         return {"status": "ok", "stored": len(docs)}
     except Exception as e:
@@ -2481,7 +2481,7 @@ async def get_client_logs(
         if level:
             query["level"] = level
         
-        logs = await db.client_logs.find(query, {"_id": 0}).sort("received_at", -1).limit(limit).to_list(limit)
+        logs = await _config.db.client_logs.find(query, {"_id": 0}).sort("received_at", -1).limit(limit).to_list(limit)
         return {"logs": logs, "count": len(logs)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2493,7 +2493,7 @@ app.include_router(external_training_router)
 
 # Include admin editor router
 from admin_api import get_admin_editor_router
-admin_editor_router = get_admin_editor_router(db)
+admin_editor_router = get_admin_editor_router(_config.db)
 app.include_router(admin_editor_router)
 
 cors_origins = os.environ.get("CORS_ORIGINS", "*")
