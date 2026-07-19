@@ -82,7 +82,7 @@ jobs:
             sed -i "s|image: $IMAGE:.*|image: $IMAGE:$SHA|" /opt/goodroad/docker-compose.yaml
 
             cd /opt/goodroad
-            docker compose up -d --no-deps backend
+            docker compose up -d --force-recreate --no-deps backend
 
             echo "Waiting for backend to become healthy..."
             for i in $(seq 1 30); do
