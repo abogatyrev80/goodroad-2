@@ -64,8 +64,11 @@ class WebhookTrainingComplete(BaseModel):
 
 
 def _serialize(obj):
+    from bson import ObjectId
     if isinstance(obj, datetime):
         return obj.isoformat()
+    if isinstance(obj, ObjectId):
+        return str(obj)
     if isinstance(obj, dict):
         return {k: _serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):

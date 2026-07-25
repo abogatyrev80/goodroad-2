@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MAIN_SERVER_URL = os.getenv("MAIN_SERVER_URL", "https://goodroad.su")
 API_KEY = os.getenv("EXTERNAL_TRAINING_API_KEY", "your-api-key-change-me")
