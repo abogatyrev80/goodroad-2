@@ -100,6 +100,11 @@ class DatasetExporter:
                         }
                     }
                 }},
+                {"$project": {
+                    "_id": 1,
+                    "count": 1,
+                    "samples": {"$slice": ["$samples", 20000]}
+                }},
             ]
 
             groups = await self.db.processed_events.aggregate(pipeline).to_list(100)
