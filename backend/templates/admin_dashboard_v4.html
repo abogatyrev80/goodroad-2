@@ -137,6 +137,7 @@ tr:hover{background:#1e293b}
   <div class="tab" onclick="switchTab('external')">🌐 External Training</div>
   <div class="tab" onclick="switchTab('map')">🗺️ Map</div>
   <div class="tab" onclick="switchTab('llm')">🤖 LLM</div>
+  <div class="tab" onclick="switchTab('gpu')">🖥️ GPU Machines</div>
 </div>
 
 <!-- TAB 1: Inference Monitor -->
@@ -599,6 +600,119 @@ tr:hover{background:#1e293b}
     <p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Test LLM classification on recent events</p>
     <button class="btn" onclick="llmClassifyRecent()" style="margin-bottom:12px">Classify Recent Events</button>
     <div id="llm-classify-result" style="max-height:300px;overflow-y:auto;font-size:12px;color:#cbd5e1"></div>
+  </div>
+</div>
+
+<!-- TAB 8: GPU Machines -->
+<div class="content" id="tab-gpu">
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Total Machines</h3>
+      <div class="value" id="gpu-total">0</div>
+      <div class="sub">подключено машин</div>
+    </div>
+    <div class="card">
+      <h3>Online</h3>
+      <div class="value" id="gpu-online" style="color:#22c55e">0</div>
+      <div class="sub">онлайн</div>
+    </div>
+    <div class="card">
+      <h3>Training</h3>
+      <div class="value" id="gpu-training" style="color:#f59e0b">0</div>
+      <div class="sub">обучают модели</div>
+    </div>
+    <div class="card">
+      <h3>Models Trained</h3>
+      <div class="value" id="gpu-models">0</div>
+      <div class="sub">моделей создано</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">GPU Machines</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-success" onclick="showAddGPUMachine()">+ Add Machine</button>
+        <button class="btn btn-outline" onclick="loadGPUMachines()">Refresh</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Host</th>
+          <th>GPU</th>
+          <th>Status</th>
+          <th>Last Check</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="gpu-machines-table">
+        <tr><td colspan="6" class="empty">No GPU machines registered</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid grid-2" id="gpu-detail" style="display:none">
+    <div class="card">
+      <h3>Machine Details</h3>
+      <div id="gpu-detail-info"></div>
+    </div>
+    <div class="card">
+      <h3>Quick Actions</h3>
+      <div id="gpu-detail-actions" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="card">
+      <h3>Deploy Log</h3>
+      <div id="gpu-deploy-log" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap"></div>
+    </div>
+    <div class="card">
+      <h3>GPU Server Logs</h3>
+      <div id="gpu-server-logs" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;display:none" id="gpu-add-form">
+    <h3>Add GPU Machine</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div>
+        <label style="color:#94a3b8;font-size:12px">Name</label>
+        <input type="text" id="gpu-name" placeholder="Home GPU (RX 6800 XT)" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:12px">Host (IP or hostname)</label>
+        <input type="text" id="gpu-host" placeholder="192.168.1.100" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:12px">SSH Port</label>
+        <input type="number" id="gpu-ssh-port" value="22" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:12px">SSH User</label>
+        <input type="text" id="gpu-ssh-user" value="root" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:12px">SSH Auth</label>
+        <select id="gpu-ssh-auth" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+          <option value="key">SSH Key</option>
+          <option value="password">Password</option>
+        </select>
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:12px">Deploy Path</label>
+        <input type="text" id="gpu-deploy-path" value="/opt/goodroad-gpu" style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px">
+      </div>
+      <div style="grid-column:span 2">
+        <label style="color:#94a3b8;font-size:12px">SSH Private Key</label>
+        <textarea id="gpu-ssh-key" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..." style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;margin-top:4px;font-family:monospace;font-size:11px"></textarea>
+        <button class="btn btn-outline" style="margin-top:8px" onclick="generateSSHKey()">Generate Key</button>
+        <span id="gpu-generated-pubkey" style="margin-left:8px;font-size:12px;color:#94a3b8"></span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-success" onclick="addGPUMachine()">Register Machine</button>
+      <button class="btn btn-outline" onclick="hideAddGPUMachine()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -1560,6 +1674,9 @@ function switchTab(tab) {
   if (tab === 'llm') {
     setTimeout(() => llmCheckHealth(), 100);
   }
+  if (tab === 'gpu') {
+    setTimeout(() => loadGPUMachines(), 100);
+  }
 }
 
 // ─── LLM Tab Functions ────────────────────────────────────────────
@@ -1679,6 +1796,191 @@ async function llmClassifyRecent() {
     el.innerHTML = '<pre style="margin:0;white-space:pre-wrap">' + JSON.stringify(result, null, 2) + '</pre>';
   } catch(e) {
     el.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
+  }
+}
+
+// ─── GPU Machines Tab Functions ────────────────────────────────────
+const GPU_API = '/api/admin/gpu-machines';
+let selectedGPUMachine = null;
+
+async function loadGPUMachines() {
+  const data = await fetchJSON(GPU_API + '/');
+  if (!data) return;
+
+  const machines = data.machines || [];
+  const online = machines.filter(m => m.status === 'online').length;
+  const training = machines.filter(m => m.status === 'training').length;
+
+  document.getElementById('gpu-total').textContent = machines.length;
+  document.getElementById('gpu-online').textContent = online;
+  document.getElementById('gpu-training').textContent = training;
+
+  const tbody = document.getElementById('gpu-machines-table');
+  if (machines.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No GPU machines registered. Click "Add Machine" to start.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = machines.map(m => `
+    <tr style="cursor:pointer" onclick="selectGPUMachine('${m.machine_id}')">
+      <td><b>${m.name}</b></td>
+      <td>${m.host}</td>
+      <td>${m.gpu_name || '<span style="color:#64748b">—</span>'}</td>
+      <td><span class="badge ${m.status}">${m.status}</span></td>
+      <td>${m.last_health_check ? formatDateTime(m.last_health_check) : '—'}</td>
+      <td>
+        <button class="btn-sm btn-outline" onclick="event.stopPropagation();checkGPUHealth('${m.machine_id}')">Health</button>
+        <button class="btn-sm btn-outline" onclick="event.stopPropagation();deployGPUMachine('${m.machine_id}')">Deploy</button>
+        <button class="btn-sm btn-outline" onclick="event.stopPropagation();trainGPUMachine('${m.machine_id}')">Train</button>
+        <button class="btn-sm btn-danger" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();deleteGPUMachine('${m.machine_id}','${m.name}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  if (selectedGPUMachine) {
+    selectGPUMachine(selectedGPUMachine);
+  }
+}
+
+async function selectGPUMachine(machineId) {
+  selectedGPUMachine = machineId;
+  const detail = document.getElementById('gpu-detail');
+  detail.style.display = 'grid';
+
+  const m = await fetchJSON(GPU_API + '/' + machineId);
+  if (!m) return;
+
+  document.getElementById('gpu-detail-info').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+      <div><span style="color:#94a3b8">Name:</span> <b>${m.name}</b></div>
+      <div><span style="color:#94a3b8">Host:</span> ${m.host}:${m.ssh_port}</div>
+      <div><span style="color:#94a3b8">GPU:</span> ${m.gpu_name || '—'}</div>
+      <div><span style="color:#94a3b8">Status:</span> <span class="badge ${m.status}">${m.status}</span></div>
+      <div><span style="color:#94a3b8">Deploy Path:</span> ${m.deploy_path}</div>
+      <div><span style="color:#94a3b8">Last Check:</span> ${m.last_health_check ? formatDateTime(m.last_health_check) : '—'}</div>
+      <div style="grid-column:span 2"><span style="color:#94a3b8">API Key:</span> <code style="font-size:11px">${m.api_key}</code></div>
+    </div>
+  `;
+
+  document.getElementById('gpu-detail-actions').innerHTML = `
+    <button class="btn btn-success" onclick="deployGPUMachine('${m.machine_id}')">Deploy Code</button>
+    <button class="btn btn-outline" onclick="startGPUMachine('${m.machine_id}')">Start Server</button>
+    <button class="btn btn-outline" onclick="stopGPUMachine('${m.machine_id}')">Stop Server</button>
+    <button class="btn btn-info" onclick="checkGPUHealth('${m.machine_id}')">Check Health</button>
+    <button class="btn btn-outline" onclick="trainGPUMachine('${m.machine_id}')">Trigger Training</button>
+    <button class="btn btn-outline" onclick="loadGPULogs('${m.machine_id}')">View Logs</button>
+  `;
+}
+
+async function checkGPUHealth(machineId) {
+  const el = document.getElementById('gpu-server-logs');
+  el.textContent = 'Checking health...';
+  const data = await fetchJSON(GPU_API + '/' + machineId + '/health');
+  if (data) {
+    el.textContent = JSON.stringify(data, null, 2);
+    loadGPUMachines();
+  }
+}
+
+async function deployGPUMachine(machineId) {
+  const el = document.getElementById('gpu-deploy-log');
+  el.textContent = 'Deploying... this may take a few minutes.';
+  const r = await fetch(GPU_API + '/' + machineId + '/deploy', {method: 'POST'});
+  const data = await r.json();
+  if (data.steps) {
+    el.textContent = data.steps.join('\n');
+  } else {
+    el.textContent = 'Error: ' + (data.detail || JSON.stringify(data));
+  }
+  loadGPUMachines();
+}
+
+async function startGPUMachine(machineId) {
+  await fetch(GPU_API + '/' + machineId + '/start', {method: 'POST'});
+  loadGPUMachines();
+}
+
+async function stopGPUMachine(machineId) {
+  await fetch(GPU_API + '/' + machineId + '/stop', {method: 'POST'});
+  loadGPUMachines();
+}
+
+async function trainGPUMachine(machineId) {
+  const datasetId = prompt('Enter dataset_id to train:');
+  if (!datasetId) return;
+  const epochs = parseInt(prompt('Epochs:', '50')) || 50;
+  const r = await fetch(GPU_API + '/' + machineId + '/train', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dataset_id: datasetId, epochs, batch_size: 64, seq_len: 32})
+  });
+  const data = await r.json();
+  alert(data.message || data.detail || 'Training queued');
+}
+
+async function loadGPULogs(machineId) {
+  const el = document.getElementById('gpu-server-logs');
+  el.textContent = 'Loading logs...';
+  const data = await fetchJSON(GPU_API + '/' + machineId + '/logs?lines=100');
+  if (data) {
+    el.textContent = data.logs || 'No logs';
+  }
+}
+
+async function deleteGPUMachine(machineId, name) {
+  if (!confirm(`Delete GPU machine "${name}"?`)) return;
+  await fetch(GPU_API + '/' + machineId, {method: 'DELETE'});
+  selectedGPUMachine = null;
+  document.getElementById('gpu-detail').style.display = 'none';
+  loadGPUMachines();
+}
+
+function showAddGPUMachine() {
+  document.getElementById('gpu-add-form').style.display = 'block';
+}
+
+function hideAddGPUMachine() {
+  document.getElementById('gpu-add-form').style.display = 'none';
+}
+
+async function generateSSHKey() {
+  const r = await fetch(GPU_API + '/generate-key', {method: 'POST'});
+  const data = await r.json();
+  if (data.private_key) {
+    document.getElementById('gpu-ssh-key').value = data.private_key;
+    document.getElementById('gpu-generated-pubkey').textContent = data.public_key;
+  }
+}
+
+async function addGPUMachine() {
+  const body = {
+    name: document.getElementById('gpu-name').value,
+    host: document.getElementById('gpu-host').value,
+    ssh_port: parseInt(document.getElementById('gpu-ssh-port').value) || 22,
+    ssh_user: document.getElementById('gpu-ssh-user').value,
+    ssh_auth: document.getElementById('gpu-ssh-auth').value,
+    ssh_private_key: document.getElementById('gpu-ssh-key').value,
+    deploy_path: document.getElementById('gpu-deploy-path').value,
+  };
+
+  if (!body.name || !body.host) {
+    alert('Name and Host are required');
+    return;
+  }
+
+  const r = await fetch(GPU_API + '/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+
+  if (data.machine_id) {
+    alert(`Machine registered!\n\nID: ${data.machine_id}\nAPI Key: ${data.api_key}\n\nCopy the public SSH key to the GPU machine, then click Deploy.`);
+    hideAddGPUMachine();
+    loadGPUMachines();
+  } else {
+    alert('Error: ' + (data.detail || JSON.stringify(data)));
   }
 }
 </script>

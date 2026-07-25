@@ -12,8 +12,10 @@ async def poll_loop(config: dict):
     api_key = config["api_key"]
     webhook_secret = config.get("webhook_secret", "")
     webhook_url = config.get("webhook_url", "")
-    poll_interval = config.get("poll_interval", 300)
+    poll_interval = config.get("poll_interval", 30)
     output_dir = config.get("output_dir", "/data/models")
+    command_poll_interval = config.get("command_poll_interval", 30)
+    machine_id = config.get("machine_id", "")
 
     headers = {"X-Api-Key": api_key}
 
@@ -24,14 +26,83 @@ async def poll_loop(config: dict):
             await _poll_once(main_url, headers, webhook_secret, webhook_url, output_dir, config)
         except Exception as e:
             logger.error("Poll cycle error: %s", e)
+
+        if machine_id:
+            try:
+                await _poll_commands(main_url, headers, machine_id, output_dir, config)
+            except Exception as e:
+                logger.error("Command poll error: %s", e)
+
         await asyncio.sleep(poll_interval)
+
+
+async def _poll_commands(main_url, headers, machine_id, output_dir, config):
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            f"{main_url}/api/admin/gpu-machines/{machine_id}/commands",
+            headers=headers,
+        )
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+
+    commands = data.get("commands", [])
+    if not commands:
+        return
+
+    logger.info("Received %d pending commands", len(commands))
+
+    for cmd in commands:
+        command_id = cmd.get("command_id", "")
+        command = cmd.get("command", "")
+        params = cmd.get("params", {})
+
+        if command == "train":
+            dataset_id = params.get("dataset_id")
+            epochs = params.get("epochs", 50)
+            batch_size = params.get("batch_size", 64)
+            seq_len = params.get("seq_len", 32)
+
+            if not dataset_id:
+                await _complete_command(main_url, command_id, {"error": "no dataset_id"})
+                continue
+
+            logger.info("Executing train command: dataset=%s epochs=%d", dataset_id, epochs)
+
+            await _execute_training(
+                main_url, headers, config.get("webhook_secret", ""),
+                config.get("webhook_url", ""), output_dir, config,
+                dataset_id=dataset_id, epochs=epochs,
+                batch_size=batch_size, seq_len=seq_len,
+            )
+
+            await _complete_command(main_url, command_id, {"status": "completed"})
+
+        else:
+            logger.warning("Unknown command: %s", command)
+            await _fail_command(main_url, command_id, f"Unknown command: {command}")
+
+
+async def _complete_command(main_url, command_id, result):
+    async with httpx.AsyncClient(timeout=30) as client:
+        await client.post(
+            f"{main_url}/api/admin/gpu-machines/commands/{command_id}/complete",
+            json=result,
+        )
+
+
+async def _fail_command(main_url, command_id, error):
+    async with httpx.AsyncClient(timeout=30) as client:
+        await client.post(
+            f"{main_url}/api/admin/gpu-machines/commands/{command_id}/fail",
+            json={"error": error},
+        )
 
 
 async def _poll_once(main_url, headers, webhook_secret, webhook_url, output_dir, config):
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(f"{main_url}/api/external/training/status", headers=headers)
         if resp.status_code != 200:
-            logger.warning("Status check failed: %d", resp.status_code)
             return
         status = resp.json()
 
@@ -51,8 +122,15 @@ async def _poll_once(main_url, headers, webhook_secret, webhook_url, output_dir,
 
     logger.info("Found pending run %s (dataset=%s)", run_id, dataset_id)
 
+    await _execute_training(
+        main_url, headers, webhook_secret, webhook_url, output_dir, config,
+        dataset_id=dataset_id, epochs=epochs, batch_size=batch_size, seq_len=seq_len,
+    )
+
+
+async def _execute_training(main_url, headers, webhook_secret, webhook_url, output_dir, config, dataset_id, epochs=50, batch_size=64, seq_len=32):
     from training.dataset_loader import download_dataset
-    dataset_path = await download_dataset(main_url, api_key, dataset_id)
+    dataset_path = await download_dataset(main_url, config.get("api_key", ""), dataset_id)
     logger.info("Dataset downloaded to %s", dataset_path)
 
     from training.train import train
@@ -87,7 +165,7 @@ async def _poll_once(main_url, headers, webhook_secret, webhook_url, output_dir,
         headers,
     )
 
-    logger.info("Run %s complete: accuracy=%.3f time=%.1fs", run_id, accuracy, elapsed)
+    logger.info("Training complete: dataset=%s accuracy=%.3f time=%.1fs", dataset_id, accuracy, elapsed)
 
 
 async def _upload_model(main_url, headers, pt_path, dataset_id, accuracy, val_accuracy):

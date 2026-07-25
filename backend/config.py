@@ -120,6 +120,15 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
                 logger.info("Created indexes for obstacle_clusters collection")
             except Exception as e:
                 logger.warning("Could not create indexes (may already exist): %s", e)
+
+            try:
+                await db.gpu_machines.create_index([("machine_id", 1)], unique=True)
+                await db.gpu_commands.create_index([("machine_id", 1), ("status", 1)])
+                await db.gpu_commands.create_index([("command_id", 1)], unique=True)
+                logger.info("Created indexes for gpu_machines/gpu_commands collections")
+            except Exception as e:
+                logger.warning("Could not create GPU machine indexes: %s", e)
+
             return
         except Exception as e:
             logger.error("MongoDB connection attempt %d/%d failed: %s", attempt, max_retries, e)

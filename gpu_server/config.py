@@ -5,7 +5,9 @@ API_KEY = os.getenv("EXTERNAL_TRAINING_API_KEY", "your-api-key-change-me")
 WEBHOOK_SECRET = os.getenv("EXTERNAL_TRAINING_WEBHOOK_SECRET", "your-webhook-secret-change-me")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 
-POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "300"))
+POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "30"))
+COMMAND_POLL_INTERVAL = int(os.getenv("COMMAND_POLL_INTERVAL", "30"))
+MACHINE_ID = os.getenv("MACHINE_ID", "")
 
 GPU_DEVICE = os.getenv("GPU_DEVICE", "auto")
 MODEL_OUTPUT_DIR = os.getenv("MODEL_OUTPUT_DIR", "/data/models")

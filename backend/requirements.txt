@@ -36,3 +36,6 @@ tzdata==2025.2
 # Type hints
 typing_extensions==4.15.0
 annotated-types==0.7.0
+
+# SSH
+paramiko>=3.4.0

@@ -71,6 +71,7 @@ async def startup_event():
             dataset_exporter = DatasetExporter(_db)
             model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
             init_external_training(_db, dataset_exporter, model_registry)
+            init_gpu_machines(_db)
             inference_worker = InferenceWorker(_db, event_classifier, _config.obstacle_clusterer)
             auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
             init_nn_admin(_db, inference_worker, auto_trainer)
@@ -2613,6 +2614,10 @@ app.include_router(external_training_router)
 from admin_api import get_admin_editor_router
 admin_editor_router = get_admin_editor_router()
 app.include_router(admin_editor_router)
+
+# Include GPU machine management router
+from gpu_machine_api import gpu_machine_router, init_gpu_machines
+app.include_router(gpu_machine_router)
 
 cors_origins = os.environ.get("CORS_ORIGINS", "*")
 if cors_origins == "*":
