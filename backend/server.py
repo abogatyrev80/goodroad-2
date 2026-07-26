@@ -2890,9 +2890,41 @@ async def llm_generate_report(req: ReportRequest):
 
 @api_router.get("/llm/health")
 async def llm_health():
+    settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
+    url = (settings or {}).get("url", "")
+    model = (settings or {}).get("model", "")
     from llm_service import generate
-    result = await generate("Say OK", system="Reply with one word: OK", max_tokens=5)
-    return {"ollama_available": result is not None, "response": result}
+    result = await generate("Say OK", system="Reply with one word: OK", max_tokens=5,
+                            ollama_url=url, model=model)
+    return {"ollama_available": result is not None, "response": result,
+            "configured_url": url, "configured_model": model}
+
+
+@api_router.get("/llm/settings")
+async def llm_get_settings():
+    settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
+    if not settings:
+        from llm_service import OLLAMA_URL, OLLAMA_MODEL
+        settings = {"url": OLLAMA_URL, "model": OLLAMA_MODEL}
+    else:
+        settings.pop("_id", None)
+    return settings
+
+
+@api_router.post("/llm/settings")
+async def llm_update_settings(body: dict):
+    url = body.get("url", "").strip()
+    model = body.get("model", "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url required")
+    if not model:
+        raise HTTPException(status_code=400, detail="model required")
+    await _config.db.llm_settings.update_one(
+        {"_id": "ollama"},
+        {"$set": {"url": url, "model": model, "updated_at": datetime.utcnow()}},
+        upsert=True,
+    )
+    return {"status": "saved", "url": url, "model": model}
 
 # Include the router in the main app
 app.include_router(api_router)

@@ -544,6 +544,24 @@ tr:hover{background:#1e293b}
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:16px;background:#1a1a2e;border:1px solid #334155">
+    <h3 style="margin-bottom:12px">⚙️ Ollama Connection Settings</h3>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div style="flex:3;min-width:200px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">Ollama URL</label>
+        <input type="text" id="llm-settings-url" value="http://localhost:11434"
+               style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+      </div>
+      <div style="flex:1;min-width:150px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px">Model</label>
+        <input type="text" id="llm-settings-model" value="qwopus3.5-tools"
+               style="width:100%;padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px">
+      </div>
+      <button class="btn" onclick="llmSaveSettings()" style="padding:8px 20px">Save & Test</button>
+    </div>
+    <div id="llm-settings-status" style="margin-top:8px;font-size:12px;color:#94a3b8"></div>
+  </div>
+
   <div class="grid grid-2">
     <div class="card">
       <h3>Data Quality Analysis</h3>
@@ -1673,6 +1691,7 @@ function switchTab(tab) {
   }
   if (tab === 'llm') {
     setTimeout(() => llmCheckHealth(), 100);
+    setTimeout(() => llmLoadSettings(), 200);
   }
   if (tab === 'gpu') {
     setTimeout(() => loadGPUMachines(), 100);
@@ -1684,14 +1703,50 @@ let llmReportsCount = 0;
 
 async function llmCheckHealth() {
   const el = document.getElementById('llm-status');
+  const modelEl = document.getElementById('llm-model');
   try {
     const r = await fetch('/api/llm/health');
     const data = await r.json();
     el.textContent = data.ollama_available ? 'Connected' : 'Offline';
     el.style.color = data.ollama_available ? '#22c55e' : '#ef4444';
+    if (data.configured_url) document.getElementById('llm-settings-url').value = data.configured_url;
+    if (data.configured_model) document.getElementById('llm-settings-model').value = data.configured_model;
+    modelEl.textContent = data.configured_model || '—';
   } catch(e) {
     el.textContent = 'Error';
     el.style.color = '#ef4444';
+  }
+}
+
+async function llmLoadSettings() {
+  try {
+    const r = await fetch('/api/llm/settings');
+    const data = await r.json();
+    if (data.url) document.getElementById('llm-settings-url').value = data.url;
+    if (data.model) document.getElementById('llm-settings-model').value = data.model;
+  } catch(e) {}
+}
+
+async function llmSaveSettings() {
+  const statusEl = document.getElementById('llm-settings-status');
+  statusEl.innerHTML = '<span style="color:#f59e0b">Saving and testing...</span>';
+  const url = document.getElementById('llm-settings-url').value.trim();
+  const model = document.getElementById('llm-settings-model').value.trim();
+  try {
+    const r = await fetch('/api/llm/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url, model})
+    });
+    const data = await r.json();
+    if (data.status === 'saved') {
+      await llmCheckHealth();
+      statusEl.innerHTML = '<span style="color:#22c55e">Saved. ' +
+        (document.getElementById('llm-status').textContent === 'Connected' ? 'Connected!' : 'Check Ollama URL') +
+        '</span>';
+    }
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:#ef4444">Error: ' + e.message + '</span>';
   }
 }
 

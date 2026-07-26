@@ -10,8 +10,10 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwopus3.5-tools")
 
 
 async def generate(prompt: str, system: str = "", temperature: float = 0.3,
-                   max_tokens: int = 2048, model: str = None) -> Optional[str]:
+                   max_tokens: int = 2048, model: str = None,
+                   ollama_url: str = None) -> Optional[str]:
     model = model or OLLAMA_MODEL
+    url = ollama_url or OLLAMA_URL
     body = {
         "model": model,
         "prompt": prompt,
@@ -25,12 +27,12 @@ async def generate(prompt: str, system: str = "", temperature: float = 0.3,
         body["system"] = system
     try:
         async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(f"{OLLAMA_URL}/api/generate", json=body)
+            resp = await client.post(f"{url}/api/generate", json=body)
             if resp.status_code == 200:
                 return resp.json().get("response", "")
             logger.warning("Ollama error: %d %s", resp.status_code, resp.text[:200])
     except httpx.ConnectError:
-        logger.warning("Ollama not reachable at %s", OLLAMA_URL)
+        logger.warning("Ollama not reachable at %s", url)
     except Exception as e:
         logger.warning("Ollama request failed: %s", e)
     return None
