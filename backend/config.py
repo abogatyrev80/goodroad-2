@@ -112,6 +112,11 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
             obstacle_clusterer = ObstacleClusterer(db)
             logger.info("Obstacle clusterer initialized")
 
+            from road_service import road_service
+            road_service.db = db
+            obstacle_clusterer.set_road_service(road_service)
+            logger.info("Road service initialized and linked to clusterer")
+
             try:
                 await db.obstacle_clusters.create_index([("status", 1)])
                 await db.obstacle_clusters.create_index([("expiresAt", 1)])

@@ -23,9 +23,13 @@ class ObstacleClusterer:
         self.db = db
         self.CLUSTER_RADIUS = 15.0  # метров - радиус объединения в один кластер
         self.DEFAULT_TTL_DAYS = 15  # дней - время жизни кластера
-        self.MIN_CONFIDENCE = 0.80  # минимальная уверенность для нового кластера (повышено с 0.70)
+        self.MIN_CONFIDENCE = 0.80  # минимальная уверенность для нового кластера
         self.MIN_REPORT_COUNT = 3  # минимум отчётов для "подтверждённого" кластера
         self.CONFIDENCE_INCREMENT = 0.05  # прирост уверенности за каждое подтверждение
+        self.road_service = None
+
+    def set_road_service(self, rs):
+        self.road_service = rs
         
     def haversine_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         return calculate_distance(lat1, lon1, lat2, lon2)
@@ -142,7 +146,14 @@ class ObstacleClusterer:
             ID созданного кластера
         """
         cluster_id = str(uuid.uuid4())
-        
+
+        # Привязка к дороге
+        road_data = None
+        if self.road_service:
+            road_data = await self.road_service.snap_obstacle_to_road(
+                event['latitude'], event['longitude']
+            )
+
         cluster = {
             "_id": cluster_id,
             "obstacleType": event['eventType'],
@@ -156,7 +167,7 @@ class ObstacleClusterer:
                 "max": event['severity'],
                 "min": event['severity'],
                 "mode": event['severity'],
-                "history": [event['severity']]  # История для вычисления mode
+                "history": [event['severity']]
             },
             "confidence": self._calculate_confidence(1),
             "reportCount": 1,
@@ -169,8 +180,9 @@ class ObstacleClusterer:
             "roadInfo": {
                 "avgSpeed": event['speed'],
                 "speedVariance": 0,
-                "speeds": [event['speed']]  # История скоростей
+                "speeds": [event['speed']]
             },
+            "roadSnap": road_data or {},
             "created_at": datetime.utcnow()
         }
         
@@ -240,20 +252,32 @@ class ObstacleClusterer:
         new_obstacle_type = self._determine_obstacle_type(all_types)
         
         # Обновляем кластер
+        update_doc = {
+            "$set": {
+                "obstacleType": new_obstacle_type,
+                "severity": new_severity,
+                "confidence": self._calculate_confidence(new_report_count),
+                "reportCount": new_report_count,
+                "devices": devices,
+                "lastReported": datetime.utcnow(),
+                "expiresAt": datetime.utcnow() + timedelta(days=self.DEFAULT_TTL_DAYS),
+                "roadInfo": new_road_info
+            }
+        }
+
+        # Добавляем roadSnap если его нет и сервис доступен
+        if "roadSnap" not in cluster or not cluster.get("roadSnap", {}).get("road_id"):
+            if self.road_service:
+                road_data = await self.road_service.snap_obstacle_to_road(
+                    cluster['location']['latitude'],
+                    cluster['location']['longitude']
+                )
+                if road_data:
+                    update_doc["$set"]["roadSnap"] = road_data
+
         await self.db.obstacle_clusters.update_one(
             {"_id": cluster_id},
-            {
-                "$set": {
-                    "obstacleType": new_obstacle_type,
-                    "severity": new_severity,
-                    "confidence": self._calculate_confidence(new_report_count),
-                    "reportCount": new_report_count,
-                    "devices": devices,
-                    "lastReported": datetime.utcnow(),
-                    "expiresAt": datetime.utcnow() + timedelta(days=self.DEFAULT_TTL_DAYS),  # Обновить TTL
-                    "roadInfo": new_road_info
-                }
-            }
+            update_doc
         )
         
         logger.info("Обновлен кластер %s: reportCount=%d, confidence=%.2f", cluster_id, new_report_count, self._calculate_confidence(new_report_count))

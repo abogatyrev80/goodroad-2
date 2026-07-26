@@ -1,11 +1,6 @@
-/**
- * useObstacleAlerts - Хук для управления оповещениями о препятствиях
- * 
- * Интегрирует ObstacleService и DynamicAudioAlertService
- */
-
 import { useState, useEffect, useRef, MutableRefObject } from 'react';
-import obstacleService, { Obstacle } from '../services/ObstacleService';
+import { AppState, AppStateStatus } from 'react-native';
+import obstacleService, { Obstacle, ObstacleSector } from '../services/ObstacleService';
 import dynamicAudioService from '../services/DynamicAudioAlertService';
 import alertSettingsService from '../services/AlertSettingsService';
 
@@ -15,16 +10,44 @@ export function useObstacleAlerts(
   isTracking: boolean,
   currentLocation: any,
   currentSpeed: number,
-  currentLocationRef?: MutableRefObject<{ coords: { latitude: number; longitude: number; heading?: number } } | null>
+  currentLocationRef?: MutableRefObject<{ coords: { latitude: number; longitude: number; heading?: number } } | null>,
+  gpsTrailRef?: MutableRefObject<Array<{ latitude: number; longitude: number; timestamp: number }>>
 ) {
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [closestObstacle, setClosestObstacle] = useState<Obstacle | null>(null);
-  const fetchInterval = useRef<NodeJS.Timeout | null>(null);
+  const fetchInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastAlertedObstacles = useRef<Set<string>>(new Set());
   const previousSpeed = useRef<number>(0);
   const alertedObstaclesForReaction = useRef<Map<string, { obstacle: Obstacle; alerted: boolean }>>(new Map());
   const lastPositionRef = useRef<{ lat: number; lon: number } | null>(null);
   const currentSpeedRef = useRef<number>(currentSpeed);
+  const obstaclesRef = useRef<Obstacle[]>([]);
+  const isProcessingAlert = useRef(false);
+  const alertQueue = useRef<Obstacle[]>([]);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const lastForegroundTimeRef = useRef<number>(Date.now());
+  const bearingHistory = useRef<number[]>([]);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    obstaclesRef.current = obstacles;
+  }, [obstacles]);
+
+  // AppState listener — пересчёт при возврате из фона
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      appStateRef.current = next;
+      if (next === 'active') {
+        lastForegroundTimeRef.current = Date.now();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Загрузка препятствий каждые 30 секунд
   useEffect(() => {
@@ -34,6 +57,8 @@ export function useObstacleAlerts(
       lastAlertedObstacles.current.clear();
       alertedObstaclesForReaction.current.clear();
       lastPositionRef.current = null;
+      alertQueue.current = [];
+      isProcessingAlert.current = false;
       return;
     }
 
@@ -42,30 +67,31 @@ export function useObstacleAlerts(
         const lat = currentLocation.coords.latitude;
         const lon = currentLocation.coords.longitude;
 
-        const nearbyObstacles = await obstacleService.fetchNearbyObstacles(
-          lat,
-          lon,
-          5000, // 5 км радиус
-          3 // 🆕 минимум 3 подтверждения (повышено для снижения ложных срабатываний)
-        );
+        let nearbyObstacles: Obstacle[];
+
+        const trail = gpsTrailRef?.current || [];
+        if (trail.length >= 2) {
+          nearbyObstacles = await obstacleService.fetchObstaclesAlongRoute(
+            trail, lat, lon, 5000, 3
+          );
+        } else {
+          nearbyObstacles = await obstacleService.fetchNearbyObstacles(
+            lat, lon, 5000, 3
+          );
+        }
 
         setObstacles(nearbyObstacles);
 
-        // Находим ближайшее
         const closest = obstacleService.getClosestObstacle(nearbyObstacles);
         setClosestObstacle(closest);
 
-        // Проверяем нужны ли оповещения
         checkForAlerts(nearbyObstacles);
       } catch (error) {
-        console.error('❌ Error fetching obstacles:', error);
+        console.error('Error fetching obstacles:', error);
       }
     };
 
-    // Загружаем сразу
     fetchObstacles();
-
-    // И каждые 30 секунд
     fetchInterval.current = setInterval(fetchObstacles, 30000);
 
     return () => {
@@ -74,10 +100,19 @@ export function useObstacleAlerts(
       }
     };
   }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude]);
-  
-  // Обновление расстояний в реальном времени: направление движения, сразу скрывать проеханные
+
+  // Сглаживание bearing (скользящее среднее по 5 последним значениям)
+  const smoothBearing = (rawBearing: number): number => {
+    const history = bearingHistory.current;
+    history.push(rawBearing);
+    if (history.length > 5) history.shift();
+    const sum = history.reduce((a, b) => a + b, 0);
+    return sum / history.length;
+  };
+
+  // Обновление расстояний в реальном времени
   useEffect(() => {
-    if (!isTracking || obstacles.length === 0) {
+    if (!isTracking || obstaclesRef.current.length === 0) {
       return;
     }
 
@@ -92,22 +127,24 @@ export function useObstacleAlerts(
         let effectiveBearing: number | null = null;
         const rawHeading = loc.coords.heading;
         if (typeof rawHeading === 'number' && rawHeading >= 0 && rawHeading <= 360) {
-          effectiveBearing = rawHeading;
+          effectiveBearing = smoothBearing(rawHeading);
         } else if (lastPositionRef.current) {
-          effectiveBearing = obstacleService.calculateBearing(
+          const calcBearing = obstacleService.calculateBearing(
             lastPositionRef.current.lat,
             lastPositionRef.current.lon,
             lat,
             lon
           );
+          effectiveBearing = smoothBearing(calcBearing);
         }
         lastPositionRef.current = { lat, lon };
 
         const passedDistance = obstacleService.getPassedDistance();
 
-        const updatedObstacles = obstacles
+        const currentList = obstaclesRef.current;
+        const updated = currentList
           .map(obstacle => {
-            const relevantDistance = obstacleService.getRelevantDistance(
+            const result = obstacleService.getRelevantDistance(
               lat,
               lon,
               effectiveBearing,
@@ -115,113 +152,147 @@ export function useObstacleAlerts(
               obstacle.longitude
             );
 
-            if (relevantDistance !== null && relevantDistance < passedDistance) {
+            if (result === null) {
               obstacleService.markAsPassed(obstacle.id);
-              return { ...obstacle, distance: 999999 };
+              return { ...obstacle, distance: 999999, sector: 'behind' as ObstacleSector };
             }
+
+            const displayDistance = obstacle.road_distance ?? result.distance;
+            if (displayDistance < passedDistance) {
+              obstacleService.markAsPassed(obstacle.id);
+              return { ...obstacle, distance: 999999, sector: 'behind' as ObstacleSector };
+            }
+
             return {
               ...obstacle,
-              distance: relevantDistance !== null ? relevantDistance : 999999,
+              distance: displayDistance,
+              sector: result.sector,
             };
           })
           .filter(o => o.distance < 999999);
 
-        setObstacles(updatedObstacles);
-        const closest = obstacleService.getClosestObstacle(updatedObstacles);
+        setObstacles(updated);
+        const closest = obstacleService.getClosestObstacle(updated);
         setClosestObstacle(closest);
       } catch (error) {
-        console.error('❌ Error updating distances:', error);
+        console.error('Error updating distances:', error);
       }
     };
 
-    // Частота пересчёта расстояния до препятствий (мс): чаще = быстрее реакция на экране
     const speedKmh = currentSpeed;
     let updateInterval: number;
-    if (speedKmh < 20) updateInterval = 700;   // было 1500 — ускорено
-    else if (speedKmh < 40) updateInterval = 350; // было 600
-    else if (speedKmh < 60) updateInterval = 200; // было 400
-    else if (speedKmh < 80) updateInterval = 150; // было 250
-    else updateInterval = 100;                    // было 200
+    if (speedKmh < 20) updateInterval = 700;
+    else if (speedKmh < 40) updateInterval = 350;
+    else if (speedKmh < 60) updateInterval = 200;
+    else if (speedKmh < 80) updateInterval = 150;
+    else updateInterval = 100;
 
     updateDistances();
     const distanceUpdateInterval = setInterval(updateDistances, updateInterval);
     return () => clearInterval(distanceUpdateInterval);
-  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading, currentSpeed, obstacles.length]);
+  }, [isTracking, currentLocation?.coords?.latitude, currentLocation?.coords?.longitude, currentLocation?.coords?.heading, currentSpeed]);
 
-  // Проверка и выдача аудио-оповещений с использованием динамической системы
+  // Обработчик очереди оповещений (строго последовательно)
+  const processAlertQueue = async () => {
+    if (isProcessingAlert.current || alertQueue.current.length === 0) return;
+    if (!mountedRef.current) return;
+
+    isProcessingAlert.current = true;
+
+    const queueItem = alertQueue.current.shift()!;
+    const currentObstacle = obstaclesRef.current.find(o => o.id === queueItem.id) || queueItem;
+
+    try {
+      const speed = currentSpeedRef.current;
+      const settings = dynamicAudioService.getSettings();
+      const displayDistance = currentObstacle.road_distance ?? currentObstacle.distance;
+
+      if (displayDistance < settings.minDistance || displayDistance > settings.maxDistance) {
+        isProcessingAlert.current = false;
+        processAlertQueue();
+        return;
+      }
+
+      lastAlertedObstacles.current.add(currentObstacle.id);
+
+      const alertText = alertSettingsService.getAlertText(currentObstacle.type, displayDistance);
+      await dynamicAudioService.announceObstacleWithText(currentObstacle, alertText);
+
+      alertedObstaclesForReaction.current.set(currentObstacle.id, {
+        obstacle: currentObstacle,
+        alerted: true,
+      });
+
+      setTimeout(() => {
+        lastAlertedObstacles.current.delete(currentObstacle.id);
+        dynamicAudioService.clearActiveObstacle();
+        alertedObstaclesForReaction.current.delete(currentObstacle.id);
+      }, 60000);
+
+      const speedCheck = alertSettingsService.checkSpeedAlert(currentObstacle.type, speed);
+      if (alertSettingsService.shouldUseSiren(speedCheck.alertLevel)) {
+        const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, displayDistance);
+        await dynamicAudioService.alertDynamicWithFrequency(currentObstacle, speed, sirenFrequency);
+      }
+
+      checkDriverReaction(currentObstacle);
+    } catch (error) {
+      console.error('Alert processing error:', error);
+    }
+
+    isProcessingAlert.current = false;
+    processAlertQueue();
+  };
+
+  // Проверка и постановка в очередь
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
     const settings = dynamicAudioService.getSettings();
     const speed = currentSpeedRef.current;
 
-    for (const obstacle of obstacleList) {
-      const distance = obstacle.distance;
+    const sorted = [...obstacleList]
+      .filter(o => {
+        const d = o.road_distance ?? o.distance;
+        return d >= settings.minDistance && d <= settings.maxDistance;
+      })
+      .filter(o => !lastAlertedObstacles.current.has(o.id))
+      .sort((a, b) => {
+        const da = a.road_distance ?? a.distance;
+        const db = b.road_distance ?? b.distance;
+        return da - db;
+      });
 
-      if (distance < settings.minDistance || distance > settings.maxDistance) {
-        continue;
-      }
+    if (sorted.length === 0) return;
 
-      const speedCheck = alertSettingsService.checkSpeedAlert(obstacle.type, speed * 3.6);
-
-      // Новое препятствие — всегда beep + голос
+    for (const obstacle of sorted) {
       if (!lastAlertedObstacles.current.has(obstacle.id)) {
-        const alertText = alertSettingsService.getAlertText(obstacle.type, distance);
-        await dynamicAudioService.announceObstacleWithText(obstacle, alertText);
-
-        lastAlertedObstacles.current.add(obstacle.id);
-
-        alertedObstaclesForReaction.current.set(obstacle.id, {
-          obstacle,
-          alerted: true,
-        });
-
-        setTimeout(() => {
-          lastAlertedObstacles.current.delete(obstacle.id);
-          dynamicAudioService.clearActiveObstacle();
-          alertedObstaclesForReaction.current.delete(obstacle.id);
-        }, 60000);
+        alertQueue.current.push(obstacle);
       }
-
-      // Непрерывная сирена только при значительном превышении скорости
-      if (alertSettingsService.shouldUseSiren(speedCheck.alertLevel)) {
-        const sirenFrequency = alertSettingsService.getSirenFrequency(speedCheck.speedExcess, distance);
-        await dynamicAudioService.alertDynamicWithFrequency(obstacle, speed, sirenFrequency);
-      }
-
-      checkDriverReaction(obstacle);
     }
+
+    processAlertQueue();
   };
 
-  // Проверка реакции водителя
   const checkDriverReaction = async (obstacle: Obstacle) => {
     const alertData = alertedObstaclesForReaction.current.get(obstacle.id);
     if (!alertData || !alertData.alerted) return;
 
-    // Проверяем снизил ли водитель скорость
     const speedDelta = previousSpeed.current - currentSpeedRef.current;
-    
+
     if (speedDelta > 5) {
-      // Водитель отреагировал (снизил скорость более чем на 5 км/ч)
       await obstacleService.recordDriverReaction(obstacle, 'confirmed');
-      
-      // Удаляем из отслеживания
       alertedObstaclesForReaction.current.delete(obstacle.id);
     } else if (obstacle.distance < 50) {
-      // Препятствие пройдено без снижения скорости - проигнорировано
       await obstacleService.recordDriverReaction(obstacle, 'ignored');
-      
-      // Удаляем из отслеживания
       alertedObstaclesForReaction.current.delete(obstacle.id);
       obstacleService.markAsPassed(obstacle.id);
     }
   };
 
-  // Отслеживание изменения скорости
   useEffect(() => {
     previousSpeed.current = currentSpeedRef.current;
     currentSpeedRef.current = currentSpeed;
   }, [currentSpeed]);
 
-  // Очистка при остановке
   useEffect(() => {
     if (!isTracking) {
       lastPositionRef.current = null;
@@ -229,12 +300,14 @@ export function useObstacleAlerts(
       obstacleService.clearPassedObstacles();
       lastAlertedObstacles.current.clear();
       alertedObstaclesForReaction.current.clear();
+      alertQueue.current = [];
+      isProcessingAlert.current = false;
+      bearingHistory.current = [];
       setObstacles([]);
       setClosestObstacle(null);
     }
   }, [isTracking]);
 
-  // 🆕 Функция для ручного обновления препятствий
   const refetchObstacles = async () => {
     if (!isTracking || !currentLocation) {
       return;
@@ -256,7 +329,7 @@ export function useObstacleAlerts(
       setClosestObstacle(closest);
       checkForAlerts(nearbyObstacles);
     } catch (error) {
-      console.error('❌ Error refetching obstacles:', error);
+      console.error('Error refetching obstacles:', error);
     }
   };
 
@@ -265,6 +338,6 @@ export function useObstacleAlerts(
     closestObstacle,
     obstaclesCount: obstacles.length,
     isNearObstacle: !!closestObstacle,
-    refetchObstacles, // 🆕 Экспортируем функцию обновления
+    refetchObstacles,
   };
 }

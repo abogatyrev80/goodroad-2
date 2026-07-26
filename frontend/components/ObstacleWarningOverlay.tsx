@@ -127,9 +127,16 @@ export default function ObstacleWarningOverlay({
   const getUrgencyLevel = (): 'critical' | 'warning' | 'caution' => {
     const distance = obstacle.distance;
     const confirmations = obstacle.confirmations;
+    const sector = obstacle.sector;
+    const roadZone = obstacle.road_zone;
 
-    if (distance < 200 && confirmations >= 3) return 'critical';
-    if (distance < 400) return 'warning';
+    const sectorBonus = sector === 'critical' ? 200 : sector === 'ahead' ? 100 : 0;
+    const zoneBonus = roadZone === 'near' ? 300 : roadZone === 'medium' ? 150 : roadZone === 'far' ? 50 : 0;
+
+    const effectiveDistance = distance - sectorBonus - zoneBonus;
+
+    if (effectiveDistance < 200 && confirmations >= 3) return 'critical';
+    if (effectiveDistance < 400) return 'warning';
     return 'caution';
   };
 
@@ -242,6 +249,30 @@ export default function ObstacleWarningOverlay({
               </Text>
             </View>
           )}
+          {obstacle.sector && (
+            <View style={styles.sectorContainer}>
+              <Ionicons
+                name={obstacle.sector === 'critical' ? 'navigate' : obstacle.sector === 'ahead' ? 'arrow-forward' : 'swap-horizontal'}
+                size={14}
+                color={colors.text}
+              />
+              <Text style={[styles.sectorText, { color: colors.text }]}>
+                {obstacle.sector === 'critical' ? 'ПО КУРСУ' : obstacle.sector === 'ahead' ? 'ВПЕРЕДИ' : 'РЯДОМ'}
+              </Text>
+            </View>
+          )}
+          {obstacle.road_zone && obstacle.road_zone !== 'beyond' && (
+            <View style={styles.roadZoneContainer}>
+              <Ionicons
+                name={obstacle.road_zone === 'near' ? 'alert-circle' : obstacle.road_zone === 'medium' ? 'warning' : 'information-circle'}
+                size={12}
+                color={colors.text}
+              />
+              <Text style={[styles.roadZoneText, { color: colors.text }]}>
+                {obstacle.road_zone === 'near' ? 'БЛИЖНЯЯ ЗОНА' : obstacle.road_zone === 'medium' ? 'СРЕДНЯЯ ЗОНА' : 'ДАЛЬНЯЯ ЗОНА'}
+              </Text>
+            </View>
+          )}
 
           {/* Уровень срочности */}
           {urgency === 'critical' && (
@@ -350,6 +381,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  sectorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  sectorText: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.8,
+  },
+  roadZoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  roadZoneText: {
+    fontSize: 10,
+    fontWeight: '600',
+    opacity: 0.7,
   },
   progressContainer: {
     height: 10,

@@ -11,21 +11,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { backendConfigService } from './BackendConfigService';
 
+export type ObstacleSector = 'critical' | 'ahead' | 'side' | 'behind';
+export type RoadZone = 'near' | 'medium' | 'far' | 'beyond';
+
 export interface Obstacle {
   id: string;
   type: 'pothole' | 'speed_bump' | 'bump' | 'braking' | 'vibration' | 'accident';
   latitude: number;
   longitude: number;
-  distance: number; // метры
+  distance: number;
   severity: {
     average: number;
     max: number;
   };
   confidence: number;
   confirmations: number;
-  avgSpeed: number; // км/ч
+  avgSpeed: number;
   lastReported: string;
   priority: number;
+  sector?: ObstacleSector;
+  road_distance?: number;
+  cross_track_distance?: number;
+  road_zone?: RoadZone;
 }
 
 export interface ObstaclesResponse {
@@ -120,6 +127,49 @@ class ObstacleService {
     } catch (error) {
       console.error('❌ Error fetching obstacles:', error);
       // Возвращаем кэшированные данные в случае ошибки
+      return this.filterActiveObstacles(this.cachedObstacles, latitude, longitude);
+    }
+  }
+
+  /**
+   * Загрузить препятствия с привязкой к дороге (через OSRM на бэкенде)
+   */
+  async fetchObstaclesAlongRoute(
+    trail: Array<{ latitude: number; longitude: number; timestamp: number }>,
+    latitude: number,
+    longitude: number,
+    radius: number = 5000,
+    minConfirmations: number = 3
+  ): Promise<Obstacle[]> {
+    try {
+      await this.ensureInitialized();
+
+      const url = `${backendConfigService.getActiveUrl()}/api/obstacles/along-road`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trail: trail.map(p => ({ latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp })),
+          latitude,
+          longitude,
+          radius,
+          min_confirmations: minConfirmations,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const obstacles = data.obstacles || [];
+
+      this.cachedObstacles = obstacles;
+      this.lastFetchTime = Date.now();
+
+      return this.filterActiveObstacles(obstacles, latitude, longitude);
+    } catch (error) {
+      console.error('Error fetching obstacles along route:', error);
       return this.filterActiveObstacles(this.cachedObstacles, latitude, longitude);
     }
   }
@@ -373,8 +423,24 @@ class ObstacleService {
   }
 
   /**
-   * 🆕 Получить релевантное расстояние с учетом вектора движения
-   * Возвращает null если препятствие не на пути
+   * Определить сектор препятствия относительно направления движения
+   */
+  getObstacleSector(
+    currentBearing: number,
+    bearingToObstacle: number
+  ): ObstacleSector {
+    let diff = Math.abs(bearingToObstacle - currentBearing);
+    if (diff > 180) diff = 360 - diff;
+
+    if (diff <= 20) return 'critical';
+    if (diff <= 50) return 'ahead';
+    if (diff <= 100) return 'side';
+    return 'behind';
+  }
+
+  /**
+   * Получить релевантное расстояние с учетом вектора движения
+   * Возвращает null если препятствие позади
    */
   getRelevantDistance(
     currentLat: number,
@@ -382,16 +448,13 @@ class ObstacleService {
     currentBearing: number | null | undefined,
     obstacleLat: number,
     obstacleLon: number
-  ): number | null {
-    // Вычисляем прямое расстояние
+  ): { distance: number; sector: ObstacleSector } | null {
     const distance = this.calculateDistance(currentLat, currentLon, obstacleLat, obstacleLon);
-    
-    // Если нет данных о направлении движения (например стоим), используем прямое расстояние
+
     if (currentBearing === null || currentBearing === undefined || currentBearing === -1) {
-      return distance;
+      return { distance, sector: 'ahead' };
     }
 
-    // Вычисляем направление на препятствие
     const bearingToObstacle = this.calculateBearing(
       currentLat,
       currentLon,
@@ -399,13 +462,12 @@ class ObstacleService {
       obstacleLon
     );
 
-    const isAhead = this.isObstacleAhead(currentBearing, bearingToObstacle, 50);
-    if (!isAhead) {
-      return null; // сзади или сбоку — не показываем
+    const sector = this.getObstacleSector(currentBearing, bearingToObstacle);
+    if (sector === 'behind') {
+      return null;
     }
 
-    // Препятствие впереди - возвращаем расстояние
-    return distance;
+    return { distance, sector };
   }
 }
 

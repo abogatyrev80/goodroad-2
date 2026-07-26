@@ -39,3 +39,5 @@ annotated-types==0.7.0
 
 # SSH
 paramiko>=3.4.0
+
+# OSM road import (optional: osmium для локальных PBF файлов)

@@ -53,9 +53,6 @@ export default function HomeScreen() {
   const [warningSize, setWarningSize] = useState<WarningSize>('medium');
   const [warningPosition, setWarningPosition] = useState<WarningPosition>('top');
 
-  // Симуляция предупреждения (только для отладки чёрного экрана)
-  const [simulateWarningOverlay, setSimulateWarningOverlay] = useState(false);
-
   // Автозапуск/автоотключение
   const [autostartMode, setAutostartMode] = useState<string>('disabled');
   const [wasAutoStarted, setWasAutoStarted] = useState(false); // Флаг что мониторинг был запущен автоматически
@@ -82,13 +79,15 @@ export default function HomeScreen() {
   const currentLocationRef = useRef<any>(null);
   const isTrackingRef = useRef(false);
   const savedBrightnessRef = useRef<number | null>(null);
+  const gpsTrailRef = useRef<Array<{ latitude: number; longitude: number; timestamp: number }>>([]);
 
   // Хук для препятствий
-  const { closestObstacle, obstaclesCount, refetchObstacles } = useObstacleAlerts(
+  const { closestObstacle, obstaclesCount } = useObstacleAlerts(
     isTracking,
     currentLocation,
     currentSpeed,
-    currentLocationRef
+    currentLocationRef,
+    gpsTrailRef
   );
 
   // Скрываем заставку, когда главный экран смонтирован и отрисован (убирает долгий «Loading»)
@@ -701,76 +700,73 @@ export default function HomeScreen() {
           distanceInterval: 0,
         },
         (location) => {
+          if (!location?.coords) return;
           setCurrentLocation(location);
-          currentLocationRef.current = location; // Сохраняем в ref для использования в интервале
-          setCurrentSpeed((location.coords.speed || 0) * 3.6); // м/с -> км/ч
+          currentLocationRef.current = location;
+          setCurrentSpeed((location.coords.speed || 0) * 3.6);
+
+          const now = Date.now();
+          gpsTrailRef.current.push({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            timestamp: now,
+          });
+          while (gpsTrailRef.current.length > 0 && now - gpsTrailRef.current[0].timestamp > 30000) {
+            gpsTrailRef.current.shift();
+          }
         }
       );
       locationSubscription.current = subscription;
 
       // Запускаем акселерометр (10 Hz) — на web expo-sensors не поддерживается
       if (Platform.OS !== 'web') {
-        Accelerometer.setUpdateInterval(100);
+        try {
+          Accelerometer.setUpdateInterval(100);
+        } catch {}
         const accelSubscription = Accelerometer.addListener((data) => {
-          accelerometerBuffer.current.push({
-            x: data.x,
-            y: data.y,
-            z: data.z,
-            timestamp: Date.now()
-          });
-          if (accelerometerBuffer.current.length > 100) {
-            accelerometerBuffer.current.shift();
-          }
+          if (!data) return;
+          try {
+            accelerometerBuffer.current.push({
+              x: data.x,
+              y: data.y,
+              z: data.z,
+              timestamp: Date.now()
+            });
+            if (accelerometerBuffer.current.length > 100) {
+              accelerometerBuffer.current.shift();
+            }
+          } catch {}
         });
         accelerometerSubscription.current = accelSubscription;
-      } else {
       }
 
       // 🆕 Интервал для сбора и отправки синхронизированных пакетов данных
       const collectSyncedPacket = () => {
-        if (currentLocationRef.current && rawDataCollector.current) {
-          // Берем snapshot акселерометра за последнюю секунду
-          const accelerometerSnapshot = [...accelerometerBuffer.current];
-          
-          // Очищаем буфер для следующей секунды
-          accelerometerBuffer.current = [];
-          
-          // Создаем синхронизированный пакет
-          const syncedPacket = {
-            timestamp: Date.now(),
-            gps: currentLocationRef.current,
-            accelerometerData: accelerometerSnapshot
-          };
-          
-          // Добавляем в буфер пакетов
-          syncedDataBuffer.current.push(syncedPacket);
-          
-          
-          // Отправляем батч когда накопится 5 пакетов (= 5 секунд данных)
-          if (syncedDataBuffer.current.length >= 5) {
-            
-            // Отправляем все пакеты
-            syncedDataBuffer.current.forEach(packet => {
-              rawDataCollector.current?.addDataPoint(
-                packet.gps,
-                packet.accelerometerData,
-                packet.timestamp
-              );
-            });
-            
-            // Очищаем буфер после отправки
-            syncedDataBuffer.current = [];
+        try {
+          if (currentLocationRef.current && rawDataCollector.current) {
+            const accelerometerSnapshot = [...accelerometerBuffer.current];
+            accelerometerBuffer.current = [];
+            const syncedPacket = {
+              timestamp: Date.now(),
+              gps: currentLocationRef.current,
+              accelerometerData: accelerometerSnapshot
+            };
+            syncedDataBuffer.current.push(syncedPacket);
+            if (syncedDataBuffer.current.length >= 5) {
+              syncedDataBuffer.current.forEach(packet => {
+                rawDataCollector.current?.addDataPoint(
+                  packet.gps,
+                  packet.accelerometerData,
+                  packet.timestamp
+                ).catch(() => {});
+              });
+              syncedDataBuffer.current = [];
+            }
           }
-          
-          // Повторяем каждую секунду
-          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
-        } else {
-          // Если GPS еще не готов, повторяем попытку
-          dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
-        }
+        } catch {}
+        dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
       };
       
-      // Запускаем первый цикл с задержкой
       dataCollectionInterval.current = setTimeout(collectSyncedPacket, 2000);
 
       setIsTracking(true);
@@ -865,7 +861,8 @@ export default function HomeScreen() {
       setIsTracking(false);
       isTrackingRef.current = false;
       setCurrentLocation(null);
-      setWasAutoStarted(false); // Сбрасываем флаг автозапуска
+      setWasAutoStarted(false);
+      gpsTrailRef.current = [];
 
       // Восстанавливаем яркость и отключаем keep screen on
       if (Platform.OS !== 'web') {
@@ -944,30 +941,13 @@ export default function HomeScreen() {
 
       {/* Плавающее предупреждение о препятствии */}
       <ObstacleWarningOverlay
-        obstacle={
-          simulateWarningOverlay
-            ? {
-                id: 'sim',
-                type: 'pothole',
-                latitude: 0,
-                longitude: 0,
-                distance: 120,
-                severity: { average: 0.7, max: 1 },
-                confidence: 0.9,
-                confirmations: 5,
-                avgSpeed: 40,
-                lastReported: new Date().toISOString(),
-                priority: 1,
-              }
-            : closestObstacle
-        }
+        obstacle={closestObstacle}
         visible={
-          simulateWarningOverlay ||
-          (isTracking &&
-            closestObstacle !== null &&
-            closestObstacle.distance < 1000 &&
-            closestObstacle.distance >= 50 &&
-            currentSpeed > 1)
+          isTracking &&
+          closestObstacle !== null &&
+          closestObstacle.distance < 1000 &&
+          closestObstacle.distance >= 50 &&
+          currentSpeed > 1
         }
         size={warningSize}
         position={warningPosition}
@@ -977,20 +957,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>GOOD ROAD</Text>
         <Text style={styles.subtitle}>Мониторинг качества дорог</Text>
-        {typeof __DEV__ !== 'undefined' && __DEV__ && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.simulateWarningBtn,
-              pressed && styles.simulateWarningBtnPressed,
-              simulateWarningOverlay && styles.simulateWarningBtnActive,
-            ]}
-            onPress={() => setSimulateWarningOverlay((v) => !v)}
-          >
-            <Text style={styles.simulateWarningBtnText}>
-              {simulateWarningOverlay ? 'Выкл симуляцию предупреждения' : 'Симуляция предупреждения'}
-            </Text>
-          </Pressable>
-        )}
+
       </View>
 
       {/* Статус */}
@@ -1040,20 +1007,6 @@ export default function HomeScreen() {
             </>
           )}
         </Pressable>
-
-        {/* 🆕 Обновить предупреждения */}
-        {isTracking && (
-          <Pressable
-            style={[styles.compactButton, styles.refreshButton]}
-            onPress={() => {
-              refetchObstacles();
-              showToast('success', '🔄 Обновлено', 'Предупреждения обновлены', 2000);
-            }}
-          >
-            <Ionicons name="refresh" size={24} color="#fbbf24" />
-            <Text style={styles.compactButtonText}>ОБНОВИТЬ</Text>
-          </Pressable>
-        )}
 
         {/* ⚡ АВТОЗАПУСК */}
         <Pressable
@@ -1161,26 +1114,6 @@ const styles = StyleSheet.create({
     color: '#8b94a8',
     marginTop: 4,
     fontWeight: '500',
-  },
-  simulateWarningBtn: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: '#1a1a3e',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3b3b6b',
-  },
-  simulateWarningBtnPressed: {
-    opacity: 0.8,
-  },
-  simulateWarningBtnActive: {
-    borderColor: '#fbbf24',
-    backgroundColor: '#2d2a14',
-  },
-  simulateWarningBtnText: {
-    fontSize: 12,
-    color: '#8b94a8',
   },
   statusContainer: {
     flexDirection: 'row',
@@ -1348,10 +1281,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.4,
-  },
-  refreshButton: {
-    borderColor: '#fbbf24', // Желтая рамка для кнопки обновления
-    backgroundColor: 'rgba(251, 191, 36, 0.1)', // Слегка желтоватый фон
   },
   reportButton: {
     borderColor: '#ff3b30', // Красная рамка для кнопки отчета

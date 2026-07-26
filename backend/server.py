@@ -657,11 +657,16 @@ async def get_nearby_obstacles(
                 }
                 
                 # Вычисляем приоритет для сортировки
-                # Приоритет = confirmations * 100 + (1 / (distance + 1)) * 10
-                # Чем больше подтверждений и ближе - тем выше приоритет
                 priority = cluster['reportCount'] * 100 + (1 / (distance + 1)) * 10
                 obstacle['priority'] = round(priority, 2)
-                
+
+                # Road data
+                road_snap = cluster.get("roadSnap", {})
+                if road_snap.get("road_id"):
+                    obstacle["road_id"] = road_snap["road_id"]
+                    obstacle["road_position"] = road_snap.get("road_position", 0)
+                    obstacle["cross_track"] = road_snap.get("cross_track", 0)
+
                 nearby_obstacles.append(obstacle)
         
         # Сортируем по приоритету (убывание)
@@ -682,6 +687,233 @@ async def get_nearby_obstacles(
     except Exception as e:
         logger.error(f"Error retrieving nearby obstacles: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving nearby obstacles: {str(e)}")
+
+
+@api_router.post("/obstacles/along-road")
+async def get_obstacles_along_road(request: Request):
+    """
+    Препятствия на той же дороге, что и пользователь.
+    Использует roadSnap из кластеров (привязка при GPU/ML обработке).
+    Если дороги не определены — фолбэк к /obstacles/nearby.
+    """
+    try:
+        from road_service import road_service
+
+        body = await request.json()
+        trail = body.get("trail", [])
+        latitude = body.get("latitude")
+        longitude = body.get("longitude")
+        radius = body.get("radius", 5000)
+        min_confirmations = body.get("min_confirmations", 3)
+
+        if not latitude or not longitude:
+            raise HTTPException(status_code=400, detail="latitude and longitude required")
+
+        if not _config.obstacle_clusterer:
+            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
+
+        # Определяем дорогу пользователя по трейлу
+        road_info = None
+        if len(trail) >= 2 and _config.mongodb_connected:
+            from road_service import road_service as rs
+            rs.db = _config.db
+            try:
+                col = _config.db["road_segments"]
+                has_roads = await col.count_documents({}, limit=1)
+                if has_roads:
+                    road_info = await rs.find_road_for_trail(trail)
+            except Exception:
+                pass
+
+        # Загружаем кластеры
+        all_clusters = await _config.db.obstacle_clusters.find({
+            "status": "active",
+            "expiresAt": {"$gt": datetime.utcnow()},
+            "reportCount": {"$gte": min_confirmations}
+        }).to_list(1000)
+
+        nearby = []
+        for cluster in all_clusters:
+            clat = cluster['location']['latitude']
+            clon = cluster['location']['longitude']
+            distance = _config.obstacle_clusterer.haversine_distance(
+                latitude, longitude, clat, clon
+            )
+            if distance > radius:
+                continue
+
+            obstacle = {
+                "id": str(cluster['_id']),
+                "type": cluster['obstacleType'],
+                "latitude": clat,
+                "longitude": clon,
+                "distance": round(distance, 1),
+                "severity": {
+                    "average": round(cluster['severity']['average'], 1),
+                    "max": cluster['severity']['max']
+                },
+                "confidence": round(cluster['confidence'], 2),
+                "confirmations": cluster['reportCount'],
+                "avgSpeed": round(cluster['roadInfo']['avgSpeed'] * 3.6, 1),
+                "lastReported": cluster['lastReported'].isoformat(),
+            }
+
+            road_snap = cluster.get("roadSnap", {})
+            if road_snap.get("road_id"):
+                obstacle["road_id"] = road_snap["road_id"]
+                obstacle["road_position"] = road_snap.get("road_position", 0)
+                obstacle["cross_track"] = road_snap.get("cross_track", 0)
+
+            priority = cluster['reportCount'] * 100 + (1 / (distance + 1)) * 10
+            obstacle['priority'] = round(priority, 2)
+            nearby.append(obstacle)
+
+        # Если есть road_id и он совпадает с дорогой пользователя — фильтруем
+        if road_info:
+            user_road_id = road_info["road_id"]
+            user_pos = 0.0
+            if trail:
+                user_pos = _position_on_linestring_flat(
+                    latitude, longitude,
+                    _get_road_geometry(road_info)
+                )
+
+            on_road = []
+            for obs in nearby:
+                if obs.get("road_id") == user_road_id:
+                    obs_pos = obs.get("road_position", 0)
+                    road_dist = abs(obs_pos - user_pos)
+                    obs["road_distance"] = round(road_dist, 1)
+                    obs["road_zone"] = _road_zone_fallback(road_dist)
+                    obs["cross_track_distance"] = obs.pop("cross_track", 0)
+                    on_road.append(obs)
+
+            if on_road:
+                on_road.sort(key=lambda x: x["road_distance"])
+                return {
+                    "mode": "road",
+                    "road_name": road_info.get("name", ""),
+                    "road_highway": road_info.get("highway", ""),
+                    "userLocation": {"latitude": latitude, "longitude": longitude},
+                    "searchRadius": radius,
+                    "obstacles": on_road,
+                    "total": len(on_road),
+                }
+
+        # Фолбэк: все препятствия с прямой дистанцией
+        for obs in nearby:
+            obs["road_distance"] = obs["distance"]
+            obs["road_zone"] = _road_zone_fallback(obs["distance"])
+
+        return {
+            "mode": "straight",
+            "userLocation": {"latitude": latitude, "longitude": longitude},
+            "searchRadius": radius,
+            "obstacles": nearby,
+            "total": len(nearby),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error in obstacles-along-road: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _position_on_linestring_flat(lat, lon, coords):
+    import math
+    if not coords or len(coords) < 2:
+        return 0.0
+    from services.geo import calculate_distance as cd
+    best_dist = float("inf")
+    best_pos = 0.0
+    total = 0.0
+    for i in range(len(coords) - 1):
+        c1_lon, c1_lat = coords[i] if isinstance(coords[i], (list, tuple)) else (0, 0)
+        c2_lon, c2_lat = coords[i + 1] if isinstance(coords[i + 1], (list, tuple)) else (0, 0)
+        seg_len = cd(c1_lat, c1_lon, c2_lat, c2_lon)
+        if seg_len < 0.01:
+            continue
+        dx = (c2_lon - c1_lon) * math.cos((c1_lat + c2_lat) / 2 * math.pi / 180)
+        dy = c2_lat - c1_lat
+        seg_sq = dx * dx + dy * dy
+        if seg_sq < 1e-14:
+            continue
+        t = max(0.0, min(1.0,
+            ((lat - c1_lat) * dy + (lon - c1_lon) * dx) / (0.00001 * seg_sq)
+        ))
+        proj_lat = c1_lat + t * (c2_lat - c1_lat)
+        proj_lon = c1_lon + t * (c2_lon - c1_lon)
+        d = cd(lat, lon, proj_lat, proj_lon)
+        if d < best_dist:
+            best_dist = d
+            best_pos = total + t * seg_len
+        total += seg_len
+    return best_pos
+
+
+def _get_road_geometry(road_info):
+    return road_info.get("_geometry", [])
+
+
+def _road_zone_fallback(distance: float) -> str:
+    if distance < 50:
+        return "near"
+    elif distance < 200:
+        return "medium"
+    elif distance < 500:
+        return "far"
+    return "beyond"
+
+
+@api_router.post("/admin/import-roads")
+async def admin_import_roads(request: Request):
+    """Запустить импорт дорог из OSM в MongoDB через Overpass API."""
+    try:
+        body = await request.json()
+        bbox = body.get("bbox", "55.5,37.3,56.0,38.0")
+        parts = [float(x.strip()) for x in bbox.split(",")]
+        if len(parts) != 4:
+            raise HTTPException(status_code=400, detail="bbox: south,west,north,east")
+
+        from scripts.import_roads import import_from_overpass, ensure_indexes
+        total = await import_from_overpass(_config.db, *parts)
+        await ensure_indexes(_config.db)
+
+        return {"success": True, "imported": total, "bbox": bbox}
+    except Exception as e:
+        logger.error("Import roads error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/roads-stats")
+async def admin_roads_stats():
+    """Статистика импортированных дорог."""
+    try:
+        col = _config.db["road_segments"]
+        total = await col.count_documents({})
+        highway_stats = await col.aggregate([
+            {"$group": {"_id": "$highway", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]).to_list(50)
+        return {
+            "total_segments": total,
+            "by_highway_type": highway_stats,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/clear-roads")
+async def admin_clear_roads(confirm: str = ""):
+    """Очистить road_segments."""
+    if confirm != "YES":
+        return {"message": "Pass confirm=YES to clear road segments"}
+    col = _config.db["road_segments"]
+    result = await col.delete_many({})
+    await col.drop_indexes()
+    return {"deleted": result.deleted_count}
+
 
 @api_router.get("/road-conditions")
 async def get_road_conditions(

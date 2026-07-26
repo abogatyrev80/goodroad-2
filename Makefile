@@ -155,3 +155,10 @@ ml-train-db: ## Обучить модель из MongoDB
 
 ml-train-prod: ## Обучить модель с production API (goodroad.su)
 	@bash -c 'source backend/.venv-ml/bin/activate && pip install -q requests && cd backend && python train_model.py --api-url https://goodroad.su --epochs 30 --api-max-events 20000 --api-max-raw 30000 --output models/accel_lstm.pt'
+
+import-roads: ## Импортировать OSM дороги в MongoDB (bbox: south,west,north,east)
+	@cd backend && python -m scripts.import_roads --bbox $$(echo $${BBOX:-"55.5,37.3,56.0,38.0"})
+	@echo "${GREEN}Дороги импортированы${NC}"
+
+roads-stats: ## Статистика дорог в MongoDB
+	@curl -s http://localhost:8001/api/admin/roads-stats 2>/dev/null || echo "Бэкенд не запущен"
