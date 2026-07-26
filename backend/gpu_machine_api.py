@@ -221,31 +221,31 @@ async def check_health(machine_id: str):
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    host = machine["host"]
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(f"http://{host}:8002/health")
-            if resp.status_code == 200:
-                data = resp.json()
-                await _db.gpu_machines.update_one(
-                    {"machine_id": machine_id},
-                    {"$set": {
-                        "status": "online",
-                        "gpu_available": data.get("gpu_available", False),
-                        "gpu_name": data.get("gpu_name"),
-                        "last_health_check": datetime.utcnow(),
-                        "updated_at": datetime.utcnow(),
-                    }},
-                )
-                return {"status": "online", "health": data}
-    except Exception as e:
-        logger.warning("Health check failed for %s: %s", machine_id, e)
+    host = machine.get("host", "")
+    stored_status = machine.get("status", "offline")
+    stored_health = machine.get("last_health_check")
 
-    await _db.gpu_machines.update_one(
-        {"machine_id": machine_id},
-        {"$set": {"status": "offline", "updated_at": datetime.utcnow()}},
-    )
-    return {"status": "offline", "error": "Cannot reach GPU server"}
+    if host and host not in ("0.0.0.0", "", "localhost", "127.0.0.1"):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"http://{host}:8002/health")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    await _db.gpu_machines.update_one(
+                        {"machine_id": machine_id},
+                        {"$set": {
+                            "status": "online",
+                            "gpu_available": data.get("gpu_available", False),
+                            "gpu_name": data.get("gpu_name"),
+                            "last_health_check": datetime.utcnow(),
+                            "updated_at": datetime.utcnow(),
+                        }},
+                    )
+                    return {"status": "online", "health": data}
+        except Exception as e:
+            logger.debug("Direct health check failed for %s: %s", machine_id, e)
+
+    return {"status": stored_status, "last_health_check": str(stored_health) if stored_health else None}
 
 
 # ─── SSH Helpers ──────────────────────────────────────────────────────────────
