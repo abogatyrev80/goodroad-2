@@ -134,6 +134,7 @@ async def _execute_training(main_url, headers, webhook_secret, webhook_url, outp
     logger.info("Dataset downloaded to %s", dataset_path)
 
     from training.train import train
+    import functools
     train_config = {
         "window_size": seq_len,
         "epochs": epochs,
@@ -143,7 +144,10 @@ async def _execute_training(main_url, headers, webhook_secret, webhook_url, outp
     }
 
     start = time.time()
-    result = train(dataset_path, output_dir, train_config)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, functools.partial(train, dataset_path, output_dir, train_config)
+    )
     elapsed = time.time() - start
 
     if "error" in result:

@@ -151,6 +151,12 @@
                         <input type="number" class="filter-input" id="limit-clusters" placeholder="Лимит кластеров" min="1" max="50000" value="5000" title="Макс. кластеров при загрузке (1–50000)">
                         <input type="number" class="filter-input" id="min-reports" placeholder="Мин. отчётов" min="0" max="100" value="3" title="Для кластеров: минимум отчётов (0 = все)">
                     </div>
+                    <div class="filter-row">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#60a5fa;font-size:0.875rem;">
+                            <input type="checkbox" id="roads-toggle" onchange="toggleRoadsLayer(this.checked)">
+                            🛣 Дороги (карта)
+                        </label>
+                    </div>
                     <div class="select-all-row">
                         <input type="checkbox" id="select-all-checkbox" class="checkbox" onchange="selectAllFiltered(this.checked)">
                         <label for="select-all-checkbox">Выбрать все отфильтрованные (<span id="filtered-count">0</span>)</label>
@@ -241,7 +247,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map, allEvents = [], allClusters = [], filteredData = [], currentMode = 'events', selectedIds = new Set();
+        let map, allEvents = [], allClusters = [], filteredData = [], currentMode = 'events', selectedIds = new Set(), roadsLayer, roadsVisible = false;
 
         initMap();
         loadData();
@@ -251,6 +257,7 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
             }).addTo(map);
+            map.on('moveend', () => { if (roadsVisible) loadRoads(); });
         }
 
         async function loadData() {
@@ -323,6 +330,50 @@
             document.getElementById('filtered-count').textContent = filteredData.length;
             
             renderData();
+        }
+
+        async function toggleRoadsLayer(show) {
+            roadsVisible = show;
+            if (!show) {
+                if (roadsLayer) { map.removeLayer(roadsLayer); roadsLayer = null; }
+                return;
+            }
+            await loadRoads();
+        }
+
+        async function loadRoads() {
+            if (!roadsVisible) return;
+            const bounds = map.getBounds();
+            const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+            try {
+                const res = await fetch(`/api/admin/roads-geojson?bbox=${encodeURIComponent(bbox)}&limit=50000`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (roadsLayer) map.removeLayer(roadsLayer);
+                roadsLayer = L.geoJSON(data, {
+                    style: f => ({
+                        color: f.properties.highway === 'motorway' ? '#f97316' :
+                               f.properties.highway === 'trunk' ? '#eab308' :
+                               f.properties.highway === 'primary' ? '#22c55e' :
+                               f.properties.highway === 'secondary' ? '#3b82f6' :
+                               f.properties.highway === 'tertiary' ? '#a855f7' : '#64748b',
+                        weight: f.properties.highway === 'motorway' ? 4 :
+                                f.properties.highway === 'trunk' ? 3.5 : 2.5,
+                        opacity: 0.7
+                    }),
+                    onEachFeature: (f, layer) => {
+                        const p = f.properties || {};
+                        layer.bindPopup(`
+                            <b>${p.name || '(безымянная)'}</b><br>
+                            Тип: ${p.highway}<br>
+                            Длина: ${(p.length || 0).toFixed(0)} м<br>
+                            ID: ${p.road_id}
+                        `);
+                    }
+                }).addTo(map);
+            } catch (e) {
+                console.error('loadRoads error:', e);
+            }
         }
 
         function renderData() {

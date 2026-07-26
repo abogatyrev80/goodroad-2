@@ -55,6 +55,10 @@ class GPUMachineUpdate(BaseModel):
     deploy_path: Optional[str] = None
 
 
+class SelfRegisterRequest(BaseModel):
+    name: str = Field(default="", max_length=100)
+
+
 class TrainRequest(BaseModel):
     dataset_id: str
     epochs: int = Field(default=50, ge=1, le=200)
@@ -102,6 +106,43 @@ async def create_machine(req: GPUMachineCreate):
 
     await _db.gpu_machines.insert_one(doc)
     logger.info("GPU machine registered: %s (%s)", machine_id, req.name)
+
+    return {
+        "machine_id": machine_id,
+        "api_key": api_key,
+        "webhook_secret": webhook_secret,
+    }
+
+
+@gpu_machine_router.post("/self-register")
+async def self_register(req: SelfRegisterRequest = None):
+    """Register a GPU machine without SSH credentials (for self-deploying clients)"""
+    machine_id = f"gpu_{uuid.uuid4().hex[:12]}"
+    api_key = _generate_api_key()
+    webhook_secret = _generate_webhook_secret()
+
+    doc = {
+        "machine_id": machine_id,
+        "name": req.name if req and req.name else f"GPU-{machine_id[-8:]}",
+        "host": "",
+        "ssh_port": 22,
+        "ssh_user": "",
+        "ssh_auth": "key",
+        "ssh_private_key": "",
+        "ssh_password": "",
+        "deploy_path": "/opt/goodroad-gpu",
+        "api_key": api_key,
+        "webhook_secret": webhook_secret,
+        "status": "offline",
+        "gpu_name": None,
+        "gpu_available": False,
+        "last_health_check": None,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+
+    await _db.gpu_machines.insert_one(doc)
+    logger.info("GPU machine self-registered: %s", machine_id)
 
     return {
         "machine_id": machine_id,

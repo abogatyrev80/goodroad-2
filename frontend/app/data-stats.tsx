@@ -17,12 +17,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import RawDataCollector from '../services/RawDataCollector';
+import backendConfigService, { BackendMode } from '../services/BackendConfigService';
 
 export default function DataStatsScreen() {
   const [bufferSize, setBufferSize] = useState(0);
   const [isOnline, setIsOnline] = useState(false);
   const [offlineQueueLength, setOfflineQueueLength] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [backendMode, setBackendMode] = useState<BackendMode>('auto');
+  const [backendUrl, setBackendUrl] = useState<string>('');
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
     const instance = RawDataCollector.currentInstance;
@@ -36,6 +40,9 @@ export default function DataStatsScreen() {
     }
     const queueLen = await RawDataCollector.getOfflineQueueLength();
     setOfflineQueueLength(queueLen);
+    await backendConfigService.initialize();
+    setBackendMode(backendConfigService.getMode());
+    setBackendUrl(backendConfigService.getActiveUrl());
   }, []);
 
   useEffect(() => {
@@ -48,6 +55,24 @@ export default function DataStatsScreen() {
     setRefreshing(true);
     await loadStats();
     setRefreshing(false);
+  };
+
+  const setBackendModeAndRefresh = async (mode: BackendMode) => {
+    await backendConfigService.setMode(mode);
+    setBackendMode(mode);
+    setBackendUrl(backendConfigService.getActiveUrl());
+    setTestResult(null);
+  };
+
+  const testBackendConnection = async () => {
+    setTestResult('Проверка...');
+    const url = backendConfigService.getActiveUrl();
+    const result = await backendConfigService.testConnection(url);
+    if (result.ok) {
+      setTestResult(`OK - ${url} (${result.latencyMs}мс)`);
+    } else {
+      setTestResult(`Ошибка: ${result.error || 'Нет ответа'}`);
+    }
   };
 
   const handleForceSend = async () => {
@@ -144,6 +169,56 @@ export default function DataStatsScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* Бэкенд сервер */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Бэкенд сервер</Text>
+
+          <View style={styles.themeButtons}>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'auto' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('auto')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'auto' && styles.themeButtonTextActive]}>
+                Авто
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'local' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('local')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'local' && styles.themeButtonTextActive]}>
+                Локальный
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.themeButton, backendMode === 'prod' && styles.themeButtonActive]}
+              onPress={() => setBackendModeAndRefresh('prod')}
+            >
+              <Text style={[styles.themeButtonText, backendMode === 'prod' && styles.themeButtonTextActive]}>
+                Production
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.urlText, { marginTop: 12 }]}>
+            URL: {backendUrl}
+          </Text>
+
+          {testResult && (
+            <Text style={[styles.urlText, { color: testResult.startsWith('OK') ? '#22c55e' : '#ef4444', marginTop: 4 }]}>
+              {testResult}
+            </Text>
+          )}
+
+          <Pressable
+            style={[styles.testButton, { marginTop: 12 }]}
+            onPress={testBackendConnection}
+          >
+            <Ionicons name="wifi" size={20} color="#fff" />
+            <Text style={styles.testButtonText}>Проверить соединение</Text>
+          </Pressable>
         </View>
 
         <Pressable
@@ -258,5 +333,57 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     paddingHorizontal: 16,
+  },
+  section: {
+    backgroundColor: '#1a1a3e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e2e8f0',
+    marginBottom: 12,
+  },
+  themeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#2d2d5f',
+    alignItems: 'center',
+  },
+  themeButtonActive: {
+    backgroundColor: '#00d4ff',
+  },
+  themeButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  themeButtonTextActive: {
+    color: '#0f0f23',
+  },
+  urlText: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#3b3b6b',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  testButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

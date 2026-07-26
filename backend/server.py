@@ -886,6 +886,63 @@ async def admin_import_roads(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/admin/roads-geojson")
+async def admin_roads_geojson(
+    bbox: str = "",
+    limit: int = 50000,
+):
+    """
+    Возвращает road_segments как GeoJSON FeatureCollection.
+    bbox: south,west,north,east (опционально, для фильтрации по области карты).
+    """
+    try:
+        col = _config.db["road_segments"]
+        if col is None:
+            return {"type": "FeatureCollection", "features": []}
+
+        query = {}
+        if bbox:
+            parts = [float(x.strip()) for x in bbox.split(",")]
+            if len(parts) == 4:
+                s, w, n, e = parts
+                query["geometry"] = {
+                    "$geoWithin": {
+                        "$geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[
+                                [w, s], [e, s], [e, n], [w, n], [w, s]
+                            ]],
+                        }
+                    }
+                }
+
+        features = []
+        cursor = col.find(query, {
+            "geometry": 1, "road_id": 1, "name": 1, "highway": 1, "length": 1
+        }).limit(limit)
+
+        async for doc in cursor:
+            features.append({
+                "type": "Feature",
+                "geometry": doc.get("geometry"),
+                "properties": {
+                    "road_id": doc.get("road_id"),
+                    "name": doc.get("name", ""),
+                    "highway": doc.get("highway", ""),
+                    "length": doc.get("length", 0),
+                }
+            })
+
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+            "total": len(features),
+        }
+    except Exception as e:
+        logger.error("Error fetching roads geojson: %s", e)
+        return {"type": "FeatureCollection", "features": [], "error": str(e)}
+
+
 @api_router.get("/admin/roads-stats")
 async def admin_roads_stats():
     """Статистика импортированных дорог."""

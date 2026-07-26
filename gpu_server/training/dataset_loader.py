@@ -1,4 +1,5 @@
 import json
+import os
 import httpx
 import numpy as np
 from typing import List, Dict, Tuple
@@ -15,13 +16,17 @@ def load_dataset_from_file(path: str) -> List[Dict]:
     return data
 
 
-async def download_dataset(main_url: str, api_key: str, dataset_id: str, tmp_dir: str = "/tmp") -> str:
+async def download_dataset(main_url: str, api_key: str, dataset_id: str, tmp_dir: str = None) -> str:
+    import tempfile
+    if tmp_dir is None:
+        tmp_dir = tempfile.gettempdir()
     url = f"{main_url}/api/external/dataset/{dataset_id}/download"
     headers = {"X-Api-Key": api_key}
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.get(url, headers=headers)
         resp.raise_for_status()
-    path = f"{tmp_dir}/{dataset_id}.json"
+    os.makedirs(tmp_dir, exist_ok=True)
+    path = os.path.join(tmp_dir, f"{dataset_id}.json")
     with open(path, "w") as f:
         f.write(resp.text)
     return path
@@ -36,7 +41,7 @@ def prepare_windows(data: List[Dict], window_size: int = 32) -> Tuple[np.ndarray
         if label not in VALID_LABELS:
             continue
         accel = sample.get("accelerometer_data", [])
-        if len(accel) < 3:
+        if not accel:
             continue
         points = [[p.get("x", 0), p.get("y", 0), p.get("z", 0)] for p in accel]
         arr = np.array(points, dtype=np.float32)
