@@ -188,6 +188,33 @@ async def delete_machine(machine_id: str):
 
 # ─── Health Check ─────────────────────────────────────────────────────────────
 
+class HeartbeatRequest(BaseModel):
+    gpu_available: bool = False
+    gpu_name: str = ""
+    training_active: bool = False
+    current_run: Optional[str] = None
+
+
+@gpu_machine_router.post("/{machine_id}/heartbeat")
+async def machine_heartbeat(machine_id: str, req: HeartbeatRequest):
+    """GPU client reports its status periodically (reverse health check)"""
+    result = await _db.gpu_machines.update_one(
+        {"machine_id": machine_id},
+        {"$set": {
+            "status": "online",
+            "gpu_available": req.gpu_available,
+            "gpu_name": req.gpu_name,
+            "training_active": req.training_active,
+            "current_run": req.current_run,
+            "last_health_check": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    return {"status": "online"}
+
+
 @gpu_machine_router.get("/{machine_id}/health")
 async def check_health(machine_id: str):
     machine = await _db.gpu_machines.find_one({"machine_id": machine_id})

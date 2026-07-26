@@ -33,7 +33,32 @@ async def poll_loop(config: dict):
             except Exception as e:
                 logger.error("Command poll error: %s", e)
 
+        if machine_id:
+            try:
+                await _send_heartbeat(main_url, headers, machine_id)
+            except Exception as e:
+                logger.error("Heartbeat error: %s", e)
+
         await asyncio.sleep(poll_interval)
+
+
+async def _send_heartbeat(main_url, headers, machine_id):
+    import torch
+    gpu_available = torch.cuda.is_available()
+    gpu_name = torch.cuda.get_device_name(0) if gpu_available else ""
+    body = {
+        "gpu_available": gpu_available,
+        "gpu_name": gpu_name,
+        "training_active": False,
+        "current_run": None,
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            f"{main_url}/api/admin/gpu-machines/{machine_id}/heartbeat",
+            json=body, headers=headers,
+        )
+        if resp.status_code == 200:
+            logger.debug("Heartbeat sent: %s", machine_id)
 
 
 async def _poll_commands(main_url, headers, machine_id, output_dir, config):
