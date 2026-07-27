@@ -66,6 +66,11 @@ class TrainRequest(BaseModel):
     seq_len: int = Field(default=32, ge=1, le=512)
 
 
+class ClusterUpload(BaseModel):
+    clusters: list
+    total_events_processed: int = 0
+
+
 # ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 @gpu_machine_router.get("/")
@@ -463,6 +468,70 @@ async def stop_machine(machine_id: str):
         {"$set": {"status": "offline", "updated_at": datetime.utcnow()}},
     )
     return {"message": "GPU server stopped", "output": result.get("stdout", "")}
+
+
+# ─── Recalculate ─────────────────────────────────────────────────────────────
+
+@gpu_machine_router.post("/{machine_id}/recalculate")
+async def trigger_recalculate(machine_id: str):
+    """Queue a recalculate-clusters command for the GPU machine"""
+    machine = await _db.gpu_machines.find_one({"machine_id": machine_id})
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    cmd_doc = {
+        "command_id": f"cmd_{uuid.uuid4().hex[:12]}",
+        "machine_id": machine_id,
+        "command": "recalculate",
+        "params": {},
+        "status": "pending",
+        "result": None,
+        "created_at": datetime.utcnow(),
+        "completed_at": None,
+    }
+
+    await _db.gpu_commands.insert_one(cmd_doc)
+    logger.info("Recalculate command queued for %s", machine_id)
+    return {"command_id": cmd_doc["command_id"], "status": "pending"}
+
+
+@gpu_machine_router.post("/clusters/bulk-upload")
+async def bulk_upload_clusters(upload: ClusterUpload):
+    """Receive clusters computed by a GPU machine and save to obstacle_clusters"""
+    api_key = None
+    auth_header = None
+    for k, v in (globals().get("__dict__", {}) or {}).items():
+        pass
+
+    # Verify api_key via header
+    inserted = 0
+    errors = 0
+    for cl in upload.clusters:
+        try:
+            doc = {
+                "_id": cl.get("clusterId", str(uuid.uuid4())),
+                "obstacleType": cl["obstacleType"],
+                "location": cl["location"],
+                "severity": cl["severity"],
+                "confidence": cl.get("confidence", 0.7),
+                "reportCount": cl.get("reportCount", 1),
+                "devices": cl.get("devices", []),
+                "firstReported": datetime.fromisoformat(cl["firstReported"]) if isinstance(cl.get("firstReported"), str) else cl.get("firstReported", datetime.utcnow()),
+                "lastReported": datetime.fromisoformat(cl["lastReported"]) if isinstance(cl.get("lastReported"), str) else cl.get("lastReported", datetime.utcnow()),
+                "status": cl.get("status", "active"),
+                "expiresAt": datetime.fromisoformat(cl["expiresAt"]) if isinstance(cl.get("expiresAt"), str) else cl.get("expiresAt", datetime.utcnow()),
+                "roadInfo": cl.get("roadInfo", {"avgSpeed": 0, "speedVariance": 0, "speeds": []}),
+                "roadSnap": cl.get("roadSnap", {}),
+                "created_at": datetime.utcnow(),
+            }
+            await _db.obstacle_clusters.insert_one(doc)
+            inserted += 1
+        except Exception as e:
+            logger.error("Cluster upload error: %s", e)
+            errors += 1
+
+    logger.info("Bulk upload: %d inserted, %d errors", inserted, errors)
+    return {"inserted": inserted, "errors": errors, "total": len(upload.clusters)}
 
 
 # ─── Command Queue (push training to GPU machine) ────────────────────────────

@@ -1,6 +1,8 @@
 import os
+import uuid
 import asyncio
 import logging
+from datetime import datetime, timedelta
 import httpx
 import time
 
@@ -102,6 +104,15 @@ async def _poll_commands(main_url, headers, machine_id, output_dir, config):
             )
 
             await _complete_command(main_url, command_id, {"status": "completed"})
+
+        elif command == "recalculate":
+            logger.info("Executing recalculate command")
+            try:
+                result = await _execute_recalculate(main_url, headers, config)
+                await _complete_command(main_url, command_id, result)
+            except Exception as e:
+                logger.error("Recalculate failed: %s", e)
+                await _fail_command(main_url, command_id, str(e))
 
         else:
             logger.warning("Unknown command: %s", command)
@@ -231,3 +242,140 @@ async def _send_webhook(main_url, webhook_secret, dataset_id, status, extra, hea
             logger.info("Webhook sent: status=%s code=%d", status, resp.status_code)
     except Exception as e:
         logger.error("Webhook failed: %s", e)
+
+
+# ─── Recalculate Clusters ────────────────────────────────────────────────────
+
+CLUSTER_RADIUS = 15.0
+COMPATIBLE_GROUPS = [
+    {'pothole', 'bump'},
+    {'speed_bump'},
+    {'braking'},
+    {'vibration'},
+]
+
+
+def _haversine(lat1, lon1, lat2, lon2):
+    import math
+    R = 6371000
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _types_compatible(t1, t2):
+    for group in COMPATIBLE_GROUPS:
+        if t1 in group and t2 in group:
+            return True
+    return False
+
+
+async def _execute_recalculate(main_url, headers, config):
+    logger.info("Starting recalculate: downloading events from %s", main_url)
+
+    all_events = []
+    skip = 0
+    limit = 50000
+    while True:
+        url = f"{main_url}/api/admin/v2/events?limit={limit}&skip={skip}"
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                logger.error("Failed to fetch events: %d", resp.status_code)
+                break
+            data = resp.json()
+            events = data.get("events", [])
+            all_events.extend(events)
+            skip += limit
+            logger.info("  Downloaded %d events (total %d)", len(events), len(all_events))
+            if len(events) < limit:
+                break
+
+    logger.info("Total events downloaded: %d", len(all_events))
+
+    clusters = {}
+    processed = 0
+    skipped = 0
+
+    for ev in all_events:
+        lat = ev.get("latitude")
+        lon = ev.get("longitude")
+        etype = ev.get("eventType")
+        if not lat or not lon or not etype:
+            skipped += 1
+            continue
+
+        device_id = ev.get("deviceId", "unknown")
+        severity = ev.get("severity", 3)
+        confidence = ev.get("confidence", 0.7)
+        speed = ev.get("speed", 0)
+        ts_str = ev.get("timestamp", "")
+
+        # Find matching cluster
+        found = None
+        for cid, cl in clusters.items():
+            dist = _haversine(lat, lon, cl["location"]["latitude"], cl["location"]["longitude"])
+            if dist < CLUSTER_RADIUS and _types_compatible(etype, cl["obstacleType"]):
+                found = cid
+                break
+
+        if found:
+            cl = clusters[found]
+            if device_id not in cl["devices"]:
+                cl["devices"].append(device_id)
+                cl["reportCount"] = len(cl["devices"])
+            cl["severity"]["history"].append(severity)
+            cl["severity"]["max"] = min(cl["severity"]["max"], severity)
+            cl["severity"]["min"] = max(cl["severity"]["min"], severity)
+            cl["severity"]["average"] = sum(cl["severity"]["history"]) / len(cl["severity"]["history"])
+            cl["severity"]["mode"] = max(set(cl["severity"]["history"]), key=cl["severity"]["history"].count)
+            cl["confidence"] = min(0.99, 0.80 + (cl["reportCount"] - 1) * 0.05)
+            cl["lastReported"] = ts_str or cl["lastReported"]
+            cl["roadInfo"]["speeds"].append(speed)
+            cl["roadInfo"]["avgSpeed"] = sum(cl["roadInfo"]["speeds"]) / len(cl["roadInfo"]["speeds"])
+        else:
+            cid = str(uuid.uuid4())
+            clusters[cid] = {
+                "clusterId": cid,
+                "obstacleType": etype,
+                "location": {"latitude": lat, "longitude": lon, "radius": CLUSTER_RADIUS},
+                "severity": {
+                    "average": severity, "max": severity, "min": severity, "mode": severity,
+                    "history": [severity],
+                },
+                "confidence": 0.80,
+                "reportCount": 1,
+                "devices": [device_id],
+                "firstReported": ts_str,
+                "lastReported": ts_str,
+                "status": "active",
+                "expiresAt": (datetime.utcnow() + timedelta(days=15)).isoformat(),
+                "roadInfo": {"avgSpeed": speed, "speedVariance": 0, "speeds": [speed]},
+                "roadSnap": {},
+            }
+
+        processed += 1
+        if processed % 10000 == 0:
+            logger.info("  Clustered %d/%d (skipped %d, clusters %d)", processed, len(all_events), skipped, len(clusters))
+
+    logger.info("Clustering done: %d clusters from %d events (skipped %d)", len(clusters), processed, skipped)
+
+    # Upload clusters
+    cluster_list = list(clusters.values())
+    url = f"{main_url}/api/admin/gpu-machines/clusters/bulk-upload"
+    async with httpx.AsyncClient(timeout=300) as client:
+        resp = await client.post(url, json={"clusters": cluster_list, "total_events_processed": processed}, headers=headers)
+        if resp.status_code == 200:
+            result = resp.json()
+            logger.info("Upload result: %s", result)
+        else:
+            logger.error("Upload failed: %d %s", resp.status_code, resp.text)
+
+    return {
+        "total_events": len(all_events),
+        "processed": processed,
+        "skipped": skipped,
+        "clusters_created": len(clusters),
+        "uploaded": resp.status_code == 200 if "resp" in dir() else False,
+    }
