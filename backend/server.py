@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.middleware.cors import CORSMiddleware
+import asyncio
 import csv
 import io
 import logging
@@ -364,92 +365,82 @@ async def get_obstacle_clusters(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving clusters: {str(e)}")
 
+_recalc_jobs: Dict[str, Dict] = {}
+
 @api_router.post("/admin/recalculate-clusters")
 async def recalculate_all_clusters():
     """
-    🔄 Удалить все кластеры и пересоздать их заново на основе событий
-    
-    Используется после изменения параметров кластеризации
+    🔄 Удалить все кластеры и пересоздать их заново на основе событий.
+    Запускается в фоне, возвращает job_id.
     """
-    try:
-        if not _config.obstacle_clusterer:
-            raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        
-        logger.info("Удаление всех существующих кластеров...")
-        
-        # Удаляем все кластеры
-        delete_result = await _config.db.obstacle_clusters.delete_many({})
-        deleted_count = delete_result.deleted_count
-        
-        logger.info("Удалено кластеров: %s", deleted_count)
-        
-        # Получаем ВСЕ события (используем cursor для больших объёмов)
-        logger.info("Получение всех событий...")
-        
-        # Подсчитываем сначала
-        total_events = await _config.db.processed_events.count_documents({})
-        logger.info("Всего событий в БД: %d", total_events)
-        
-        # Получаем все события батчами
-        all_events = []
-        cursor = _config.db.processed_events.find({})
-        async for event in cursor:
-            all_events.append(event)
-        
-        logger.info("Получено событий для обработки: %d", len(all_events))
-        
-        # Пересоздаём кластеры
-        logger.info("🔄 Создание кластеров с новыми параметрами...")
-        created_count = 0
-        error_count = 0
-        
-        for event in all_events:
-            try:
-                cluster_event = {
-                    '_id': str(event['_id']),
-                    'eventType': event.get('eventType'),
-                    'latitude': event.get('latitude'),
-                    'longitude': event.get('longitude'),
-                    'severity': event.get('severity', 3),
-                    'confidence': event.get('confidence', 0.7),
-                    'speed': event.get('speed', 0),
-                    'timestamp': event.get('timestamp'),
-                }
-                await _config.obstacle_clusterer.process_event(
-                    event=cluster_event,
-                    device_id=event.get('deviceId', 'unknown')
-                )
-                created_count += 1
-                
-                if created_count % 500 == 0:
-                    logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
-                    
-            except Exception as e:
-                logger.error(f"Ошибка обработки события {event.get('_id')}: {str(e)}")
-                error_count += 1
-                continue
-        
-        # Подсчитываем итоговое количество кластеров
-        final_clusters = await _config.db.obstacle_clusters.count_documents({})
-        
-        logger.info("Пересоздание завершено")
-        logger.info(f"  Обработано событий: {created_count}/{len(all_events)}")
-        logger.info(f"  Создано кластеров: {final_clusters}")
-        
-        return {
-            "success": True,
-            "deleted_clusters": deleted_count,
-            "processed_events": created_count,
-            "total_events": len(all_events),
-            "final_clusters": final_clusters,
-            "message": f"Пересоздано кластеров: {final_clusters} (было: {deleted_count})"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error recalculating clusters: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error recalculating clusters: {str(e)}")
+    if not _config.obstacle_clusterer:
+        raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
+
+    job_id = str(uuid.uuid4())
+    _recalc_jobs[job_id] = {
+        "status": "running",
+        "started_at": datetime.utcnow().isoformat(),
+        "total_events": 0,
+        "processed": 0,
+        "final_clusters": 0,
+        "error": None,
+    }
+
+    async def _run():
+        try:
+            logger.info("[recalc %s] Удаление всех кластеров...", job_id)
+            await _config.db.obstacle_clusters.delete_many({})
+
+            total = await _config.db.processed_events.count_documents({})
+            _recalc_jobs[job_id]["total_events"] = total
+            logger.info("[recalc %s] Всего событий: %d", job_id, total)
+
+            processed = 0
+            cursor = _config.db.processed_events.find({}, no_cursor_timeout=True)
+            async for event in cursor:
+                try:
+                    ce = {
+                        '_id': str(event['_id']),
+                        'eventType': event.get('eventType'),
+                        'latitude': event.get('latitude'),
+                        'longitude': event.get('longitude'),
+                        'severity': event.get('severity', 3),
+                        'confidence': event.get('confidence', 0.7),
+                        'speed': event.get('speed', 0),
+                        'timestamp': event.get('timestamp'),
+                    }
+                    await _config.obstacle_clusterer.process_event(
+                        event=ce,
+                        device_id=event.get('deviceId', 'unknown')
+                    )
+                    processed += 1
+                    if processed % 1000 == 0:
+                        _recalc_jobs[job_id]["processed"] = processed
+                        logger.info("[recalc %s] %d/%d", job_id, processed, total)
+                except Exception:
+                    continue
+
+            final = await _config.db.obstacle_clusters.count_documents({})
+            _recalc_jobs[job_id].update(
+                status="done", processed=processed, final_clusters=final
+            )
+            logger.info("[recalc %s] Готово: %d кластеров из %d событий", job_id, final, processed)
+        except Exception as e:
+            _recalc_jobs[job_id]["status"] = "error"
+            _recalc_jobs[job_id]["error"] = str(e)
+            logger.error("[recalc %s] Ошибка: %s", job_id, e)
+
+    asyncio.create_task(_run())
+
+    return {"job_id": job_id, "status": "started", "message": "Пересчёт запущен в фоне"}
+
+
+@api_router.get("/admin/recalculate-clusters/status")
+async def recalc_status(job_id: str):
+    job = _recalc_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 @api_router.post("/admin/cleanup-old-data")
 async def cleanup_old_data(

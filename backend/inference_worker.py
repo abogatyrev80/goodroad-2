@@ -153,24 +153,45 @@ class InferenceWorker:
         )
 
     async def _process_single(self, doc: Dict) -> tuple:
-        accel_x = doc.get('accelerometer_x', 0)
-        accel_y = doc.get('accelerometer_y', 0)
-        accel_z = doc.get('accelerometer_z', 0)
-        speed = doc.get('speed', 0)
         device_id = doc.get('deviceId', 'unknown')
         timestamp = doc.get('timestamp', datetime.utcnow())
-        latitude = doc.get('latitude')
-        longitude = doc.get('longitude')
+
+        gps = doc.get('gps', {}) or {}
+        if isinstance(gps, dict):
+            latitude = gps.get('latitude') or doc.get('latitude')
+            longitude = gps.get('longitude') or doc.get('longitude')
+            speed = gps.get('speed', 0) or doc.get('speed', 0)
+        else:
+            latitude = doc.get('latitude')
+            longitude = doc.get('longitude')
+            speed = doc.get('speed', 0)
+
+        accel_array = doc.get('accelerometer', [])
+        if not isinstance(accel_array, list) or len(accel_array) == 0:
+            accel_array = [{
+                'x': doc.get('accelerometer_x', 0),
+                'y': doc.get('accelerometer_y', 0),
+                'z': doc.get('accelerometer_z', 0),
+            }]
 
         inference_start = time.monotonic()
+        detected_event = None
 
-        event = self.event_classifier.analyze_data_point(
-            device_id=device_id,
-            accel_x=accel_x,
-            accel_y=accel_y,
-            accel_z=accel_z,
-            speed=speed
-        )
+        for pt in accel_array:
+            if not isinstance(pt, dict):
+                continue
+            ax = pt.get('x', 0)
+            ay = pt.get('y', 0)
+            az = pt.get('z', 0)
+            ev = self.event_classifier.analyze_data_point(
+                device_id=device_id,
+                accel_x=ax,
+                accel_y=ay,
+                accel_z=az,
+                speed=speed
+            )
+            if ev and ev.get('eventType'):
+                detected_event = ev
 
         inference_ms = (time.monotonic() - inference_start) * 1000
 
@@ -181,11 +202,11 @@ class InferenceWorker:
         confidence = 0.0
         severity = 5
 
-        if event and event.get('eventType'):
-            event_type = event['eventType']
-            confidence = event.get('confidence', 0)
-            severity = event.get('severity', 5)
-            detection_method = event.get('detection_method', 'heuristic')
+        if detected_event and detected_event.get('eventType'):
+            event_type = detected_event['eventType']
+            confidence = detected_event.get('confidence', 0)
+            severity = detected_event.get('severity', 5)
+            detection_method = detected_event.get('detection_method', 'heuristic')
 
             self._stats['events_detected'] += 1
             if detection_method == 'neural_network':
@@ -219,14 +240,14 @@ class InferenceWorker:
                 "latitude": latitude,
                 "longitude": longitude,
                 "speed": speed,
-                "accelerometer_x": accel_x,
-                "accelerometer_y": accel_y,
-                "accelerometer_z": accel_z,
-                "accelerometer_magnitude": event.get('accelerometer', {}).get('magnitude', 0),
-                "accelerometer_deltaY": event.get('accelerometer', {}).get('deltaY', 0),
-                "accelerometer_deltaZ": event.get('accelerometer', {}).get('deltaZ', 0),
-                "accelerometer_variance": event.get('accelerometer', {}).get('variance', 0),
-                "roadType": event.get('roadType', 'unknown'),
+                "accelerometer_x": 0,
+                "accelerometer_y": 0,
+                "accelerometer_z": 0,
+                "accelerometer_magnitude": detected_event.get('accelerometer', {}).get('magnitude', 0),
+                "accelerometer_deltaY": detected_event.get('accelerometer', {}).get('deltaY', 0),
+                "accelerometer_deltaZ": detected_event.get('accelerometer', {}).get('deltaZ', 0),
+                "accelerometer_variance": detected_event.get('accelerometer', {}).get('variance', 0),
+                "roadType": detected_event.get('roadType', 'unknown'),
                 "clusterId": cluster_id,
                 "detection_method": detection_method,
                 "created_at": datetime.utcnow()
@@ -236,7 +257,7 @@ class InferenceWorker:
         log_doc = {
             "timestamp": datetime.utcnow(),
             "device_id": device_id,
-            "input_samples": 1,
+            "input_samples": len(accel_array) if isinstance(accel_array, list) else 1,
             "processing_time_ms": round(inference_ms, 2),
             "detection_method": detection_method,
             "result_event_type": event_type,
@@ -248,4 +269,4 @@ class InferenceWorker:
         }
         await self.db.inference_logs.insert_one(log_doc)
 
-        return (event, detection_method) if event else (None, detection_method)
+        return (detected_event, detection_method) if detected_event else (None, detection_method)
