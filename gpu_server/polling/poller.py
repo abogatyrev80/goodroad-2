@@ -380,7 +380,7 @@ async def _execute_recalculate(main_url, headers, config):
     # Upload clusters in batches of 5000
     cluster_list = list(clusters.values())
     url = f"{main_url}/api/admin/gpu-machines/clusters/bulk-upload"
-    batch_size = 5000
+    batch_size = 250
     total_uploaded = 0
     upload_errors = 0
 
