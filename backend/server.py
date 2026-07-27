@@ -2608,6 +2608,18 @@ async def bulk_delete_events(ids_data: dict):
         logger.error(f"Error bulk deleting events: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error bulk deleting events: {str(e)}")
 
+@api_router.post("/admin/v2/clusters/clear")
+async def clear_all_clusters():
+    """
+    Удалить все кластеры (вызывается GPU клиентом перед пересчётом)
+    """
+    try:
+        result = await _config.db.obstacle_clusters.delete_many({})
+        return {"success": True, "deleted": result.deleted_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing clusters: {str(e)}")
+
+
 @api_router.post("/admin/editor/clusters/bulk-delete")
 async def bulk_delete_clusters(ids_data: dict):
     """

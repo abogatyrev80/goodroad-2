@@ -283,7 +283,21 @@ def _nearby_cells(lat, lon, size=0.002):
 
 
 async def _execute_recalculate(main_url, headers, config):
-    logger.info("Starting recalculate: downloading events from %s", main_url)
+    logger.info("Starting recalculate from %s", main_url)
+
+    # Delete all existing clusters first
+    try:
+        del_url = f"{main_url}/api/admin/v2/clusters/clear"
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(del_url, headers=headers)
+            if resp.status_code == 200:
+                logger.info("Deleted existing clusters: %s", resp.json())
+            else:
+                logger.warning("Clear clusters returned %d: %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.warning("Failed to clear clusters (non-fatal): %s", e)
+
+    logger.info("Downloading events from %s", main_url)
 
     all_events = []
     skip = 0
