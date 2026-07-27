@@ -399,11 +399,18 @@ async def recalculate_all_clusters():
             cursor = _config.db.processed_events.find({}, no_cursor_timeout=True)
             async for event in cursor:
                 try:
+                    lat = event.get('latitude')
+                    lon = event.get('longitude')
+                    etype = event.get('eventType')
+                    if not lat or not lon or not etype:
+                        if processed < 10:
+                            logger.warning("[recalc %s] skip event (lat=%s lon=%s type=%s)", job_id, lat, lon, etype)
+                        continue
                     ce = {
                         '_id': str(event['_id']),
-                        'eventType': event.get('eventType'),
-                        'latitude': event.get('latitude'),
-                        'longitude': event.get('longitude'),
+                        'eventType': etype,
+                        'latitude': lat,
+                        'longitude': lon,
                         'severity': event.get('severity', 3),
                         'confidence': event.get('confidence', 0.7),
                         'speed': event.get('speed', 0),
@@ -416,8 +423,10 @@ async def recalculate_all_clusters():
                     processed += 1
                     if processed % 1000 == 0:
                         _recalc_jobs[job_id]["processed"] = processed
-                        logger.info("[recalc %s] %d/%d", job_id, processed, total)
-                except Exception:
+                        logger.info("[recalc %s] %d/%d clusters=%d", job_id, processed, total, await _config.db.obstacle_clusters.count_documents({}))
+                except Exception as exc:
+                    if processed < 5:
+                        logger.warning("[recalc %s] error on event %s: %s", job_id, event.get('_id'), exc)
                     continue
 
             final = await _config.db.obstacle_clusters.count_documents({})
