@@ -271,6 +271,17 @@ def _types_compatible(t1, t2):
     return False
 
 
+def _grid_key(lat, lon, size=0.002):
+    """Grid cell key ~200m at Moscow latitude"""
+    return (round(lat / size), round(lon / size))
+
+
+def _nearby_cells(lat, lon, size=0.002):
+    """Return keys for cell + 8 neighbors"""
+    cx, cy = round(lat / size), round(lon / size)
+    return [(cx + dx, cy + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+
+
 async def _execute_recalculate(main_url, headers, config):
     logger.info("Starting recalculate: downloading events from %s", main_url)
 
@@ -295,6 +306,7 @@ async def _execute_recalculate(main_url, headers, config):
     logger.info("Total events downloaded: %d", len(all_events))
 
     clusters = {}
+    grid = {}  # grid_key -> list of cluster_ids
     processed = 0
     skipped = 0
 
@@ -308,16 +320,18 @@ async def _execute_recalculate(main_url, headers, config):
 
         device_id = ev.get("deviceId", "unknown")
         severity = ev.get("severity", 3)
-        confidence = ev.get("confidence", 0.7)
         speed = ev.get("speed", 0)
         ts_str = ev.get("timestamp", "")
 
-        # Find matching cluster
         found = None
-        for cid, cl in clusters.items():
-            dist = _haversine(lat, lon, cl["location"]["latitude"], cl["location"]["longitude"])
-            if dist < CLUSTER_RADIUS and _types_compatible(etype, cl["obstacleType"]):
-                found = cid
+        for ck in _nearby_cells(lat, lon):
+            for cid in grid.get(ck, []):
+                cl = clusters[cid]
+                dist = _haversine(lat, lon, cl["location"]["latitude"], cl["location"]["longitude"])
+                if dist < CLUSTER_RADIUS and _types_compatible(etype, cl["obstacleType"]):
+                    found = cid
+                    break
+            if found:
                 break
 
         if found:
@@ -354,6 +368,8 @@ async def _execute_recalculate(main_url, headers, config):
                 "roadInfo": {"avgSpeed": speed, "speedVariance": 0, "speeds": [speed]},
                 "roadSnap": {},
             }
+            gk = _grid_key(lat, lon)
+            grid.setdefault(gk, []).append(cid)
 
         processed += 1
         if processed % 10000 == 0:
