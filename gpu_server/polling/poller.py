@@ -361,21 +361,32 @@ async def _execute_recalculate(main_url, headers, config):
 
     logger.info("Clustering done: %d clusters from %d events (skipped %d)", len(clusters), processed, skipped)
 
-    # Upload clusters
+    # Upload clusters in batches of 5000
     cluster_list = list(clusters.values())
     url = f"{main_url}/api/admin/gpu-machines/clusters/bulk-upload"
-    async with httpx.AsyncClient(timeout=300) as client:
-        resp = await client.post(url, json={"clusters": cluster_list, "total_events_processed": processed}, headers=headers)
-        if resp.status_code == 200:
-            result = resp.json()
-            logger.info("Upload result: %s", result)
-        else:
-            logger.error("Upload failed: %d %s", resp.status_code, resp.text)
+    batch_size = 5000
+    total_uploaded = 0
+    upload_errors = 0
+
+    for i in range(0, len(cluster_list), batch_size):
+        batch = cluster_list[i:i + batch_size]
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(url, json={"clusters": batch, "total_events_processed": processed}, headers=headers)
+            if resp.status_code == 200:
+                result = resp.json()
+                total_uploaded += result.get("inserted", 0)
+                logger.info("Upload batch %d: %d/%d inserted", i // batch_size + 1, result.get("inserted", 0), len(batch))
+            else:
+                logger.error("Upload batch %d failed: %d %s", i // batch_size + 1, resp.status_code, resp.text[:200])
+                upload_errors += 1
+
+    logger.info("Upload complete: %d clusters uploaded (%d errors)", total_uploaded, upload_errors)
 
     return {
         "total_events": len(all_events),
         "processed": processed,
         "skipped": skipped,
         "clusters_created": len(clusters),
-        "uploaded": resp.status_code == 200 if "resp" in dir() else False,
+        "clusters_uploaded": total_uploaded,
+        "upload_errors": upload_errors,
     }
