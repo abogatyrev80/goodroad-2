@@ -28,6 +28,7 @@ from models import (
 from services.geo import (
     validate_gps_coords, calculate_distance,
 )
+from ml_processor import merge_nearby_obstacles
 from dataset_exporter import DatasetExporter
 from model_registry import ModelRegistry
 from external_training_api import external_training_router, init_external_training
@@ -603,84 +604,67 @@ async def get_heatmap_data_simple():
 async def get_nearby_obstacles(
     latitude: float,
     longitude: float,
-    radius: float = 5000,  # 5 км по умолчанию
-    min_confirmations: int = 1
+    radius: float = 5000,
+    min_confirmations: int = 1,
+    merge_radius: float = 50.0,
 ):
-    """
-    Получить препятствия рядом с текущей позицией (для мобильного приложения)
-    
-    Args:
-        latitude: Широта текущей позиции
-        longitude: Долгота текущей позиции
-        radius: Радиус поиска в метрах (по умолчанию 5000м = 5км)
-        min_confirmations: Минимальное количество подтверждений (по умолчанию 1)
-    
-    Returns:
-        Список активных кластеров препятствий отсортированных по приоритету
-    """
     try:
         if not _config.obstacle_clusterer:
             raise HTTPException(status_code=503, detail="Obstacle clusterer not initialized")
-        
-        # Получаем все активные кластеры
+
         all_clusters = await _config.db.obstacle_clusters.find({
             "status": "active",
             "expiresAt": {"$gt": datetime.utcnow()},
             "reportCount": {"$gte": min_confirmations}
         }).to_list(1000)
-        
-        # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
-        nearby_obstacles = []
+
+        nearby = []
         for cluster in all_clusters:
             distance = _config.obstacle_clusterer.haversine_distance(
                 latitude, longitude,
                 cluster['location']['latitude'],
                 cluster['location']['longitude']
             )
-            
+
             if distance <= radius:
-                # Оптимизированный формат для мобильного приложения
                 obstacle = {
                     "id": str(cluster['_id']),
                     "type": cluster['obstacleType'],
                     "latitude": cluster['location']['latitude'],
                     "longitude": cluster['location']['longitude'],
-                    "distance": round(distance, 1),  # метры
+                    "distance": round(distance, 1),
                     "severity": {
                         "average": round(cluster['severity']['average'], 1),
                         "max": cluster['severity']['max']
                     },
                     "confidence": round(cluster['confidence'], 2),
                     "confirmations": cluster['reportCount'],
-                    "avgSpeed": round(cluster['roadInfo']['avgSpeed'] * 3.6, 1),  # м/с -> км/ч
+                    "avgSpeed": round(cluster['roadInfo']['avgSpeed'] * 3.6, 1),
                     "lastReported": cluster['lastReported'].isoformat()
                 }
-                
-                # Вычисляем приоритет для сортировки
+
                 priority = cluster['reportCount'] * 100 + (1 / (distance + 1)) * 10
                 obstacle['priority'] = round(priority, 2)
 
-                # Road data
                 road_snap = cluster.get("roadSnap", {})
                 if road_snap.get("road_id"):
                     obstacle["road_id"] = road_snap["road_id"]
                     obstacle["road_position"] = road_snap.get("road_position", 0)
                     obstacle["cross_track"] = road_snap.get("cross_track", 0)
 
-                nearby_obstacles.append(obstacle)
-        
-        # Сортируем по приоритету (убывание)
-        nearby_obstacles.sort(key=lambda x: x['priority'], reverse=True)
-        
+                nearby.append(obstacle)
+
+        nearby.sort(key=lambda x: x['priority'], reverse=True)
+
+        if merge_radius > 0:
+            nearby = merge_nearby_obstacles(nearby, merge_radius)
+
         return {
-            "userLocation": {
-                "latitude": latitude,
-                "longitude": longitude
-            },
+            "userLocation": {"latitude": latitude, "longitude": longitude},
             "searchRadius": radius,
             "minConfirmations": min_confirmations,
-            "total": len(nearby_obstacles),
-            "obstacles": nearby_obstacles
+            "total": len(nearby),
+            "obstacles": nearby,
         }
     except HTTPException:
         raise
@@ -705,6 +689,7 @@ async def get_obstacles_along_road(request: Request):
         longitude = body.get("longitude")
         radius = body.get("radius", 5000)
         min_confirmations = body.get("min_confirmations", 3)
+        merge_radius_param = body.get("merge_radius", 50.0)
 
         if not latitude or not longitude:
             raise HTTPException(status_code=400, detail="latitude and longitude required")
@@ -790,6 +775,8 @@ async def get_obstacles_along_road(request: Request):
 
             if on_road:
                 on_road.sort(key=lambda x: x["road_distance"])
+                if merge_radius_param > 0:
+                    on_road = merge_nearby_obstacles(on_road, merge_radius_param)
                 return {
                     "mode": "road",
                     "road_name": road_info.get("name", ""),
@@ -800,7 +787,9 @@ async def get_obstacles_along_road(request: Request):
                     "total": len(on_road),
                 }
 
-        # Фолбэк: все препятствия с прямой дистанцией
+        if merge_radius_param > 0:
+            nearby = merge_nearby_obstacles(nearby, merge_radius_param)
+
         for obs in nearby:
             obs["road_distance"] = obs["distance"]
             obs["road_zone"] = _road_zone_fallback(obs["distance"])

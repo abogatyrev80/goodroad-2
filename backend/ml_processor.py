@@ -1039,3 +1039,104 @@ class WarningGenerator:
     
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         return calculate_distance(lat1, lon1, lat2, lon2)
+
+
+COMPATIBLE_OBSTACLE_GROUPS = [
+    {'pothole', 'bump'},
+    {'speed_bump'},
+    {'braking'},
+    {'vibration'},
+    {'wave'},
+]
+
+
+def _obstacle_types_compatible(t1: str, t2: str) -> bool:
+    for group in COMPATIBLE_OBSTACLE_GROUPS:
+        if t1 in group and t2 in group:
+            return True
+    return False
+
+
+def merge_nearby_obstacles(obstacles: list, merge_radius: float = 50.0) -> list:
+    """
+    Объединяет препятствия, находящиеся в радиусе merge_radius друг от друга
+    и имеющие совместимый тип. Уменьшает количество предупреждений в городе.
+    """
+    if len(obstacles) <= 1:
+        return obstacles
+
+    merged = []
+    used = set()
+
+    for i, a in enumerate(obstacles):
+        if i in used:
+            continue
+        group = [a]
+        used.add(i)
+
+        for j, b in enumerate(obstacles):
+            if j in used:
+                continue
+            if not _obstacle_types_compatible(a.get("type", ""), b.get("type", "")):
+                continue
+            dist = calculate_distance(
+                a["latitude"], a["longitude"],
+                b["latitude"], b["longitude"],
+            )
+            if dist <= merge_radius:
+                group.append(b)
+                used.add(j)
+
+        if len(group) == 1:
+            merged.append(a)
+        else:
+            type_counts = {}
+            total_weight = 0
+            wlat = 0.0
+            wlon = 0.0
+            max_sev = 0
+            max_conf = 0.0
+            max_reports = 0
+            min_dist = float("inf")
+            first_ts = None
+            last_ts = None
+
+            for o in group:
+                t = o.get("type", "unknown")
+                type_counts[t] = type_counts.get(t, 0) + 1
+                w = o.get("confirmations", 1)
+                total_weight += w
+                wlat += o["latitude"] * w
+                wlon += o["longitude"] * w
+                sev = o.get("severity", {}).get("max", 0)
+                if sev > max_sev:
+                    max_sev = sev
+                conf = o.get("confidence", 0)
+                if conf > max_conf:
+                    max_conf = conf
+                if o.get("confirmations", 0) > max_reports:
+                    max_reports = o["confirmations"]
+                d = o.get("distance", float("inf"))
+                if d < min_dist:
+                    min_dist = d
+                ts = o.get("lastReported", "")
+                if ts and (last_ts is None or ts > last_ts):
+                    last_ts = ts
+                if ts and (first_ts is None or ts < first_ts):
+                    first_ts = ts
+
+            dominant_type = max(type_counts, key=type_counts.get)
+            merged.append({
+                "id": f"merged_{len(merged)}",
+                "type": dominant_type,
+                "latitude": round(wlat / total_weight, 6),
+                "longitude": round(wlon / total_weight, 6),
+                "distance": round(min_dist, 1),
+                "severity": {"average": round(max_sev, 1), "max": max_sev},
+                "confidence": round(max_conf, 2),
+                "confirmations": max_reports,
+                "merged_count": len(group),
+                "lastReported": last_ts or "",
+            })
+
+    return merged
