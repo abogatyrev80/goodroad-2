@@ -254,6 +254,12 @@ export default function AudioSettingsScreen() {
             });
             await alertSettingsService.saveSettings({
               speedThresholdExcess: 20,
+              cityMode: 'auto',
+              citySpeedThreshold: 60,
+              cityMinDistance: 20,
+              cityMaxDistance: 200,
+              highwayMinDistance: 50,
+              highwayMaxDistance: 600,
               recommendedSpeeds: {
                 pothole: 40,
                 speed_bump: 20,
@@ -452,6 +458,98 @@ export default function AudioSettingsScreen() {
           <Text style={styles.sectionDescription}>
             Настройте когда будут срабатывать звуковые предупреждения
           </Text>
+
+          {/* Городской режим */}
+          <Text style={styles.subSectionTitle}>🌆 Городской / Трассовый режим</Text>
+          <Text style={styles.sliderDescription}>
+            В городе меньше скорость и больше препятствий — дальность оповещения снижается
+          </Text>
+
+          <View style={styles.themeButtonsWrap}>
+            <Pressable
+              style={[
+                styles.themeButton,
+                alertSettings.cityMode === 'auto' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateAlertSetting('cityMode', 'auto')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                alertSettings.cityMode === 'auto' && styles.themeButtonTextActive,
+              ]}>Авто</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.themeButton,
+                alertSettings.cityMode === 'always_on' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateAlertSetting('cityMode', 'always_on')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                alertSettings.cityMode === 'always_on' && styles.themeButtonTextActive,
+              ]}>Город</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.themeButton,
+                alertSettings.cityMode === 'always_off' && styles.themeButtonActive,
+              ]}
+              onPress={() => updateAlertSetting('cityMode', 'always_off')}
+            >
+              <Text style={[
+                styles.themeButtonText,
+                alertSettings.cityMode === 'always_off' && styles.themeButtonTextActive,
+              ]}>Трасса</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>Порог скорости для города:</Text>
+            <TextInput
+              style={styles.input}
+              value={String(alertSettings.citySpeedThreshold)}
+              onChangeText={(text) => updateAlertSetting('citySpeedThreshold', parseInt(text) || 60)}
+              keyboardType="number-pad"
+            />
+            <Text style={styles.inputUnit}>км/ч</Text>
+          </View>
+
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Город: {alertSettings.cityMinDistance}м — {alertSettings.cityMaxDistance}м
+            </Text>
+            <Text style={styles.sliderDescription}>Дальность оповещения в городе</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={10}
+              maximumValue={300}
+              step={10}
+              value={alertSettings.cityMaxDistance}
+              onValueChange={(value) => updateAlertSetting('cityMaxDistance', value)}
+              minimumTrackTintColor="#22c55e"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#22c55e"
+            />
+          </View>
+
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Трасса: {alertSettings.highwayMinDistance}м — {alertSettings.highwayMaxDistance}м
+            </Text>
+            <Text style={styles.sliderDescription}>Дальность оповещения на трассе</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={100}
+              maximumValue={1000}
+              step={50}
+              value={alertSettings.highwayMaxDistance}
+              onValueChange={(value) => updateAlertSetting('highwayMaxDistance', value)}
+              minimumTrackTintColor="#fbbf24"
+              maximumTrackTintColor="#3e3e3e"
+              thumbTintColor="#fbbf24"
+            />
+          </View>
 
           <View style={styles.inputRow}>
             <Text style={styles.inputLabel}>Порог превышения скорости:</Text>

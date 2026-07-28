@@ -204,10 +204,10 @@ export function useObstacleAlerts(
 
     try {
       const speed = currentSpeedRef.current;
-      const settings = dynamicAudioService.getSettings();
+      const alertDistances = alertSettingsService.getAlertDistances(speed);
       const displayDistance = currentObstacle.road_distance ?? currentObstacle.distance;
 
-      if (displayDistance < settings.minDistance || displayDistance > settings.maxDistance) {
+      if (displayDistance < alertDistances.minDistance || displayDistance > alertDistances.maxDistance) {
         isProcessingAlert.current = false;
         processAlertQueue();
         return;
@@ -246,16 +246,19 @@ export function useObstacleAlerts(
 
   // Проверка и постановка в очередь
   const checkForAlerts = async (obstacleList: Obstacle[]) => {
-    const settings = dynamicAudioService.getSettings();
     const speed = currentSpeedRef.current;
+    const alertDistances = alertSettingsService.getAlertDistances(speed);
 
     const sorted = [...obstacleList]
       .filter(o => {
         const d = o.road_distance ?? o.distance;
-        return d >= settings.minDistance && d <= settings.maxDistance;
+        return d >= alertDistances.minDistance && d <= alertDistances.maxDistance;
       })
       .filter(o => !lastAlertedObstacles.current.has(o.id))
       .sort((a, b) => {
+        const pa = alertSettingsService.getPriority(a.type);
+        const pb = alertSettingsService.getPriority(b.type);
+        if (pa !== pb) return pb - pa;
         const da = a.road_distance ?? a.distance;
         const db = b.road_distance ?? b.distance;
         return da - db;

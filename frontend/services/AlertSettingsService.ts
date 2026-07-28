@@ -6,6 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface AlertSettings {
   speedThresholdExcess: number;
+  cityMode: 'auto' | 'always_on' | 'always_off';
+  citySpeedThreshold: number;
+  cityMinDistance: number;
+  cityMaxDistance: number;
+  highwayMinDistance: number;
+  highwayMaxDistance: number;
   recommendedSpeeds: {
     pothole: number;
     speed_bump: number;
@@ -22,8 +28,22 @@ export interface AlertSettings {
   };
 }
 
+const PRIORITY: Record<string, number> = {
+  pothole: 5,
+  speed_bump: 4,
+  bump: 3,
+  braking: 2,
+  vibration: 1,
+};
+
 const DEFAULT_SETTINGS: AlertSettings = {
   speedThresholdExcess: 20,
+  cityMode: 'auto',
+  citySpeedThreshold: 60,
+  cityMinDistance: 20,
+  cityMaxDistance: 200,
+  highwayMinDistance: 50,
+  highwayMaxDistance: 600,
   recommendedSpeeds: {
     pothole: 40,
     speed_bump: 20,
@@ -97,6 +117,25 @@ class AlertSettingsService {
   getAlertText(obstacleType: string, distance: number): string {
     const baseText = this.settings.customTexts[obstacleType as keyof typeof this.settings.customTexts] || 'Препятствие через';
     return `${baseText} ${Math.round(distance)} метров`;
+  }
+
+  getPriority(obstacleType: string): number {
+    return PRIORITY[obstacleType] || 0;
+  }
+
+  isCityMode(currentSpeed: number): boolean {
+    const mode = this.settings.cityMode;
+    if (mode === 'always_on') return true;
+    if (mode === 'always_off') return false;
+    return currentSpeed < this.settings.citySpeedThreshold;
+  }
+
+  getAlertDistances(currentSpeed: number): { minDistance: number; maxDistance: number } {
+    const city = this.isCityMode(currentSpeed);
+    return {
+      minDistance: city ? this.settings.cityMinDistance : this.settings.highwayMinDistance,
+      maxDistance: city ? this.settings.cityMaxDistance : this.settings.highwayMaxDistance,
+    };
   }
 
   shouldUseVoice(alertLevel: 'silent' | 'visual' | 'voice' | 'full'): boolean {
