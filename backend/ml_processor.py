@@ -1098,8 +1098,13 @@ def merge_nearby_obstacles(obstacles: list, merge_radius: float = 50.0) -> list:
             max_conf = 0.0
             max_reports = 0
             min_dist = float("inf")
-            first_ts = None
             last_ts = None
+            best_priority = 0.0
+            best_speed = 0.0
+            road_id = None
+            road_position = 0.0
+            cross_track = 0.0
+            road_dist = None
 
             for o in group:
                 t = o.get("type", "unknown")
@@ -1108,6 +1113,7 @@ def merge_nearby_obstacles(obstacles: list, merge_radius: float = 50.0) -> list:
                 total_weight += w
                 wlat += o["latitude"] * w
                 wlon += o["longitude"] * w
+
                 sev = o.get("severity", {}).get("max", 0)
                 if sev > max_sev:
                     max_sev = sev
@@ -1122,11 +1128,23 @@ def merge_nearby_obstacles(obstacles: list, merge_radius: float = 50.0) -> list:
                 ts = o.get("lastReported", "")
                 if ts and (last_ts is None or ts > last_ts):
                     last_ts = ts
-                if ts and (first_ts is None or ts < first_ts):
-                    first_ts = ts
+
+                p = o.get("priority", 0)
+                if p > best_priority:
+                    best_priority = p
+                sp = o.get("avgSpeed", 0)
+                if sp > best_speed:
+                    best_speed = sp
+                if o.get("road_id"):
+                    road_id = o["road_id"]
+                    road_position = o.get("road_position", 0)
+                    cross_track = o.get("cross_track", 0)
+                rd = o.get("road_distance")
+                if rd is not None and (road_dist is None or rd < road_dist):
+                    road_dist = rd
 
             dominant_type = max(type_counts, key=type_counts.get)
-            merged.append({
+            result = {
                 "id": f"merged_{len(merged)}",
                 "type": dominant_type,
                 "latitude": round(wlat / total_weight, 6),
@@ -1135,8 +1153,18 @@ def merge_nearby_obstacles(obstacles: list, merge_radius: float = 50.0) -> list:
                 "severity": {"average": round(max_sev, 1), "max": max_sev},
                 "confidence": round(max_conf, 2),
                 "confirmations": max_reports,
+                "avgSpeed": round(best_speed, 1),
+                "priority": round(best_priority, 2),
                 "merged_count": len(group),
                 "lastReported": last_ts or "",
-            })
+            }
+            if road_id:
+                result["road_id"] = road_id
+                result["road_position"] = road_position
+                result["cross_track"] = cross_track
+            if road_dist is not None:
+                result["road_distance"] = round(road_dist, 1)
+
+            merged.append(result)
 
     return merged
