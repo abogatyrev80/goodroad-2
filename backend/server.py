@@ -2912,10 +2912,11 @@ async def llm_data_dataset_stats(collection: str = "processed_events"):
     cursor = _config.db[collection].aggregate(pipeline)
     labels = await cursor.to_list(length=20)
     pipeline2 = [
+        {"$addFields": {"accel_len": {"$cond": [{"$isArray": "$accelerometer_data"}, {"$size": "$accelerometer_data"}, 0]}}},
         {"$group": {"_id": None,
                      "total": {"$sum": 1},
                      "devices": {"$addToSet": "$device_id"},
-                     "avg_points": {"$avg": {"$size": "$accelerometer_data"}}}},
+                     "avg_points": {"$avg": "$accel_len"}}},
     ]
     cursor2 = _config.db[collection].aggregate(pipeline2)
     overview = await cursor2.to_list(length=1)
