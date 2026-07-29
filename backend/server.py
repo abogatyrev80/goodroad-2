@@ -2889,6 +2889,61 @@ async def llm_generate_report(req: ReportRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/llm/data/events")
+async def llm_data_events(
+    limit: int = Query(100, ge=1, le=1000),
+    collection: str = "processed_events"
+):
+    """Return raw events data without LLM processing (for browser-direct Ollama calls)"""
+    cursor = _config.db[collection].find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
+    samples = await cursor.to_list(length=limit)
+    return {"data": samples, "count": len(samples)}
+
+@api_router.get("/llm/data/dataset-stats")
+async def llm_data_dataset_stats(collection: str = "processed_events"):
+    """Return dataset statistics without LLM processing"""
+    pipeline = [
+        {"$group": {"_id": "$event_type", "count": {"$sum": 1},
+                     "avg_magnitude": {"$avg": "$acceleration_magnitude"},
+                     "min_magnitude": {"$min": "$acceleration_magnitude"},
+                     "max_magnitude": {"$max": "$acceleration_magnitude"}}},
+        {"$sort": {"count": -1}},
+    ]
+    cursor = _config.db[collection].aggregate(pipeline)
+    labels = await cursor.to_list(length=20)
+    pipeline2 = [
+        {"$group": {"_id": None,
+                     "total": {"$sum": 1},
+                     "devices": {"$addToSet": "$device_id"},
+                     "avg_points": {"$avg": {"$size": "$accelerometer_data"}}}},
+    ]
+    cursor2 = _config.db[collection].aggregate(pipeline2)
+    overview = await cursor2.to_list(length=1)
+    stats = overview[0] if overview else {}
+    return {
+        "label_distribution": labels,
+        "total_samples": stats.get("total", 0),
+        "unique_devices": len(stats.get("devices", [])),
+        "avg_points_per_sample": round(stats.get("avg_points", 0), 1),
+    }
+
+@api_router.get("/llm/data/clusters-summary")
+async def llm_data_clusters_summary():
+    """Return cluster summary without LLM processing"""
+    pipeline = [
+        {"$group": {
+            "_id": {"type": "$obstacle_type", "status": "$status", "severity_max": "$severity_max"},
+            "count": {"$sum": 1},
+            "location": {"$first": "$location"}
+        }}
+    ]
+    cursor = _config.db.obstacle_clusters.aggregate(pipeline)
+    clusters = await cursor.to_list(length=100)
+    for c in clusters:
+        c.pop("_id", None)
+    total = await _config.db.obstacle_clusters.count_documents({"status": "active"})
+    return {"total_active": total, "clusters": clusters, "count": len(clusters)}
+
 @api_router.get("/llm/health")
 async def llm_health():
     settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
