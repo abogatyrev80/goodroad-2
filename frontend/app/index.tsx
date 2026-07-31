@@ -34,6 +34,7 @@ import SimpleToast, { showToast } from '../components/SimpleToast';
 
 // Сервисы
 import RawDataCollector from '../services/RawDataCollector';
+import AdaptiveCollector from '../services/AdaptiveCollector';
 import BackgroundSensorService from '../services/BackgroundSensorService';
 import { clientLogService } from '../services/ClientLogService';
 import { backendConfigService } from '../services/BackendConfigService';
@@ -61,6 +62,7 @@ export default function HomeScreen() {
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const accelerometerSubscription = useRef<any>(null);
   const rawDataCollector = useRef<RawDataCollector | null>(null);
+  const adaptiveCollector = useRef<AdaptiveCollector | null>(null);
   const batterySubscription = useRef<any>(null);
   const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
   const bluetoothCheckInterval = useRef<NodeJS.Timeout | null>(null);
@@ -578,6 +580,20 @@ export default function HomeScreen() {
           }
         );
       }
+      // Адаптивный коллектор (маркерный сбор, пороги с сервера)
+      if (!adaptiveCollector.current) {
+        const deviceId = 'mobile-app-' + Date.now();
+        const backendUrl = backendConfigService.getActiveUrl();
+        adaptiveCollector.current = new AdaptiveCollector(backendUrl, deviceId, (hz: number) => {
+          // Пре-арм: повышаем частоту акселерометра у зон, baseline в остальное время
+          if (Platform.OS !== 'web') {
+            try {
+              Accelerometer.setUpdateInterval(1000 / hz);
+            } catch {}
+          }
+        });
+        void adaptiveCollector.current.loadConfig();
+      }
 
       // Загружаем настройки предупреждений
       await loadWarningSettings();
@@ -704,6 +720,7 @@ export default function HomeScreen() {
           setCurrentLocation(location);
           currentLocationRef.current = location;
           setCurrentSpeed((location.coords.speed || 0) * 3.6);
+          adaptiveCollector.current?.updateGps(location);
 
           const now = Date.now();
           gpsTrailRef.current.push({
@@ -718,56 +735,29 @@ export default function HomeScreen() {
       );
       locationSubscription.current = subscription;
 
-      // Запускаем акселерометр (10 Hz) — на web expo-sensors не поддерживается
+      // Запускаем акселерометр (10 Гц baseline) — на web expo-sensors не поддерживается.
+      // Данные идут в AdaptiveCollector: триггер вибрации, пре-арм у зон, фон.
       if (Platform.OS !== 'web') {
         try {
           Accelerometer.setUpdateInterval(100);
         } catch {}
         const accelSubscription = Accelerometer.addListener((data) => {
           if (!data) return;
-          try {
-            accelerometerBuffer.current.push({
-              x: data.x,
-              y: data.y,
-              z: data.z,
-              timestamp: Date.now()
-            });
-            if (accelerometerBuffer.current.length > 100) {
-              accelerometerBuffer.current.shift();
-            }
-          } catch {}
+          adaptiveCollector.current?.onAccel(
+            { x: data.x, y: data.y, z: data.z },
+            Date.now()
+          );
         });
         accelerometerSubscription.current = accelSubscription;
       }
 
-      // 🆕 Интервал для сбора и отправки синхронизированных пакетов данных
-      const collectSyncedPacket = () => {
-        try {
-          if (currentLocationRef.current && rawDataCollector.current) {
-            const accelerometerSnapshot = [...accelerometerBuffer.current];
-            accelerometerBuffer.current = [];
-            const syncedPacket = {
-              timestamp: Date.now(),
-              gps: currentLocationRef.current,
-              accelerometerData: accelerometerSnapshot
-            };
-            syncedDataBuffer.current.push(syncedPacket);
-            if (syncedDataBuffer.current.length >= 5) {
-              syncedDataBuffer.current.forEach(packet => {
-                rawDataCollector.current?.addDataPoint(
-                  packet.gps,
-                  packet.accelerometerData,
-                  packet.timestamp
-                ).catch(() => {});
-              });
-              syncedDataBuffer.current = [];
-            }
-          }
-        } catch {}
-        dataCollectionInterval.current = setTimeout(collectSyncedPacket, 1000);
-      };
-      
-      dataCollectionInterval.current = setTimeout(collectSyncedPacket, 2000);
+      // Адаптивный сбор: фон (1 т/мин), зоны пре-арма, очередь офлайна
+      if (adaptiveCollector.current) {
+        adaptiveCollector.current.startBackgroundSampling();
+        void adaptiveCollector.current.refreshZones(true);
+        adaptiveCollector.current.startZoneRefresher();
+        void adaptiveCollector.current.flushOfflineQueue();
+      }
 
       setIsTracking(true);
       isTrackingRef.current = true;
@@ -829,6 +819,13 @@ export default function HomeScreen() {
         await rawDataCollector.current?.forceSend();
       } catch (e) {
         console.warn('forceSend при остановке:', e);
+      }
+      // Адаптивный коллектор: останавливаем фоновый сбор и сбрасываем офлайн-очередь
+      adaptiveCollector.current?.stop();
+      try {
+        await adaptiveCollector.current?.flushOfflineQueue();
+      } catch (e) {
+        console.warn('flushOfflineQueue при остановке:', e);
       }
 
       await AsyncStorage.removeItem('is_tracking_active');

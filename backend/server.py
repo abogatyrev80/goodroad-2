@@ -29,6 +29,10 @@ from services.geo import (
     validate_gps_coords, calculate_distance,
 )
 from ml_processor import merge_nearby_obstacles
+from collector_config import (
+    get_collector_config, save_collector_config,
+    load_ml_thresholds, save_ml_thresholds,
+)
 from dataset_exporter import DatasetExporter
 from model_registry import ModelRegistry
 from external_training_api import external_training_router, init_external_training
@@ -70,6 +74,11 @@ async def startup_event():
 
         from config import db as _db
         if _db is not None:
+            saved_thresholds = await load_ml_thresholds(_db)
+            if saved_thresholds:
+                event_classifier.update_thresholds(saved_thresholds)
+                logger.info("ML thresholds loaded from DB: %s", list(saved_thresholds.keys()))
+
             dataset_exporter = DatasetExporter(_db)
             model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
             init_external_training(_db, dataset_exporter, model_registry)
@@ -188,16 +197,25 @@ async def ingest_raw_data(request: Request):
         if not device_id or not data_points:
             raise HTTPException(status_code=400, detail="deviceId and data array required")
         
+        if not check_rate_limit(device_id):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        
         inserted = 0
         for point in data_points:
             doc = {
                 "deviceId": device_id,
+                "kind": point.get("kind", "legacy"),
                 "timestamp": point.get("timestamp", int(datetime.utcnow().timestamp() * 1000)),
                 "gps": point.get("gps"),
                 "accelerometer": point.get("accelerometer"),
                 "userReported": point.get("userReported", False),
                 "eventType": point.get("eventType"),
                 "severity": point.get("severity"),
+                "duration_ms": point.get("duration_ms"),
+                "capture_frequency_hz": point.get("capture_frequency_hz"),
+                "zone_id": point.get("zone_id"),
+                "max_magnitude": point.get("max_magnitude"),
+                "created_at": datetime.utcnow(),
                 "receivedAt": datetime.utcnow(),
             }
             await _config.db.raw_sensor_data.insert_one(doc)
@@ -209,6 +227,70 @@ async def ingest_raw_data(request: Request):
     except Exception as e:
         logger.error(f"Error ingesting raw data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/raw-events")
+async def ingest_raw_events(request: Request):
+    """Приём маркерных событий с мобильных устройств (адаптивный сбор данных).
+
+    kinds:
+        background   — редкий фоновый сэмпл (GPS+скорость, без акселерометра)
+        trigger      — окно захваченное по триггеру вибрации (±2с, 50 Гц)
+        prearm       — окно захваченное при приближении к зоне интереса
+        user_report  — ручное сообщение пользователя
+    """
+    try:
+        body = await request.json()
+        device_id = body.get("deviceId")
+        events = body.get("events") or body.get("data") or []
+        if not device_id:
+            raise HTTPException(status_code=400, detail="deviceId required")
+        if not events:
+            raise HTTPException(status_code=400, detail="events array required")
+        if not isinstance(events, list):
+            raise HTTPException(status_code=400, detail="events must be an array")
+
+        if not check_rate_limit(device_id):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+        now = datetime.utcnow()
+        inserted = 0
+        for ev in events:
+            doc = {
+                "deviceId": device_id,
+                "kind": ev.get("kind", "trigger"),
+                "timestamp": ev.get("timestamp", int(now.timestamp() * 1000)),
+                "gps": ev.get("gps"),
+                "accelerometer": ev.get("accelerometer") or [],
+                "userReported": ev.get("userReported", False),
+                "eventType": ev.get("eventType"),
+                "severity": ev.get("severity"),
+                "duration_ms": ev.get("duration_ms"),
+                "capture_frequency_hz": ev.get("capture_frequency_hz"),
+                "zone_id": ev.get("zone_id"),
+                "max_magnitude": ev.get("max_magnitude"),
+                "trigger_magnitude": ev.get("trigger_magnitude"),
+                "speed_kmh": ev.get("speed_kmh"),
+                "created_at": now,
+                "receivedAt": now,
+            }
+            await _config.db.raw_sensor_data.insert_one(doc)
+            inserted += 1
+
+        config = await get_collector_config(_config.db)
+        return {"status": "ok", "inserted": inserted, "collectorConfig": config}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ingesting raw events: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/collection-config")
+async def get_collection_config_public():
+    """Публичная конфигурация адаптивного сбора данных (для устройств и агентов)"""
+    config = await get_collector_config(_config.db)
+    return {"config": config}
 
 # ==============================================================================
 # НОВАЯ АРХИТЕКТУРА: Избыточный сбор данных + серверная классификация
@@ -482,7 +564,7 @@ async def cleanup_old_data(
         
         if delete_raw_data:
             raw_result = await _config.db.raw_sensor_data.delete_many({
-                "created_at": {"$lt": cutoff_date}
+                "receivedAt": {"$lt": cutoff_date}
             })
             results["deleted_raw_data"] = raw_result.deleted_count
             logger.info("Удалено сырых данных: %d", raw_result.deleted_count)
@@ -1073,6 +1155,9 @@ class MLThresholdsUpdate(BaseModel):
     braking: Optional[Dict[str, float]] = None
     bump: Optional[Dict[str, float]] = None
     vibration: Optional[Dict[str, float]] = None
+    speed_bump: Optional[Dict[str, float]] = None
+    severity_levels: Optional[Dict[str, float]] = None
+    baseline: Optional[Dict[str, float]] = None
 
 # API для управления порогами ML
 @api_router.get("/admin/v2/ml-thresholds")
@@ -1086,7 +1171,9 @@ async def get_ml_thresholds():
                 "pothole": "Порог для обнаружения ям (deltaY, deltaZ, magnitude)",
                 "braking": "Порог для обнаружения резкого торможения (deltaY, magnitude)",
                 "bump": "Порог для обнаружения неровностей (deltaZ, magnitude)",
-                "vibration": "Порог для обнаружения вибраций (variance, magnitude)"
+                "speed_bump": "Порог для лежачих полицейских (deltaZ, deltaY, magnitude, max_speed)",
+                "vibration": "Порог для обнаружения вибраций (variance, magnitude)",
+                "severity_levels": "Уровни серьёзности (critical, high, medium, low)"
             }
         }
     except Exception as e:
@@ -1094,27 +1181,117 @@ async def get_ml_thresholds():
 
 @api_router.post("/admin/v2/ml-thresholds")
 async def update_ml_thresholds(update: MLThresholdsUpdate):
-    """Обновить пороги ML классификатора"""
+    """Обновить пороги ML классификатора (сохраняются в MongoDB)"""
     try:
-        # Подготовка данных для обновления
         new_thresholds = {}
-        if update.pothole:
-            new_thresholds['pothole'] = update.pothole
-        if update.braking:
-            new_thresholds['braking'] = update.braking
-        if update.bump:
-            new_thresholds['bump'] = update.bump
-        if update.vibration:
-            new_thresholds['vibration'] = update.vibration
-        
-        # Обновляем пороги
+        for key in ("pothole", "braking", "bump", "vibration", "speed_bump", "severity_levels", "baseline"):
+            value = getattr(update, key, None)
+            if value:
+                new_thresholds[key] = value
+
         event_classifier.update_thresholds(new_thresholds)
-        
+        await save_ml_thresholds(_config.db, event_classifier.get_thresholds())
+
         return {
             "message": "Пороги успешно обновлены",
             "updated_thresholds": new_thresholds,
             "current_thresholds": event_classifier.get_thresholds()
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class CollectorConfigUpdate(BaseModel):
+    """Модель обновления конфигурации адаптивного сбора"""
+    enabled: Optional[bool] = None
+    trigger: Optional[Dict[str, float]] = None
+    prearm: Optional[Dict[str, float]] = None
+    background: Optional[Dict[str, float]] = None
+
+
+@api_router.get("/admin/v2/collection-config")
+async def get_admin_collection_config():
+    """Конфигурация адаптивного сбора данных (админ)"""
+    config = await get_collector_config(_config.db)
+    return {"config": config}
+
+
+@api_router.post("/admin/v2/collection-config")
+async def update_admin_collection_config(update: CollectorConfigUpdate):
+    """Обновить конфигурацию адаптивного сбора данных (админ)"""
+    try:
+        current = await get_collector_config(_config.db)
+        patch = {k: v for k, v in update.model_dump().items() if v is not None}
+        for key, value in patch.items():
+            if isinstance(value, dict) and isinstance(current.get(key), dict):
+                current[key].update(value)
+            else:
+                current[key] = value
+        saved = await save_collector_config(_config.db, current)
+        return {"message": "Конфигурация обновлена", "config": saved}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API для агентов (нейросети, аналитика) — чтение и адаптация конфигурации
+@api_router.get("/agent/config")
+async def get_agent_config():
+    """Полная конфигурация для агентов: ML пороги + настройки сбора + статистика"""
+    try:
+        thresholds = event_classifier.get_thresholds()
+        config = await get_collector_config(_config.db)
+
+        event_stats = await _config.db.processed_events.aggregate([
+            {"$group": {"_id": "$eventType", "count": {"$sum": 1}}}
+        ]).to_list(100)
+        raw_stats = await _config.db.raw_sensor_data.aggregate([
+            {"$group": {"_id": "$kind", "count": {"$sum": 1}}}
+        ]).to_list(100)
+
+        return {
+            "thresholds": thresholds,
+            "collectorConfig": config,
+            "stats": {
+                "processed_events": {s["_id"]: s["count"] for s in event_stats},
+                "raw_by_kind": {s["_id"]: s["count"] for s in raw_stats},
+            },
+            "updatedAt": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/agent/thresholds")
+async def agent_update_thresholds(update: MLThresholdsUpdate):
+    """Агент предлагает новые пороги классификации"""
+    try:
+        new_thresholds = {}
+        for key in ("pothole", "braking", "bump", "vibration", "speed_bump", "severity_levels", "baseline"):
+            value = getattr(update, key, None)
+            if value:
+                new_thresholds[key] = value
+
+        event_classifier.update_thresholds(new_thresholds)
+        await save_ml_thresholds(_config.db, event_classifier.get_thresholds())
+        return {
+            "applied": True,
+            "current_thresholds": event_classifier.get_thresholds()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AgentCollectorUpdate(BaseModel):
+    """Агент предлагает настройки сбора данных"""
+    config: Dict = {}
+
+
+@api_router.post("/agent/collection-config")
+async def agent_update_collector_config(update: AgentCollectorUpdate):
+    """Агент предлагает конфигурацию сбора данных (адаптация)"""
+    try:
+        saved = await save_collector_config(_config.db, update.config)
+        return {"applied": True, "config": saved}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

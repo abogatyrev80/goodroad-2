@@ -331,7 +331,13 @@ class EventClassifier:
         if event:
             event['device_id'] = device_id
             event['sample_count'] = len(accelerometer_data)
-            event['duration_ms'] = accelerometer_data[-1]['timestamp'] - accelerometer_data[0]['timestamp']
+            try:
+                t0 = accelerometer_data[0].get('timestamp')
+                t1 = accelerometer_data[-1].get('timestamp')
+                if t0 is not None and t1 is not None:
+                    event['duration_ms'] = t1 - t0
+            except Exception:
+                pass
         
         return event
 

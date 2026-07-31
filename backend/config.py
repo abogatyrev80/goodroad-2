@@ -127,6 +127,13 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
                 logger.warning("Could not create indexes (may already exist): %s", e)
 
             try:
+                await db.raw_sensor_data.create_index([("receivedAt", 1)], expireAfterSeconds=30 * 24 * 3600)
+                await db.raw_sensor_data.create_index([("kind", 1)])
+                logger.info("Created TTL index for raw_sensor_data (30 days)")
+            except Exception as e:
+                logger.warning("Could not create raw_sensor_data TTL index: %s", e)
+
+            try:
                 await db.gpu_machines.create_index([("machine_id", 1)], unique=True)
                 await db.gpu_commands.create_index([("machine_id", 1), ("status", 1)])
                 await db.gpu_commands.create_index([("command_id", 1)], unique=True)

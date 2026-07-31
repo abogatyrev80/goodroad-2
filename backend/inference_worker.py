@@ -155,6 +155,7 @@ class InferenceWorker:
     async def _process_single(self, doc: Dict) -> tuple:
         device_id = doc.get('deviceId', 'unknown')
         timestamp = doc.get('timestamp', datetime.utcnow())
+        kind = doc.get('kind', 'legacy')
 
         gps = doc.get('gps', {}) or {}
         if isinstance(gps, dict):
@@ -174,28 +175,55 @@ class InferenceWorker:
                 'z': doc.get('accelerometer_z', 0),
             }]
 
+        self._stats['total_processed'] += 1
+
+        # Фоновые сэмплы (kind=background) — только статистика, без классификации
+        if kind == 'background':
+            log_doc = {
+                "timestamp": datetime.utcnow(),
+                "device_id": device_id,
+                "kind": kind,
+                "input_samples": len(accel_array),
+                "processing_time_ms": 0.0,
+                "detection_method": "background",
+                "result_event_type": None,
+                "result_confidence": 0.0,
+                "result_severity": 5,
+                "latitude": latitude,
+                "longitude": longitude,
+                "speed": speed,
+            }
+            await self.db.inference_logs.insert_one(log_doc)
+            return (None, 'background')
+
         inference_start = time.monotonic()
         detected_event = None
 
-        for pt in accel_array:
-            if not isinstance(pt, dict):
-                continue
-            ax = pt.get('x', 0)
-            ay = pt.get('y', 0)
-            az = pt.get('z', 0)
-            ev = self.event_classifier.analyze_data_point(
+        # Оконная классификация (триггер/пре-арм окна) — анализирует весь массив
+        if isinstance(accel_array, list) and len(accel_array) >= 3:
+            detected_event = self.event_classifier.analyze_accelerometer_array(
                 device_id=device_id,
-                accel_x=ax,
-                accel_y=ay,
-                accel_z=az,
+                accelerometer_data=accel_array,
                 speed=speed
             )
-            if ev and ev.get('eventType'):
-                detected_event = ev
+        else:
+            for pt in accel_array:
+                if not isinstance(pt, dict):
+                    continue
+                ax = pt.get('x', 0)
+                ay = pt.get('y', 0)
+                az = pt.get('z', 0)
+                ev = self.event_classifier.analyze_data_point(
+                    device_id=device_id,
+                    accel_x=ax,
+                    accel_y=ay,
+                    accel_z=az,
+                    speed=speed
+                )
+                if ev and ev.get('eventType'):
+                    detected_event = ev
 
         inference_ms = (time.monotonic() - inference_start) * 1000
-
-        self._stats['total_processed'] += 1
 
         detection_method = 'heuristic'
         event_type = None
@@ -250,6 +278,11 @@ class InferenceWorker:
                 "roadType": detected_event.get('roadType', 'unknown'),
                 "clusterId": cluster_id,
                 "detection_method": detection_method,
+                "kind": kind,
+                "sample_count": detected_event.get('sample_count', len(accel_array)),
+                "duration_ms": detected_event.get('duration_ms'),
+                "zone_id": doc.get('zone_id'),
+                "max_magnitude": doc.get('max_magnitude'),
                 "created_at": datetime.utcnow()
             }
             await self.db.processed_events.insert_one(processed_event)
@@ -257,6 +290,7 @@ class InferenceWorker:
         log_doc = {
             "timestamp": datetime.utcnow(),
             "device_id": device_id,
+            "kind": kind,
             "input_samples": len(accel_array) if isinstance(accel_array, list) else 1,
             "processing_time_ms": round(inference_ms, 2),
             "detection_method": detection_method,
