@@ -31,7 +31,7 @@ Generate a professional road condition report including:
 
 Write in Russian. Format as a structured report with clear sections.
 Keep it concise (300-500 words)."""
-    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.4, max_tokens=1024, tag="report")
+    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.4, max_tokens=8192, tag="report")
 
 
 async def generate_road_report_json(clusters: list, events: list = None,

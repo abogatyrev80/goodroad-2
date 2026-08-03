@@ -52,7 +52,7 @@ async def _track(tag: str, model: str, url: str, success: bool,
 
 
 async def generate(prompt: str, system: str = "", temperature: float = 0.3,
-                   max_tokens: int = 2048, model: str = None,
+                   max_tokens: int = 8192, model: str = None,
                    ollama_url: str = None, tag: str = "generate") -> Optional[str]:
     model = model or OLLAMA_MODEL
     url = ollama_url or OLLAMA_URL
@@ -63,6 +63,7 @@ async def generate(prompt: str, system: str = "", temperature: float = 0.3,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,
+            "think": False,
         },
     }
     if system:
