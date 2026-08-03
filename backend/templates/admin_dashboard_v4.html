@@ -1846,7 +1846,12 @@ async function llmLoadOverview() {
   const statusEl = document.getElementById('llm-ov-status');
   if (st.ollama_available === true) { statusEl.textContent = 'Online'; statusEl.style.color = '#22c55e'; }
   else if (st.ollama_available === false) { statusEl.textContent = 'Offline'; statusEl.style.color = '#ef4444'; }
-  else { statusEl.textContent = 'Unknown'; statusEl.style.color = '#f59e0b'; }
+  else {
+    statusEl.textContent = 'Unknown'; statusEl.style.color = '#f59e0b';
+    fetch('/api/llm/health').then(r => r.json()).then(h => {
+      if (h && h.ollama_available != null) llmLoadOverview();
+    }).catch(_ => {});
+  }
   document.getElementById('llm-ov-status-sub').textContent = (st.configured_url || '—') + ' · ' + (st.configured_model || '');
   document.getElementById('llm-ov-total').textContent = s.total || 0;
   document.getElementById('llm-ov-24h').textContent = 'за 24ч: ' + (s.last_24h || 0);
