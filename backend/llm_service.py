@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 import logging
 import time
 from collections import deque
@@ -70,7 +71,7 @@ async def generate(prompt: str, system: str = "", temperature: float = 0.3,
     body = {
         "model": model,
         "prompt": prompt,
-        "stream": False,
+        "stream": True,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,
@@ -83,16 +84,28 @@ async def generate(prompt: str, system: str = "", temperature: float = 0.3,
     error = ""
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                resp = await client.post(f"{url}/api/generate", json=body)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    content = data.get("response", "")
+            async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300,
+                                                               write=30, pool=10)) as client:
+                async with client.stream("POST", f"{url}/api/generate", json=body) as resp:
+                    if resp.status_code != 200:
+                        error = f"HTTP {resp.status_code}"
+                        logger.warning("Ollama error: %d", resp.status_code)
+                        break
+                    parts = []
+                    async for line in resp.aiter_lines():
+                        if not line.strip():
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                        except Exception:
+                            continue
+                        parts.append(chunk.get("response", ""))
+                        if chunk.get("done"):
+                            break
+                    content = "".join(parts)
                     await _track(tag, model, url, True, int((time.monotonic() - start) * 1000),
                                  len(prompt), len(content))
                     return content
-                error = f"HTTP {resp.status_code}"
-                logger.warning("Ollama error: %d %s", resp.status_code, resp.text[:200])
         except httpx.ConnectError:
             error = "connect_error"
             logger.warning("Ollama not reachable at %s (attempt %d/3)", url, attempt + 1)
