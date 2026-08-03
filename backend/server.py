@@ -83,8 +83,14 @@ async def startup_event():
             model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
             init_external_training(_db, dataset_exporter, model_registry)
             init_gpu_machines(_db)
-            from llm_service import init_llm_tracker
+            from llm_service import init_llm_tracker, set_runtime_defaults
             init_llm_tracker(_db)
+            try:
+                s = await _db.llm_settings.find_one({"_id": "ollama"})
+                if s:
+                    set_runtime_defaults(s.get("url"), s.get("model"))
+            except Exception as e:
+                logger.warning("Could not load LLM settings at startup: %s", e)
             try:
                 await _db.llm_requests.create_index([("ts", -1)])
                 await _db.llm_requests.create_index([("tag", 1)])
@@ -3149,7 +3155,8 @@ async def llm_health():
     settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
     url = (settings or {}).get("url", "")
     model = (settings or {}).get("model", "")
-    from llm_service import generate
+    from llm_service import generate, set_runtime_defaults
+    set_runtime_defaults(url, model)
     result = await generate("Say OK", system="Reply with one word: OK", max_tokens=5,
                             ollama_url=url, model=model, tag="health")
     _last_llm_health = {"ollama_available": result is not None, "response": result,
@@ -3181,6 +3188,8 @@ async def llm_update_settings(body: dict):
         {"$set": {"url": url, "model": model, "updated_at": datetime.utcnow()}},
         upsert=True,
     )
+    from llm_service import set_runtime_defaults
+    set_runtime_defaults(url, model)
     return {"status": "saved", "url": url, "model": model}
 
 

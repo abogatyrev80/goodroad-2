@@ -15,11 +15,21 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwopus3.5-tools")
 
 _tracker_db = None
 _recent_requests: deque = deque(maxlen=200)
+_runtime_url = None
+_runtime_model = None
 
 
 def init_llm_tracker(db=None):
     global _tracker_db
     _tracker_db = db
+
+
+def set_runtime_defaults(url: str = None, model: str = None):
+    global _runtime_url, _runtime_model
+    if url:
+        _runtime_url = url
+    if model:
+        _runtime_model = model
 
 
 def get_tracker_db():
@@ -55,8 +65,8 @@ async def _track(tag: str, model: str, url: str, success: bool,
 async def generate(prompt: str, system: str = "", temperature: float = 0.3,
                    max_tokens: int = 8192, model: str = None,
                    ollama_url: str = None, tag: str = "generate") -> Optional[str]:
-    model = model or OLLAMA_MODEL
-    url = ollama_url or OLLAMA_URL
+    model = model or _runtime_model or OLLAMA_MODEL
+    url = ollama_url or _runtime_url or OLLAMA_URL
     body = {
         "model": model,
         "prompt": prompt,
