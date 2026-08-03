@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 import time
@@ -70,23 +71,25 @@ async def generate(prompt: str, system: str = "", temperature: float = 0.3,
         body["system"] = system
     start = time.monotonic()
     error = ""
-    try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(f"{url}/api/generate", json=body)
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data.get("response", "")
-                await _track(tag, model, url, True, int((time.monotonic() - start) * 1000),
-                             len(prompt), len(content))
-                return content
-            error = f"HTTP {resp.status_code}"
-            logger.warning("Ollama error: %d %s", resp.status_code, resp.text[:200])
-    except httpx.ConnectError:
-        error = "connect_error"
-        logger.warning("Ollama not reachable at %s", url)
-    except Exception as e:
-        error = str(e)
-        logger.warning("Ollama request failed: %s", e)
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                resp = await client.post(f"{url}/api/generate", json=body)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    content = data.get("response", "")
+                    await _track(tag, model, url, True, int((time.monotonic() - start) * 1000),
+                                 len(prompt), len(content))
+                    return content
+                error = f"HTTP {resp.status_code}"
+                logger.warning("Ollama error: %d %s", resp.status_code, resp.text[:200])
+        except httpx.ConnectError:
+            error = "connect_error"
+            logger.warning("Ollama not reachable at %s (attempt %d/3)", url, attempt + 1)
+        except Exception as e:
+            error = str(e)
+            logger.warning("Ollama request failed: %s (attempt %d/3)", e, attempt + 1)
+        await asyncio.sleep(2 * (attempt + 1))
     await _track(tag, model, url, False, int((time.monotonic() - start) * 1000),
                  len(prompt), 0, error)
     return None
