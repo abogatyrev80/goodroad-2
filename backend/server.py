@@ -39,6 +39,7 @@ from external_training_api import external_training_router, init_external_traini
 from inference_worker import InferenceWorker
 from auto_trainer import AutoTrainer
 from nn_admin_api import nn_admin_router, init_nn_admin
+from llm_tasks import start as llm_task_start, get as llm_task_get
 
 logger = logging.getLogger(__name__)
 
@@ -3007,8 +3008,8 @@ class ReportRequest(BaseModel):
 
 @api_router.post("/llm/analyze-quality")
 async def llm_analyze_quality(req: DataQualityRequest):
-    try:
-        from llm_data_quality import analyze_batch, analyze_dataset_overview
+    async def run():
+        from llm_data_quality import analyze_batch
         cursor = _config.db[req.collection].find().sort("timestamp", -1).limit(req.limit)
         samples = await cursor.to_list(length=req.limit)
         for s in samples:
@@ -3017,53 +3018,41 @@ async def llm_analyze_quality(req: DataQualityRequest):
         if not result:
             raise HTTPException(status_code=503, detail="Ollama not available")
         return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"task_id": llm_task_start(run())}
 
 @api_router.post("/llm/analyze-dataset")
 async def llm_analyze_dataset(req: DataQualityRequest):
-    try:
+    async def run():
         from llm_data_quality import analyze_dataset_overview
         result = await analyze_dataset_overview(_config.db, db_name, req.collection)
         if not result:
             raise HTTPException(status_code=503, detail="Ollama not available")
         return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"task_id": llm_task_start(run())}
 
 @api_router.post("/llm/generate-synthetic")
 async def llm_generate_synthetic(req: SyntheticRequest):
-    try:
+    async def run():
         from llm_synthetic import generate_samples
         samples = await generate_samples(req.label, count=req.count, window_size=req.window_size)
         if not samples:
             raise HTTPException(status_code=503, detail="Ollama not available")
         return {"samples": samples, "count": len(samples)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"task_id": llm_task_start(run())}
 
 @api_router.post("/llm/classify")
 async def llm_classify(req: ClassifyRequest):
-    try:
+    async def run():
         from llm_classifier import classify_batch
         result = await classify_batch(req.samples)
         if not result:
             raise HTTPException(status_code=503, detail="Ollama not available")
         return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"task_id": llm_task_start(run())}
 
 @api_router.post("/llm/generate-report")
 async def llm_generate_report(req: ReportRequest):
-    try:
+    async def run():
         from llm_reports import generate_road_report, generate_road_report_json
         pipeline = [
             {"$group": {
@@ -3087,8 +3076,14 @@ async def llm_generate_report(req: ReportRequest):
         except Exception as e:
             logger.warning("Could not save LLM report: %s", e)
         return {"text": report_text, "data": report_json}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"task_id": llm_task_start(run())}
+
+@api_router.get("/llm/tasks/{task_id}")
+async def llm_task_status(task_id: str):
+    result = llm_task_get(task_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return result
 
 @api_router.get("/llm/data/events")
 async def llm_data_events(
