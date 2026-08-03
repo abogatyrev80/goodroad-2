@@ -567,6 +567,56 @@ tr:hover{background:#1e293b}
     <div id="llm-settings-status" style="margin-top:8px;font-size:12px;color:#94a3b8"></div>
   </div>
 
+  <div class="card" style="margin-bottom:16px;background:#1a1a2e;border:1px solid #334155">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">📈 LLM Overview</h3>
+      <button class="btn btn-outline" onclick="llmLoadOverview()">Refresh</button>
+    </div>
+    <div class="grid grid-4" style="margin-bottom:12px">
+      <div>
+        <div style="font-size:11px;color:#94a3b8">Model Status</div>
+        <div id="llm-ov-status" style="font-size:18px;font-weight:600">—</div>
+        <div style="font-size:11px;color:#64748b;word-break:break-all" id="llm-ov-status-sub">серверная сторона</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#94a3b8">Requests</div>
+        <div id="llm-ov-total" style="font-size:18px;font-weight:600">—</div>
+        <div style="font-size:11px;color:#64748b" id="llm-ov-24h"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#94a3b8">Success Rate</div>
+        <div id="llm-ov-rate" style="font-size:18px;font-weight:600">—</div>
+        <div style="font-size:11px;color:#64748b" id="llm-ov-errors"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#94a3b8">Avg Latency</div>
+        <div id="llm-ov-latency" style="font-size:18px;font-weight:600">—</div>
+        <div style="font-size:11px;color:#64748b">по последним запросам</div>
+      </div>
+    </div>
+    <div class="grid grid-2">
+      <div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Requests — 14 days</div>
+        <div style="height:140px"><canvas id="llm-chart-requests"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">By Task Type</div>
+        <div id="llm-ov-by-tag" style="font-size:13px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Recent Reports</h3>
+      <div id="llm-ov-reports" style="max-height:320px;overflow-y:auto;font-size:12px;color:#94a3b8">—</div>
+    </div>
+    <div class="card">
+      <h3>Recent Requests</h3>
+      <div id="llm-ov-requests" style="max-height:320px;overflow-y:auto;font-size:12px;color:#94a3b8">—</div>
+    </div>
+  </div>
+
   <div class="grid grid-2">
     <div class="card">
       <h3>Data Quality Analysis</h3>
@@ -1697,6 +1747,7 @@ function switchTab(tab) {
   if (tab === 'llm') {
     setTimeout(() => llmCheckHealth(), 100);
     setTimeout(() => llmLoadSettings(), 200);
+    setTimeout(() => llmLoadOverview(), 300);
   }
   if (tab === 'gpu') {
     setTimeout(() => loadGPUMachines(), 100);
@@ -1768,6 +1819,67 @@ async function llmCallOllamaJSON(prompt, system, temperature=0.3) {
     try { return JSON.parse(raw.slice(startA, endA)); } catch(_) {}
   }
   throw new Error('Failed to parse JSON from Ollama response');
+}
+
+const TAG_NAMES = {classify:'Классификация', quality:'Качество данных', report:'Отчёты', synthetic:'Синтетика', health:'Health', generate:'Прочее'};
+
+async function llmLoadOverview() {
+  const data = await fetchJSON('/api/llm/overview');
+  if (!data) return;
+  const st = data.status || {};
+  const s = data.stats || {};
+  const statusEl = document.getElementById('llm-ov-status');
+  if (st.ollama_available === true) { statusEl.textContent = 'Online'; statusEl.style.color = '#22c55e'; }
+  else if (st.ollama_available === false) { statusEl.textContent = 'Offline'; statusEl.style.color = '#ef4444'; }
+  else { statusEl.textContent = 'Unknown'; statusEl.style.color = '#f59e0b'; }
+  document.getElementById('llm-ov-status-sub').textContent = (st.configured_url || '—') + ' · ' + (st.configured_model || '');
+  document.getElementById('llm-ov-total').textContent = s.total || 0;
+  document.getElementById('llm-ov-24h').textContent = 'за 24ч: ' + (s.last_24h || 0);
+  document.getElementById('llm-ov-rate').textContent = (s.success_rate ?? '—') + '%';
+  const errEl = document.getElementById('llm-ov-errors');
+  errEl.textContent = 'ошибок: ' + (s.failed || 0);
+  errEl.style.color = s.failed ? '#ef4444' : '#64748b';
+  document.getElementById('llm-ov-latency').textContent = s.avg_duration_ms ? s.avg_duration_ms + ' ms' : '—';
+  if (s.reports_total != null) document.getElementById('llm-reports-count').textContent = s.reports_total;
+  const tags = s.by_tag || {};
+  const maxTag = Math.max(1, ...Object.values(tags));
+  document.getElementById('llm-ov-by-tag').innerHTML = Object.entries(tags).map(([k,v]) => {
+    const w = Math.round(100*v/maxTag);
+    return '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>' + (TAG_NAMES[k]||k) + '</span><span style="color:#94a3b8">' + v + '</span></div>' +
+      '<div style="background:#1e293b;border-radius:3px;height:6px;margin-bottom:8px"><div style="width:' + w + '%;background:#3b82f6;height:6px;border-radius:3px"></div></div>';
+  }).join('') || '—';
+  const daily = s.daily || [];
+  makeChart('llm-chart-requests', {
+    type: 'bar',
+    data: { labels: daily.map(d=>d.date.slice(5)), datasets: [{ label: 'Requests', data: daily.map(d=>d.requests),
+      backgroundColor: daily.map(d=> d.success===d.requests ? '#22c55e' : '#f59e0b') }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color:'#64748b', font:{size:10} } }, y: { beginAtZero: true, ticks: { color:'#64748b' } } } }
+  });
+  const reports = data.reports || [];
+  document.getElementById('llm-ov-reports').innerHTML = reports.length ? reports.map((r,i) =>
+    '<div style="margin-bottom:8px;padding:8px;background:#1e293b;border-radius:4px">' +
+      '<div style="display:flex;justify-content:space-between;color:#cbd5e1"><span>' + (r.region || 'All regions') + ' · ' + (r.cluster_count||0) + ' clusters</span>' +
+      '<span style="color:#64748b;font-size:11px">' + formatDateTime(r.ts) + '</span></div>' +
+      '<div id="llm-report-text-' + i + '" style="font-size:11px;color:#64748b;margin-top:4px;max-height:80px;overflow:hidden">' + (r.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div>' +
+      '<button class="btn btn-outline" style="margin-top:6px;padding:2px 8px;font-size:11px" onclick="llmToggleReport(this, ' + i + ')">Expand</button>' +
+    '</div>').join('') : '<span style="color:#64748b">No reports yet</span>';
+  const reqs = data.requests || [];
+  document.getElementById('llm-ov-requests').innerHTML = reqs.length ?
+    '<table><thead><tr><th>Time</th><th>Tag</th><th>Status</th><th>Duration</th><th>Error</th></tr></thead><tbody>' +
+    reqs.map(r => '<tr><td style="color:#94a3b8">' + formatDateTime(r.ts) + '</td><td>' + (TAG_NAMES[r.tag]||r.tag||'generate') + '</td>' +
+      '<td style="color:' + (r.success ? '#22c55e' : '#ef4444') + '">' + (r.success ? 'OK' : 'Fail') + '</td>' +
+      '<td style="color:#94a3b8">' + (r.duration_ms || '') + ' ms</td>' +
+      '<td style="color:#ef4444;font-size:11px">' + (r.error || '') + '</td></tr>').join('') + '</tbody></table>'
+    : '<span style="color:#64748b">No requests yet</span>';
+}
+
+function llmToggleReport(btn, i) {
+  const el = document.getElementById('llm-report-text-' + i);
+  const isExpanded = btn.textContent === 'Collapse';
+  el.style.maxHeight = isExpanded ? '80px' : 'none';
+  el.style.overflow = isExpanded ? 'hidden' : 'auto';
+  btn.textContent = isExpanded ? 'Expand' : 'Collapse';
 }
 
 async function llmCheckHealth() {

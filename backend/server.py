@@ -83,6 +83,14 @@ async def startup_event():
             model_registry = ModelRegistry(_db, event_classifier.neural_classifier)
             init_external_training(_db, dataset_exporter, model_registry)
             init_gpu_machines(_db)
+            from llm_service import init_llm_tracker
+            init_llm_tracker(_db)
+            try:
+                await _db.llm_requests.create_index([("ts", -1)])
+                await _db.llm_requests.create_index([("tag", 1)])
+                await _db.llm_reports.create_index([("ts", -1)])
+            except Exception as e:
+                logger.warning("Could not create LLM indexes: %s", e)
             inference_worker = InferenceWorker(_db, event_classifier, _config.obstacle_clusterer)
             auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
             init_nn_admin(_db, inference_worker, auto_trainer)
@@ -3062,6 +3070,16 @@ async def llm_generate_report(req: ReportRequest):
         clusters = await cursor.to_list(length=100)
         report_text = await generate_road_report(clusters, region=req.region)
         report_json = await generate_road_report_json(clusters, region=req.region)
+        try:
+            await _config.db.llm_reports.insert_one({
+                "ts": datetime.utcnow().isoformat(),
+                "region": req.region,
+                "cluster_count": len(clusters),
+                "text": report_text,
+                "data": report_json,
+            })
+        except Exception as e:
+            logger.warning("Could not save LLM report: %s", e)
         return {"text": report_text, "data": report_json}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -3122,16 +3140,21 @@ async def llm_data_clusters_summary():
     total = await _config.db.obstacle_clusters.count_documents({"status": "active"})
     return {"total_active": total, "clusters": clusters, "count": len(clusters)}
 
+_last_llm_health = None
+
+
 @api_router.get("/llm/health")
 async def llm_health():
+    global _last_llm_health
     settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
     url = (settings or {}).get("url", "")
     model = (settings or {}).get("model", "")
     from llm_service import generate
     result = await generate("Say OK", system="Reply with one word: OK", max_tokens=5,
-                            ollama_url=url, model=model)
-    return {"ollama_available": result is not None, "response": result,
-            "configured_url": url, "configured_model": model}
+                            ollama_url=url, model=model, tag="health")
+    _last_llm_health = {"ollama_available": result is not None, "response": result,
+                        "configured_url": url, "configured_model": model}
+    return _last_llm_health
 
 
 @api_router.get("/llm/settings")
@@ -3159,6 +3182,84 @@ async def llm_update_settings(body: dict):
         upsert=True,
     )
     return {"status": "saved", "url": url, "model": model}
+
+
+@api_router.get("/llm/overview")
+async def llm_overview():
+    db = _config.db
+    from llm_service import recent_requests
+    now = datetime.utcnow()
+    day_ago = now - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+
+    stats = {
+        "total": 0, "success": 0, "failed": 0, "success_rate": 0.0,
+        "avg_duration_ms": 0, "last_24h": 0, "by_tag": {}, "daily": [], "errors": [],
+    }
+    requests = []
+    reports = []
+    try:
+        cursor = db.llm_requests.find({}).sort("ts", -1).limit(200)
+        requests = await cursor.to_list(length=200)
+    except Exception as e:
+        logger.warning("LLM overview requests: %s", e)
+    try:
+        cursor = db.llm_reports.find({}, {"text": 1, "ts": 1, "region": 1,
+                                          "cluster_count": 1}).sort("ts", -1).limit(20)
+        reports = await cursor.to_list(length=20)
+    except Exception as e:
+        logger.warning("LLM overview reports: %s", e)
+    stats["reports_total"] = 0
+    try:
+        stats["reports_total"] = await db.llm_reports.count_documents({})
+    except Exception:
+        pass
+
+    if requests:
+        ok = [r for r in requests if r.get("success")]
+        stats["total"] = len(requests)
+        stats["success"] = len(ok)
+        stats["failed"] = stats["total"] - stats["success"]
+        stats["success_rate"] = round(ok and 100 * len(ok) / stats["total"] or 0.0, 1)
+        durations = [r.get("duration_ms", 0) for r in requests if r.get("duration_ms")]
+        stats["avg_duration_ms"] = round(sum(durations) / len(durations)) if durations else 0
+        for r in requests:
+            tag = r.get("tag") or "unknown"
+            stats["by_tag"][tag] = stats["by_tag"].get(tag, 0) + 1
+        try:
+            stats["last_24h"] = await db.llm_requests.count_documents(
+                {"ts": {"$gte": day_ago.isoformat()}})
+        except Exception:
+            stats["last_24h"] = sum(1 for r in requests if r.get("ts", "") >= day_ago.isoformat())
+        stats["daily"] = []
+        for i in range(13, -1, -1):
+            d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+            day_reqs = [r for r in requests if (r.get("ts") or "").startswith(d)]
+            if day_reqs:
+                stats["daily"].append({
+                    "date": d,
+                    "requests": len(day_reqs),
+                    "success": sum(1 for r in day_reqs if r.get("success")),
+                })
+        stats["errors"] = [{"ts": r.get("ts"), "tag": r.get("tag"), "error": r.get("error")}
+                           for r in requests if not r.get("success")][-10:]
+
+    out_requests = [{k: r.get(k) for k in ("ts", "tag", "model", "success", "error",
+                                            "duration_ms", "prompt_len", "response_len")}
+                    for r in requests[:30]]
+    for r in out_requests:
+        r.pop("_id", None)
+    for r in reports:
+        r.pop("_id", None)
+
+    status = _last_llm_health or {}
+    if not status:
+        settings = await _config.db.llm_settings.find_one({"_id": "ollama"})
+        from llm_service import OLLAMA_URL, OLLAMA_MODEL
+        status = {"ollama_available": None, "configured_url": (settings or {}).get("url") or OLLAMA_URL,
+                  "configured_model": (settings or {}).get("model") or OLLAMA_MODEL}
+
+    return {"status": status, "stats": stats, "reports": reports, "requests": out_requests}
 
 # Include the router in the main app
 app.include_router(api_router)

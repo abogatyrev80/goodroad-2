@@ -40,7 +40,7 @@ Return JSON:
   "uncertainty_samples": [{{"index": 0, "reasoning": "..."}}],
   "summary": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="classify")
 
 
 async def classify_single(sample: dict) -> Optional[dict]:
@@ -55,7 +55,7 @@ Return JSON:
   "reasoning": "...",
   "features_used": ["feature1", "feature2"]
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="classify")
 
 
 async def validate_classification(sample: dict, claimed_label: str) -> Optional[dict]:
@@ -76,7 +76,7 @@ Return JSON:
   "reasoning": "...",
   "key_features": ["feature1", "feature2"]
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="classify")
 
 
 async def explain_classification(sample: dict, label: str) -> Optional[str]:
@@ -86,4 +86,4 @@ async def explain_classification(sample: dict, label: str) -> Optional[str]:
 Provide a clear explanation of the signal features that support this classification.
 Keep it under 100 words."""
     from llm_service import generate
-    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.2, max_tokens=200)
+    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.2, max_tokens=200, tag="classify")

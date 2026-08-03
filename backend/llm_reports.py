@@ -31,7 +31,7 @@ Generate a professional road condition report including:
 
 Write in Russian. Format as a structured report with clear sections.
 Keep it concise (300-500 words)."""
-    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.4, max_tokens=1024)
+    return await generate(prompt, system=SYSTEM_PROMPT, temperature=0.4, max_tokens=1024, tag="report")
 
 
 async def generate_road_report_json(clusters: list, events: list = None,
@@ -67,7 +67,7 @@ Return JSON:
   "recommendations": ["..."],
   "summary": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="report")
 
 
 async def generate_maintenance_plan(road_report: dict, budget: float = None) -> Optional[dict]:
@@ -95,7 +95,7 @@ Return JSON:
   "monitoring_recommendations": ["..."],
   "next_assessment_date": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="report")
 
 
 async def compare_periods(report_current: dict, report_previous: dict) -> Optional[dict]:
@@ -124,4 +124,4 @@ Return JSON:
   "recommendations": ["..."],
   "summary": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="report")

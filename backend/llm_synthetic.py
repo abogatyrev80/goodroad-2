@@ -36,7 +36,7 @@ Label-specific patterns:
 - wave: sinusoidal z pattern (±10-15, period 4-8 readings), speed 20-60 km/h
 
 Return JSON array of {count} samples."""
-    return await generate_json_list(prompt, system=SYSTEM_PROMPT)
+    return await generate_json_list(prompt, system=SYSTEM_PROMPT, tag="synthetic")
 
 
 async def generate_balanced_dataset(db, db_name: str, collection: str,
@@ -88,4 +88,4 @@ Generate an augmented version with "{variation_type}" augmentation:
 - rotation: rotate coordinate frame slightly
 
 Return the augmented sample as JSON with the same structure."""
-    return await generate_json_list(prompt, system=SYSTEM_PROMPT)
+    return await generate_json_list(prompt, system=SYSTEM_PROMPT, tag="synthetic")

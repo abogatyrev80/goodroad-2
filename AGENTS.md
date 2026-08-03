@@ -94,7 +94,9 @@ make ml-train       # Обучение ML модели
 ## Важно
 - GPU: AMD Radeon RX 6800 XT (16GB VRAM)
 - Модель Ollama: qwopus3.5-tools (основана на Qwen3.5 9B Q4_K_M)
+- Ollama живёт на локальной GPU-машине (порт 11434), прод-бэкенд подключается к ней через cloudflared-туннель (trycloudflare). URL обновляется в настройках LLM на goodroad.su командой: `backend/ollama_tunnel.sh`
+- Текущий адрес туннеля хранится в настройках прода: GET /api/llm/settings
 - Не добавлять лишние комментарии в код
 - Избегать emoji в коде
-- production URL: https://road-monitor-4.emergent.host
+- production URL: https://goodroad.su
 - Админ-панель: /api/admin/dashboard/v3

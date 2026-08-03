@@ -36,7 +36,7 @@ Return JSON:
   "recommendations": ["..."],
   "summary": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="quality")
 
 
 async def analyze_label_quality(samples: list, labels: list) -> Optional[dict]:
@@ -60,7 +60,7 @@ Return JSON:
   "worst_labels": ["label1", "label2"],
   "improvement_suggestions": ["..."]
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="quality")
 
 
 async def analyze_dataset_overview(db, db_name: str, collection: str) -> Optional[dict]:
@@ -109,4 +109,4 @@ Return JSON:
   "recommendations": ["..."],
   "summary": "..."
 }}"""
-    return await generate_json(prompt, system=SYSTEM_PROMPT)
+    return await generate_json(prompt, system=SYSTEM_PROMPT, tag="quality")
