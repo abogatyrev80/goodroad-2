@@ -1316,48 +1316,71 @@ async def admin_ingest_warnings(request: Request):
         if not isinstance(items, list):
             items = [items]
         saved = 0
+        errors = []
         for item in items:
-            if item.get("eventType"):
-                event = {
-                    "eventType": item["eventType"],
-                    "severity": item.get("severity", 5),
-                    "confidence": item.get("confidence", 0),
-                    "latitude": item.get("latitude"),
-                    "longitude": item.get("longitude"),
-                    "speed": item.get("speed", 0),
-                    "kind": item.get("kind", "gpu"),
-                    "deviceId": item.get("deviceId", "gpu-machine"),
-                    "raw_id": item.get("raw_id"),
-                    "clusterId": item.get("clusterId"),
-                    "zone_id": item.get("zone_id"),
-                    "description": item.get("description"),
-                }
-                w = await create_warning_from_event(_config.db, event, source="gpu_classifier")
-            else:
-                lat = item.get("latitude")
-                lon = item.get("longitude")
-                wtype = item.get("type") or item.get("hazard_type")
-                if not lat or not lon or not wtype:
-                    continue
-                w = await save_warning(_config.db, build_warning(
-                    event_type=wtype,
-                    severity=item.get("severity", 3),
-                    latitude=lat,
-                    longitude=lon,
-                    device_id=item.get("deviceId", "gpu-machine"),
-                    confidence=item.get("confidence", 0),
-                    speed=item.get("speed", 0),
-                    kind=item.get("kind", "gpu"),
-                    source="gpu_classifier",
-                    raw_id=item.get("raw_id"),
-                    zone_id=item.get("zone_id"),
-                    description=item.get("description"),
-                ))
-            if w:
-                saved += 1
-        return {"status": "ok", "saved": saved}
+            try:
+                if item.get("eventType"):
+                    event = {
+                        "eventType": item["eventType"],
+                        "severity": item.get("severity", 5),
+                        "confidence": item.get("confidence", 0),
+                        "latitude": item.get("latitude"),
+                        "longitude": item.get("longitude"),
+                        "speed": item.get("speed", 0),
+                        "kind": item.get("kind", "gpu"),
+                        "deviceId": item.get("deviceId", "gpu-machine"),
+                        "raw_id": item.get("raw_id"),
+                        "clusterId": item.get("clusterId"),
+                        "zone_id": item.get("zone_id"),
+                        "description": item.get("description"),
+                    }
+                    w = await create_warning_from_event(_config.db, event, source="gpu_classifier")
+                else:
+                    lat = item.get("latitude")
+                    lon = item.get("longitude")
+                    wtype = item.get("type") or item.get("hazard_type")
+                    if not lat or not lon or not wtype:
+                        errors.append({"item": item, "error": "missing type/lat/lon"})
+                        continue
+                    w = await save_warning(_config.db, build_warning(
+                        event_type=wtype,
+                        severity=item.get("severity", 3),
+                        latitude=lat,
+                        longitude=lon,
+                        device_id=item.get("deviceId", "gpu-machine"),
+                        confidence=item.get("confidence", 0),
+                        speed=item.get("speed", 0),
+                        kind=item.get("kind", "gpu"),
+                        source="gpu_classifier",
+                        raw_id=item.get("raw_id"),
+                        zone_id=item.get("zone_id"),
+                        description=item.get("description"),
+                    ))
+                if w:
+                    saved += 1
+            except Exception as ie:
+                logging.error(f"Warning ingest item error: {ie}", exc_info=True)
+                errors.append({"item": item, "error": str(ie)})
+        return {"status": "ok", "saved": saved, "errors": errors}
     except Exception as e:
         logging.error(f"Error ingesting warnings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/warnings/cleanup-expired")
+async def admin_cleanup_expired_warnings():
+    """Удалить истёкшие/отклонённые предупреждения"""
+    try:
+        result = await _config.db.user_warnings.delete_many({
+            "expiresAt": {"$lt": datetime.utcnow()}
+        })
+        dismissed = await _config.db.user_warnings.delete_many({
+            "status": "dismissed",
+            "expiresAt": {"$lt": datetime.utcnow() - timedelta(days=7)},
+        })
+        return {"status": "ok", "deleted_expired": result.deleted_count, "deleted_old_dismissed": dismissed.deleted_count}
+    except Exception as e:
+        logging.error(f"Error cleaning expired warnings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

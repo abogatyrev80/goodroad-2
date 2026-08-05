@@ -155,8 +155,8 @@ async def save_warning(db, warning: Dict, dedup_radius_m: float = WARNING_DEDUP_
         result = await db.user_warnings.insert_one(warning)
         return str(result.inserted_id)
     except Exception as e:
-        logger.error(f"save_warning error: {e}")
-        return None
+        logger.error(f"save_warning error: {e}", exc_info=True)
+        raise
 
 
 async def create_warning_from_event(db, event: Dict, source: str = "inference") -> Optional[str]:
