@@ -80,11 +80,11 @@ const DEFAULT_CONFIG: CollectorConfig = {
   version: 1,
   enabled: true,
   trigger: {
-    magnitude_threshold_g: 1.3,
+    magnitude_threshold_g: 1.15,
     window_before_ms: 2000,
-    window_after_ms: 2000,
+    window_after_ms: 0,
     capture_frequency_hz: 50,
-    baseline_frequency_hz: 10,
+    baseline_frequency_hz: 50,
     min_speed_kmh: 5,
   },
   prearm: {
@@ -126,6 +126,7 @@ export class AdaptiveCollector {
 
   private backgroundTimer: ReturnType<typeof setTimeout> | null = null;
   private lastBackgroundAt = 0;
+  private currentCaptureHz = DEFAULT_CONFIG.trigger.baseline_frequency_hz;
 
   private offlineQueue: RawEvent[] = [];
 
@@ -164,6 +165,7 @@ export class AdaptiveCollector {
     if (config?.trigger) this.config.trigger = { ...DEFAULT_CONFIG.trigger, ...config.trigger };
     if (config?.prearm) this.config.prearm = { ...DEFAULT_CONFIG.prearm, ...config.prearm };
     if (config?.background) this.config.background = { ...DEFAULT_CONFIG.background, ...config.background };
+    this.applyCaptureRate();
     try {
       void AsyncStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(this.config));
     } catch {}
@@ -251,6 +253,7 @@ export class AdaptiveCollector {
     const hz = this.isPrearmZone()
       ? this.config.trigger.capture_frequency_hz
       : this.config.trigger.baseline_frequency_hz;
+    this.currentCaptureHz = hz;
     this.onIntervalChange?.(hz);
   }
 
@@ -270,6 +273,10 @@ export class AdaptiveCollector {
       clearTimeout(this.zoneRefreshTimer);
       this.zoneRefreshTimer = null;
     }
+  }
+
+  refreshCaptureRate() {
+    this.applyCaptureRate();
   }
 
   stop() {
@@ -314,9 +321,9 @@ export class AdaptiveCollector {
     this.triggerFiredAt = now;
 
     const before = this.config.trigger.window_before_ms;
-    const after = this.config.trigger.window_after_ms;
+    // Буфер содержит только прошлые сэмплы — окно всегда заканчивается на ts
     const startTs = ts - before;
-    const endTs = ts + after;
+    const endTs = ts;
 
     const window = this.accelBuffer.filter((s) => s.timestamp >= startTs && s.timestamp <= endTs);
     if (window.length < 3) return;
@@ -335,9 +342,7 @@ export class AdaptiveCollector {
       },
       accelerometer: window,
       duration_ms: endTs - startTs,
-      capture_frequency_hz: isPrearm
-        ? this.config.trigger.capture_frequency_hz
-        : this.config.trigger.baseline_frequency_hz,
+      capture_frequency_hz: this.currentCaptureHz,
       zone_id: isPrearm ? this.zoneForCapture : undefined,
       max_magnitude: Math.max(...window.map((s) => Math.sqrt(s.x ** 2 + s.y ** 2 + s.z ** 2) / GRAVITY)),
       trigger_magnitude: magnitude,

@@ -14,11 +14,11 @@ DEFAULT_COLLECTOR_CONFIG = {
     "version": 1,
     "enabled": True,
     "trigger": {
-        "magnitude_threshold_g": 1.3,
+        "magnitude_threshold_g": 1.15,
         "window_before_ms": 2000,
-        "window_after_ms": 2000,
+        "window_after_ms": 0,
         "capture_frequency_hz": 50,
-        "baseline_frequency_hz": 10,
+        "baseline_frequency_hz": 50,
         "min_speed_kmh": 5,
     },
     "prearm": {

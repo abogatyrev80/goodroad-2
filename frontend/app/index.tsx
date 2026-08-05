@@ -735,11 +735,13 @@ export default function HomeScreen() {
       );
       locationSubscription.current = subscription;
 
-      // Запускаем акселерометр (10 Гц baseline) — на web expo-sensors не поддерживается.
-      // Данные идут в AdaptiveCollector: триггер вибрации, пре-арм у зон, фон.
+      // Запускаем акселерометр — частоту берём из конфига AdaptiveCollector
+      // (baseline 50 Гц, иначе импульс ямы пропускается при 10 Гц).
+      // На web expo-sensors не поддерживается.
       if (Platform.OS !== 'web') {
         try {
-          Accelerometer.setUpdateInterval(100);
+          const hz = adaptiveCollector.current?.config?.trigger?.baseline_frequency_hz ?? 50;
+          Accelerometer.setUpdateInterval(1000 / hz);
         } catch {}
         const accelSubscription = Accelerometer.addListener((data) => {
           if (!data) return;
@@ -749,6 +751,7 @@ export default function HomeScreen() {
           );
         });
         accelerometerSubscription.current = accelSubscription;
+        adaptiveCollector.current?.refreshCaptureRate();
       }
 
       // Адаптивный сбор: фон (1 т/мин), зоны пре-арма, очередь офлайна
