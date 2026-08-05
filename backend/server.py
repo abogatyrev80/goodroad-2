@@ -769,6 +769,8 @@ async def get_nearby_obstacles(
 
                 nearby.append(obstacle)
 
+        nearby.extend(await _warnings_as_obstacles(_config.db, latitude, longitude, radius))
+
         nearby.sort(key=lambda x: x['priority'], reverse=True)
 
         if merge_radius > 0:
@@ -868,6 +870,10 @@ async def get_obstacles_along_road(request: Request):
             obstacle['priority'] = round(priority, 2)
             nearby.append(obstacle)
 
+        # Серверные предупреждения (критичные, sev<=2) — показываем в обоих режимах
+        warnings_obs = await _warnings_as_obstacles(_config.db, latitude, longitude, radius)
+        nearby.extend(warnings_obs)
+
         # Если есть road_id и он совпадает с дорогой пользователя — фильтруем
         if road_info:
             user_road_id = road_info["road_id"]
@@ -886,6 +892,10 @@ async def get_obstacles_along_road(request: Request):
                     obs["road_distance"] = round(road_dist, 1)
                     obs["road_zone"] = _road_zone_fallback(road_dist)
                     obs["cross_track_distance"] = obs.pop("cross_track", 0)
+                    on_road.append(obs)
+                elif obs.get("source") == "warning":
+                    obs["road_distance"] = obs["distance"]
+                    obs["road_zone"] = _road_zone_fallback(obs["distance"])
                     on_road.append(obs)
 
             if on_road:
@@ -1245,6 +1255,47 @@ async def get_available_regions():
                 },
             }
     return list(regions.values())[:200]
+
+
+async def _warnings_as_obstacles(db, latitude: float, longitude: float, radius: float) -> List[Dict]:
+    """Активные серверные предупреждения в виде препятствий для приложения."""
+    try:
+        warnings = await db.user_warnings.find({
+            "status": "active",
+            "expiresAt": {"$gt": datetime.utcnow()},
+        }).limit(500).to_list(500)
+        result = []
+        for w in warnings:
+            wlat = w.get("latitude")
+            wlon = w.get("longitude")
+            wtype = w.get("type")
+            if not wlat or not wlon or not wtype:
+                continue
+            distance = calculate_distance(latitude, longitude, wlat, wlon)
+            if distance > radius:
+                continue
+            severity = int(w.get("severity", 3) or 3)
+            mapped_type = wtype if wtype in ("pothole", "speed_bump", "bump", "braking", "vibration") else "bump"
+            obstacle = {
+                "id": "warn_" + str(w.get("_id")),
+                "type": mapped_type,
+                "latitude": wlat,
+                "longitude": wlon,
+                "distance": round(distance, 1),
+                "severity": {"average": float(severity), "max": severity},
+                "confidence": round(float(w.get("confidence", 0) or 0), 2),
+                "confirmations": 1,
+                "avgSpeed": round(float(w.get("speed", 0) or 0) * 3.6, 1),
+                "lastReported": w.get("created_at").isoformat()
+                if isinstance(w.get("created_at"), datetime) else str(w.get("created_at")),
+                "source": w.get("source", "warning"),
+            }
+            obstacle["priority"] = round((6 - severity) * 500 + (1 / (distance + 1)) * 10, 2)
+            result.append(obstacle)
+        return result
+    except Exception as e:
+        logger.error(f"Error building warnings obstacles: {e}")
+        return []
 
 
 def _serialize_region_warning(w: Dict) -> Dict:
