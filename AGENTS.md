@@ -35,6 +35,9 @@ backend/
   clustering.py          # Пространственная кластеризация
   neural_classifier.py   # LSTM нейросеть
   train_model.py         # Обучение модели
+  warning_service.py     # Серверные предупреждения (user_warnings, TTL 1h)
+  force_classify.py      # Принудительная классификация с локальной GPU-машины
+  inference_worker.py    # Фоновый инференс-воркер (пишет предупреждения)
   templates/             # Jinja2 шаблоны админки
 
 frontend/
@@ -42,9 +45,9 @@ frontend/
   app/admin/             # Экраны админ-панели
   app/settings/          # Настройки
   services/
-    RawDataCollector.ts  # Сбор данных с датчиков
+    AdaptiveCollector.ts       # Адаптивный сбор (background/trigger/prearm) -> POST /api/raw-events
+    RawDataCollector.ts        # Легаси-сбор + получение предупреждений /api/warnings/{deviceId}
     DynamicAudioAlertService.ts  # Аудио-оповещения
-    ObstacleAlertService.ts     # Предупреждения о препятствиях
   hooks/
     useAppStore.ts       # Zustand store
     useObstacleAlerts.ts # Хук оповещений
@@ -69,6 +72,7 @@ frontend/
 - raw_sensor_data — сырые данные с датчиков
 - processed_events — классифицированные события
 - obstacle_clusters — кластеры препятствий
+- user_warnings — серверные предупреждения (TTL 1h, severity<=2, дедуп по местоположению)
 
 ## Команды
 
@@ -77,6 +81,16 @@ frontend/
 cd backend && python3 server.py
 supervisorctl restart backend
 ```
+
+### Принудительная классификация с локальной GPU-машины
+```bash
+cd backend && .venv-ml/bin/python force_classify.py --push --limit 200 --hours 48
+# dry-run (без записи): .venv-ml/bin/python force_classify.py --hours 24
+```
+- Тянет необработанные окна (trigger/prearm) с прода через `/api/admin/v2/raw-data?unprocessed=true&kind=...`
+- Классифицирует локально (EventClassifier; LSTM подключается если NEURAL_MIN_CONFIDENCE >= confidence)
+- Пушит предупреждения: `POST /api/admin/warnings/ingest`, помечает обработанные: `POST /api/admin/raw-data/mark-processed`
+- ML-окружение: `backend/.venv-ml` (PyTorch ROCm 6.4, ставится scripts/setup-ml-env.sh)
 
 ### Frontend
 ```bash
