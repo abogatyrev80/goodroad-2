@@ -287,6 +287,10 @@ class InferenceWorker:
             }
             await self.db.processed_events.insert_one(processed_event)
 
+            if warning_service.should_warn(severity):
+                from warning_service import create_warning_from_event
+                await create_warning_from_event(self.db, processed_event, source="inference")
+
         log_doc = {
             "timestamp": datetime.utcnow(),
             "device_id": device_id,

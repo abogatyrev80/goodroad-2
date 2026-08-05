@@ -373,17 +373,35 @@ async def get_v2_analytics():
 @api_router.get("/admin/v2/raw-data")
 async def get_raw_data(
     limit: int = Query(100, ge=1, le=50000, description="Максимальное количество записей (1-50000)"),
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска")
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
+    unprocessed: bool = Query(False, description="Только необработанные записи"),
+    kind: str = Query(None, description="Фильтр по kind (background/trigger/prearm)"),
 ):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
-        total = await _config.db.raw_sensor_data.count_documents({})
-        
+        query = {}
+        if unprocessed:
+            query["processed_by_inference"] = {"$ne": True}
+        if kind:
+            if "," in kind:
+                query["kind"] = {"$in": [k.strip() for k in kind.split(",")]}
+            else:
+                query["kind"] = kind
+
+        total = await _config.db.raw_sensor_data.count_documents(query)
+
         data = await _config.db.raw_sensor_data.find(
-            {},
-            {"_id": 0}
+            query,
+            {"_id": 1, "deviceId": 1, "kind": 1, "timestamp": 1, "gps": 1,
+             "accelerometer": 1, "userReported": 1, "eventType": 1, "severity": 1,
+             "duration_ms": 1, "capture_frequency_hz": 1, "zone_id": 1,
+             "max_magnitude": 1, "trigger_magnitude": 1, "speed_kmh": 1,
+             "created_at": 1, "receivedAt": 1, "processed_by_inference": 1}
         ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
-        
+
+        for doc in data:
+            doc["_id"] = str(doc["_id"])
+
         return {
             "total": total,
             "limit": limit,
@@ -1132,6 +1150,244 @@ async def get_road_warnings(
     except Exception as e:
         logging.error(f"Error fetching road warnings: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching road warnings: {str(e)}")
+
+
+from warning_service import (
+    build_warning,
+    save_warning,
+    create_warning_from_event,
+    list_active_warnings,
+)
+
+
+@api_router.get("/warnings/{device_id}")
+async def get_device_warnings(device_id: str):
+    """Активные предупреждения для устройства (новая серверная схема)"""
+    warnings = await list_active_warnings(_config.db, limit=100)
+    return {"warnings": warnings}
+
+
+@api_router.delete("/warnings/{warning_id}")
+async def dismiss_warning(warning_id: str):
+    """Отклонить предупреждение"""
+    try:
+        from bson import ObjectId
+        result = await _config.db.user_warnings.update_one(
+            {"_id": ObjectId(warning_id)},
+            {"$set": {"status": "dismissed", "updated_at": datetime.utcnow()}},
+        )
+        if result.matched_count == 0:
+            result = await _config.db.user_warnings.update_one(
+                {"_id": warning_id},
+                {"$set": {"status": "dismissed", "updated_at": datetime.utcnow()}},
+            )
+        return {"status": "ok"}
+    except Exception as e:
+        logging.error(f"Error dismissing warning: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/warnings/region/{region_code}")
+async def get_region_warnings(region_code: str, since: str = None):
+    """Предупреждения для региона (в формате SyncService приложения)"""
+    query = {"status": "active", "expiresAt": {"$gt": datetime.utcnow()}}
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00")).replace(tzinfo=None)
+            query["updated_at"] = {"$gt": since_dt}
+        except Exception:
+            pass
+    warnings = await _config.db.user_warnings.find(query).limit(1000).to_list(1000)
+    return [_serialize_region_warning(w) for w in warnings]
+
+
+@api_router.get("/warnings/region/{region_code}/full")
+async def get_region_warnings_full(
+    region_code: str,
+    north: float = None,
+    south: float = None,
+    east: float = None,
+    west: float = None,
+):
+    """Полный дамп предупреждений региона (в границах bbox)"""
+    query = {"status": "active"}
+    if north is not None and south is not None and east is not None and west is not None:
+        query["latitude"] = {"$gte": south, "$lte": north}
+        query["longitude"] = {"$gte": west, "$lte": east}
+    warnings = await _config.db.user_warnings.find(query).limit(5000).to_list(5000)
+    return [_serialize_region_warning(w) for w in warnings]
+
+
+@api_router.get("/regions/available")
+async def get_available_regions():
+    """Список регионов для офлайн-загрузки (гео-индексы предупреждений)"""
+    from services.geo import calculate_distance
+    warnings = await _config.db.user_warnings.find(
+        {"status": "active"}
+    ).limit(5000).to_list(5000)
+    if not warnings:
+        return []
+    regions = {}
+    for w in warnings:
+        lat, lon = w.get("latitude"), w.get("longitude")
+        if not lat or not lon:
+            continue
+        code = f"{round(lat, 1):.1f}_{round(lon, 1):.1f}"
+        if code not in regions:
+            regions[code] = {
+                "code": code,
+                "name": f"Region {code}",
+                "bounds": {
+                    "north": round(lat + 0.1, 3),
+                    "south": round(lat - 0.1, 3),
+                    "east": round(lon + 0.1, 3),
+                    "west": round(lon - 0.1, 3),
+                },
+            }
+    return list(regions.values())[:200]
+
+
+def _serialize_region_warning(w: Dict) -> Dict:
+    return {
+        "_id": str(w.get("_id", "")),
+        "latitude": w.get("latitude"),
+        "longitude": w.get("longitude"),
+        "hazard_type": w.get("hazard_type") or w.get("type"),
+        "severity": w.get("severity"),
+        "description": w.get("description") or w.get("message"),
+        "is_verified": w.get("is_verified", False),
+        "city": w.get("city", ""),
+        "country": w.get("country", ""),
+        "updated_at": w.get("updated_at", w.get("created_at")).isoformat()
+        if isinstance(w.get("updated_at", w.get("created_at")), datetime)
+        else str(w.get("updated_at", w.get("created_at"))),
+        "type": w.get("type"),
+        "message": w.get("message"),
+        "confidence": w.get("confidence"),
+        "speed": w.get("speed"),
+        "kind": w.get("kind"),
+        "status": w.get("status"),
+        "expiresAt": w.get("expiresAt").isoformat()
+        if isinstance(w.get("expiresAt"), datetime)
+        else str(w.get("expiresAt")),
+        "deviceId": w.get("deviceId"),
+        "source": w.get("source"),
+    }
+
+
+@api_router.get("/admin/warnings")
+async def admin_list_warnings(
+    limit: int = Query(200, ge=1, le=5000),
+    status: str = "active",
+):
+    """Список предупреждений для админ-панели"""
+    warnings = await _config.db.user_warnings.find(
+        {"status": status}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    items = []
+    for w in warnings:
+        items.append({
+            "id": str(w.get("_id")),
+            "type": w.get("type"),
+            "severity": w.get("severity"),
+            "confidence": w.get("confidence"),
+            "latitude": w.get("latitude"),
+            "longitude": w.get("longitude"),
+            "message": w.get("message"),
+            "source": w.get("source"),
+            "kind": w.get("kind"),
+            "deviceId": w.get("deviceId"),
+            "status": w.get("status"),
+            "created_at": w.get("created_at").isoformat()
+            if isinstance(w.get("created_at"), datetime) else str(w.get("created_at")),
+            "expiresAt": w.get("expiresAt").isoformat()
+            if isinstance(w.get("expiresAt"), datetime) else str(w.get("expiresAt")),
+        })
+    total = await _config.db.user_warnings.count_documents({"status": status})
+    return {"total": total, "warnings": items}
+
+
+@api_router.post("/admin/warnings/ingest")
+async def admin_ingest_warnings(request: Request):
+    """Приём предупреждений от внешних классификаторов (локальная GPU-машина)"""
+    try:
+        body = await request.json()
+        items = body.get("warnings") or body.get("events") or [body]
+        if not isinstance(items, list):
+            items = [items]
+        saved = 0
+        for item in items:
+            if item.get("eventType"):
+                event = {
+                    "eventType": item["eventType"],
+                    "severity": item.get("severity", 5),
+                    "confidence": item.get("confidence", 0),
+                    "latitude": item.get("latitude"),
+                    "longitude": item.get("longitude"),
+                    "speed": item.get("speed", 0),
+                    "kind": item.get("kind", "gpu"),
+                    "deviceId": item.get("deviceId", "gpu-machine"),
+                    "raw_id": item.get("raw_id"),
+                    "clusterId": item.get("clusterId"),
+                    "zone_id": item.get("zone_id"),
+                    "description": item.get("description"),
+                }
+                w = await create_warning_from_event(_config.db, event, source="gpu_classifier")
+            else:
+                lat = item.get("latitude")
+                lon = item.get("longitude")
+                wtype = item.get("type") or item.get("hazard_type")
+                if not lat or not lon or not wtype:
+                    continue
+                w = await save_warning(_config.db, build_warning(
+                    event_type=wtype,
+                    severity=item.get("severity", 3),
+                    latitude=lat,
+                    longitude=lon,
+                    device_id=item.get("deviceId", "gpu-machine"),
+                    confidence=item.get("confidence", 0),
+                    speed=item.get("speed", 0),
+                    kind=item.get("kind", "gpu"),
+                    source="gpu_classifier",
+                    raw_id=item.get("raw_id"),
+                    zone_id=item.get("zone_id"),
+                    description=item.get("description"),
+                ))
+            if w:
+                saved += 1
+        return {"status": "ok", "saved": saved}
+    except Exception as e:
+        logging.error(f"Error ingesting warnings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/raw-data/mark-processed")
+async def admin_mark_raw_processed(request: Request):
+    """Пометить сырые данные как обработанные внешним классификатором"""
+    try:
+        body = await request.json()
+        ids = body.get("ids", [])
+        if not ids:
+            return {"status": "ok", "updated": 0}
+        from bson import ObjectId
+        oids = []
+        for i in ids:
+            try:
+                oids.append(ObjectId(i))
+            except Exception:
+                pass
+        matched = 0
+        if oids:
+            result = await _config.db.raw_sensor_data.update_many(
+                {"_id": {"$in": oids}},
+                {"$set": {"processed_by_inference": True}},
+            )
+            matched += result.modified_count + result.matched_count
+        return {"status": "ok", "updated": matched}
+    except Exception as e:
+        logging.error(f"Error marking raw processed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Administrative data models
 class AdminSensorDataUpdate(BaseModel):
