@@ -79,8 +79,18 @@ def pull_raw_data(api: str, limit: int, kind: str, hours: int) -> list:
 
 def classify_docs(docs: list) -> list:
     """Локальная классификация окон. Возвращает список событий."""
-    from config import event_classifier
+    from pathlib import Path
+    from ml_processor import EventClassifier
 
+    _here = Path(__file__).resolve().parent
+    _model = _here / "models" / "accel_lstm.pt"
+    if _model.exists():
+        os.environ.setdefault("NEURAL_MODEL_PATH", str(_model))
+    # Текущая LSTM вырождается (всегда ~0.53 confidence -> speed_bump).
+    # Пока модель не дообучена, доверяем эвристике (поднимаем порог NN).
+    os.environ.setdefault("NEURAL_MIN_CONFIDENCE", "0.75")
+
+    classifier = EventClassifier()
     events = []
     for doc in docs:
         try:
@@ -98,7 +108,7 @@ def classify_docs(docs: list) -> list:
             if not isinstance(accel, list) or len(accel) < 3:
                 continue
 
-            ev = event_classifier.analyze_accelerometer_array(
+            ev = classifier.analyze_accelerometer_array(
                 device_id=doc.get("deviceId", "gpu-machine"),
                 accelerometer_data=accel,
                 speed=speed,

@@ -138,6 +138,7 @@ tr:hover{background:#1e293b}
   <div class="tab" onclick="switchTab('map')">🗺️ Map</div>
   <div class="tab" onclick="switchTab('llm')">🤖 LLM</div>
   <div class="tab" onclick="switchTab('gpu')">🖥️ GPU Machines</div>
+  <div class="tab" onclick="switchTab('warnings')">⚠️ Warnings</div>
 </div>
 
 <!-- TAB 1: Inference Monitor -->
@@ -785,6 +786,68 @@ tr:hover{background:#1e293b}
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-success" onclick="addGPUMachine()">Register Machine</button>
       <button class="btn btn-outline" onclick="hideAddGPUMachine()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="tab-warnings">
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Active Warnings</h3>
+      <div class="value" id="warn-total">0</div>
+      <div class="sub">активных предупреждений</div>
+    </div>
+    <div class="card">
+      <h3>Critical</h3>
+      <div class="value" id="warn-critical" style="color:#ef4444">0</div>
+      <div class="sub">severity 1-2</div>
+    </div>
+    <div class="card">
+      <h3>From GPU</h3>
+      <div class="value" id="warn-gpu" style="color:#8b5cf6">0</div>
+      <div class="sub">источник gpu_classifier</div>
+    </div>
+    <div class="card">
+      <h3>TTL</h3>
+      <div class="value">1h</div>
+      <div class="sub">время жизни</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">Warnings</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="loadWarnings()">Refresh</button>
+        <button class="btn btn-danger" onclick="clearExpiredWarnings()">Clear Expired</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Severity</th>
+          <th>Confidence</th>
+          <th>Location</th>
+          <th>Message</th>
+          <th>Source</th>
+          <th>Created</th>
+          <th>Expires</th>
+        </tr>
+      </thead>
+      <tbody id="warnings-table">
+        <tr><td colspan="8" class="empty">No warnings yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Force Classification</h3>
+    <p style="color:#94a3b8;font-size:13px;margin:8px 0 16px">
+      Принудительная классификация с локальной GPU-машины:
+    </p>
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;font-family:monospace;font-size:13px;color:#94a3b8">
+      cd backend && python3 force_classify.py --push --limit 200 --hours 48
     </div>
   </div>
 </div>
@@ -1752,6 +1815,68 @@ function switchTab(tab) {
   if (tab === 'gpu') {
     setTimeout(() => loadGPUMachines(), 100);
   }
+  if (tab === 'warnings') {
+    setTimeout(() => loadWarnings(), 100);
+  }
+}
+
+// ─── Warnings Tab Functions ─────────────────────────────────────
+async function loadWarnings() {
+  try {
+    const r = await fetch('/api/admin/warnings?limit=500&status=active');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const items = data.warnings || [];
+    document.getElementById('warn-total').textContent = items.length;
+
+    let critical = 0, gpu = 0;
+    for (const w of items) {
+      if ((w.severity || 5) <= 2) critical++;
+      if (w.source === 'gpu_classifier') gpu++;
+    }
+    document.getElementById('warn-critical').textContent = critical;
+    document.getElementById('warn-gpu').textContent = gpu;
+
+    const tbody = document.getElementById('warnings-table');
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No warnings yet</td></tr>';
+      return;
+    }
+    const sevColor = {1:'#ef4444',2:'#f97316',3:'#f59e0b',4:'#eab308',5:'#22c55e'};
+    const typeIcons = {pothole:'🕳️',speed_bump:'🛑',bump:'〰️',braking:'🚗',vibration:'〰️',wave:'🌊'};
+    tbody.innerHTML = items.map(w => `
+      <tr>
+        <td>${typeIcons[w.type] || ''} ${(w.type || w.hazard_type || 'unknown').replace(/_/g,' ')}</td>
+        <td><span style="color:${sevColor[w.severity] || '#94a3b8'}">${w.severity || '-'}</span></td>
+        <td>${w.confidence != null ? (w.confidence*100).toFixed(0)+'%' : '-'}</td>
+        <td>${w.latitude != null ? w.latitude.toFixed(5)+', '+w.longitude.toFixed(5) : '-'}</td>
+        <td style="max-width:280px">${w.message || '-'}</td>
+        <td>${w.source || w.kind || '-'}</td>
+        <td>${fmtDate(w.created_at)}</td>
+        <td>${fmtDate(w.expiresAt)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error('loadWarnings error:', e);
+  }
+}
+
+async function clearExpiredWarnings() {
+  if (!confirm('Удалить истёкшие предупреждения?')) return;
+  try {
+    const r = await fetch('/api/admin/warnings/cleanup-expired', { method: 'POST' });
+    const data = await r.json();
+    alert(JSON.stringify(data));
+    loadWarnings();
+  } catch (e) {
+    console.error('clearExpiredWarnings error:', e);
+  }
+}
+
+function fmtDate(v) {
+  if (!v) return '-';
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? String(v) : d.toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 }
 
 // ─── LLM Tab Functions (Browser Direct) ─────────────────────────
