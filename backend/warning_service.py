@@ -36,7 +36,6 @@ Server-side warning service.
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -151,7 +150,6 @@ async def save_warning(db, warning: Dict, dedup_radius_m: float = WARNING_DEDUP_
             await db.user_warnings.update_one({"_id": existing["_id"]}, {"$set": update})
             return str(existing["_id"])
 
-        warning.setdefault("_id", uuid.uuid4())
         result = await db.user_warnings.insert_one(warning)
         return str(result.inserted_id)
     except Exception as e:
