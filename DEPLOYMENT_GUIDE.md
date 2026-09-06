@@ -65,7 +65,7 @@ DB_NAME=good_road_production
 
 ```bash
 # Backend URL (должен указывать на ваш deployment URL)
-EXPO_PUBLIC_BACKEND_URL=https://ваш-deployment-url.emergent.host
+EXPO_PUBLIC_BACKEND_URL=https://goodroad.su
 ```
 
 #### Удалите старые переменные (если есть):
@@ -87,14 +87,14 @@ DB_NAME=roadqual-track-test_database  # Старое значение
 
 #### Проверка Backend:
 ```bash
-curl https://ваш-deployment-url.emergent.host/api/admin/analytics
+curl https://goodroad.su/api/admin/analytics
 ```
 
 Должен вернуть JSON с данными (не ошибку unauthorized).
 
 #### Проверка Frontend:
 1. Откройте QR код deployment в Expo Go
-2. Или введите вручную: `exp://ваш-deployment-url.emergent.host`
+2. Или введите вручную: `exp://goodroad.su`
 3. Приложение должно загрузиться без ошибок
 
 ## 🔧 Решение проблем
@@ -141,21 +141,21 @@ curl https://ваш-deployment-url.emergent.host/api/admin/analytics
 **Решение:**
 1. В Environment Variables установите правильный URL:
    ```
-   EXPO_PUBLIC_BACKEND_URL=https://ваш-deployment-url.emergent.host
+   EXPO_PUBLIC_BACKEND_URL=https://goodroad.su
    ```
 2. НЕ добавляйте `/api` в конец - это делается автоматически в коде
 
 ## 📊 Текущие URL
 
 ### Preview (Работает сейчас):
-- Frontend: https://soundzummer.preview.emergentagent.com/
-- Backend: https://soundzummer.preview.emergentagent.com/api
+- Frontend: https://goodroad.su/
+- Backend: https://goodroad.su/api
 - MongoDB: Локальная (mongodb://localhost:27017)
 - База: test_database (7 записей)
 
 ### Deploy (После настройки):
-- Frontend: https://roadqual-track.emergent.host/
-- Backend: https://roadqual-track.emergent.host/api
+- Frontend: https://goodroad.su/
+- Backend: https://goodroad.su/api
 - MongoDB: MongoDB Atlas (нужно настроить)
 - База: good_road_production (новая)
 
@@ -171,7 +171,7 @@ curl https://ваш-deployment-url.emergent.host/api/admin/analytics
 
 **Как использовать:**
 1. Откройте Expo Go на телефоне
-2. Введите URL: `exp://potholefinder.preview.emergentagent.com`
+2. Введите URL: `exp://goodroad.su`
 3. Тестируйте все функции
 
 ### Вариант B: Production Deployment (Рекомендуется для долгосрочного использования)

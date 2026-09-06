@@ -39,7 +39,7 @@ REACT_APP_BACKEND_URL
 
 **ПРОВЕРИТЬ:**
 ```
-EXPO_PUBLIC_BACKEND_URL = https://roadqual-track.emergent.host
+EXPO_PUBLIC_BACKEND_URL = https://goodroad.su
 ```
 (должно быть ваш реальный deployment URL)
 
@@ -53,7 +53,7 @@ EXPO_PUBLIC_BACKEND_URL = https://roadqual-track.emergent.host
 
 **Проверка Backend:**
 ```bash
-curl https://roadqual-track.emergent.host/api/admin/analytics
+curl https://goodroad.su/api/admin/analytics
 ```
 
 Должен вернуть JSON с данными (не ошибку "not authorized").

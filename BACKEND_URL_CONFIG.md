@@ -3,7 +3,7 @@
 ## ✅ Текущая конфигурация (правильная)
 
 ### Development/Preview Environment
-**URL:** `https://soundzummer.preview.emergentagent.com` (опционально, для разработки)
+**URL:** `https://goodroad.su` (опционально, для разработки)
 **Использование:** Только для разработки и тестирования в preview режиме
 **Конфигурация:** `frontend/.env` → `EXPO_PUBLIC_BACKEND_URL`
 

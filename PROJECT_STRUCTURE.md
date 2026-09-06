@@ -180,7 +180,7 @@ MONGO_URL=mongodb://localhost:27017
 
 ### Frontend (.env)
 ```
-EXPO_PUBLIC_BACKEND_URL=https://road-monitor-4.emergent.host
+EXPO_PUBLIC_BACKEND_URL=https://goodroad.su
 EXPO_PACKAGER_PROXY_URL=...
 EXPO_PACKAGER_HOSTNAME=...
 ```
@@ -240,7 +240,7 @@ eas build --platform android --profile preview
 
 ## 🔗 Полезные ссылки
 
-- **Admin панель:** https://road-monitor-4.emergent.host/api/admin
-- **Dashboard:** https://road-monitor-4.emergent.host/api/admin/dashboard/v3
-- **ML настройки:** https://road-monitor-4.emergent.host/api/admin/ml-settings
-- **APK guide:** https://road-monitor-4.emergent.host/api/admin/apk-guide
+- **Admin панель:** https://goodroad.su/api/admin
+- **Dashboard:** https://goodroad.su/api/admin/dashboard/v3
+- **ML настройки:** https://goodroad.su/api/admin/ml-settings
+- **APK guide:** https://goodroad.su/api/admin/apk-guide

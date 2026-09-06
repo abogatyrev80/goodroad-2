@@ -13,7 +13,7 @@
 
 Архив находится по адресу:
 ```
-https://road-monitor-4.emergent.host/download/good-road-frontend.tar.gz
+https://goodroad.su/download/good-road-frontend.tar.gz
 ```
 
 Или скачайте через ваш интерфейс Emergent.
@@ -125,7 +125,7 @@ eas build --platform android --profile preview
 
 - ✅ `app.json` - конфигурация приложения
 - ✅ `eas.json` - профили сборки
-- ✅ Backend URL: `https://road-monitor-4.emergent.host`
+- ✅ Backend URL: `https://goodroad.su`
 - ✅ Все зависимости в `package.json`
 
 ---

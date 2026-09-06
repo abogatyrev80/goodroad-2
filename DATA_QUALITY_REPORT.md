@@ -1,7 +1,7 @@
 # Data Quality Report - Good Road Application
 
 **Дата анализа:** 2025-11-11  
-**Production Backend:** https://roadqual-track.emergent.host  
+**Production Backend:** https://goodroad.su  
 **Всего точек данных:** 243  
 **Проанализировано событий:** 50 (не test_sync)
 

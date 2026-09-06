@@ -18,7 +18,7 @@ DB_NAME=good_road_production
 
 # Backend URL - будет установлен автоматически после deployment
 # Замените на ваш реальный deployment URL
-EXPO_PUBLIC_BACKEND_URL=https://roadqual-track.emergent.host
+EXPO_PUBLIC_BACKEND_URL=https://goodroad.su
 
 # ============================================
 # ПЕРЕМЕННЫЕ ДЛЯ УДАЛЕНИЯ

@@ -2,7 +2,7 @@
 
 **Дата анализа:** 2025-11-11  
 **Время поездки:** 21:48 - 21:53 (5 минут)  
-**Backend:** https://roadqual-track.emergent.host
+**Backend:** https://goodroad.su
 
 ---
 

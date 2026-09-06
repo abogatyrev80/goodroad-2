@@ -59,7 +59,7 @@ const sendEventsToServer = async (events: DetectedEvent[]) => {
   const deviceId = Constants.deviceId || `mobile-app-${Date.now()}`;
   const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
                     Constants.expoConfig?.extra?.backendUrl || 
-                    'https://roadquality.emergent.host';
+                    'https://goodroad.su';
   const apiUrl = backendUrl.endsWith('/') ? backendUrl + 'api/sensor-data' : backendUrl + '/api/sensor-data';
   
   const payload = {

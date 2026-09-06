@@ -36,7 +36,7 @@ DB_NAME = test_database
 │ test_database                                       │ ← ИЗМЕНИТЬ НА ЭТО
 │                                                     │
 │ EXPO_PUBLIC_BACKEND_URL                             │
-│ https://roadqual-track.emergent.host                │ ← НЕ ТРОГАТЬ
+│ https://goodroad.su                │ ← НЕ ТРОГАТЬ
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```

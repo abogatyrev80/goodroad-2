@@ -2,7 +2,7 @@
 
 ## Что произошло:
 
-Вы открыли URL `https://roadqual-track.emergent.host/admin/dashboard` через **Expo Go приложение**.
+Вы открыли URL `https://goodroad.su/admin/dashboard` через **Expo Go приложение**.
 
 Но `/admin/dashboard` - это **backend HTML страница**, она должна открываться в **обычном браузере**, а не в Expo Go!
 
@@ -15,7 +15,7 @@
 **Откройте в ОБЫЧНОМ БРАУЗЕРЕ (Chrome, Safari, Firefox):**
 
 ```
-https://roadqual-track.emergent.host/admin/dashboard
+https://goodroad.su/admin/dashboard
 ```
 
 ☝️ НЕ в Expo Go, а в браузере на компьютере или телефоне!
@@ -33,7 +33,7 @@ https://roadqual-track.emergent.host/admin/dashboard
 
 Способ B: Прямая ссылка в Expo Go
 ```
-exp://roadqual-track.emergent.host/admin-simple
+exp://goodroad.su/admin-simple
 ```
 
 ---
@@ -42,8 +42,8 @@ exp://roadqual-track.emergent.host/admin-simple
 
 | Панель | Где открывать | URL |
 |--------|---------------|-----|
-| Веб-дашборд | **Браузер** | https://roadqual-track.emergent.host/admin/dashboard |
-| Мобильная панель | **Expo Go** | exp://roadqual-track.emergent.host/admin-simple |
+| Веб-дашборд | **Браузер** | https://goodroad.su/admin/dashboard |
+| Мобильная панель | **Expo Go** | exp://goodroad.su/admin-simple |
 
 ---
 
@@ -51,7 +51,7 @@ exp://roadqual-track.emergent.host/admin-simple
 
 ### Для веб-дашборда:
 1. Откройте Chrome/Safari на компьютере или телефоне
-2. Введите URL: `https://roadqual-track.emergent.host/admin/dashboard`
+2. Введите URL: `https://goodroad.su/admin/dashboard`
 3. Увидите карту с данными
 
 ### Для мобильной панели:
@@ -79,10 +79,10 @@ exp://roadqual-track.emergent.host/admin-simple
 ## 🚀 Попробуйте сейчас:
 
 **На компьютере:**
-Откройте в браузере: https://roadqual-track.emergent.host/admin/dashboard
+Откройте в браузере: https://goodroad.su/admin/dashboard
 
 **На телефоне:**
-Вариант 1: Браузер → https://roadqual-track.emergent.host/admin/dashboard
+Вариант 1: Браузер → https://goodroad.su/admin/dashboard
 Вариант 2: Expo Go → Откройте приложение → Нажмите 📊
 
 ---

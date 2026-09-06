@@ -306,7 +306,7 @@ curl "http://localhost:8001/api/clusters/nearby?latitude=55.62&longitude=37.30&r
 ```
 
 2. **Веб-админка:**
-- Открыть https://road-monitor-4.emergent.host/api/admin/dashboard/v2
+- Открыть https://goodroad.su/api/admin/dashboard/v2
 - Выбрать режим "Кластеры препятствий"
 - Проверить отображение маркеров
 

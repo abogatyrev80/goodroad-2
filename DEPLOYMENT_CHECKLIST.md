@@ -44,7 +44,7 @@ mongodb+srv://goodroad_user:PASSWORD@cluster0.abc123.mongodb.net/?retryWrites=tr
 - [ ] Дождаться завершения (~10 минут)
 - [ ] Записать полученный Production URL
 
-**Результат:** URL вида `https://ваш-app.emergent.host`
+**Результат:** URL вида `https://goodroad.su`
 
 ### 3. Настройка Environment Variables (5 минут)
 
@@ -67,7 +67,7 @@ mongodb+srv://goodroad_user:PASSWORD@cluster0.abc123.mongodb.net/?retryWrites=tr
 
 - [ ] Проверить Backend API:
   ```bash
-  curl https://ваш-url.emergent.host/api/admin/analytics
+  curl https://goodroad.su/api/admin/analytics
   ```
   Должен вернуть JSON (не ошибку)
 
@@ -103,7 +103,7 @@ mongodb+srv://goodroad_user:PASSWORD@cluster0.abc123.mongodb.net/?retryWrites=tr
 Если не хотите настраивать MongoDB Atlas сейчас:
 
 - [ ] Откройте Expo Go на телефоне
-- [ ] Введите URL: `exp://potholefinder.preview.emergentagent.com`
+- [ ] Введите URL: `exp://goodroad.su`
 - [ ] Тестируйте все функции (работает полностью!)
 
 **Preview использует локальную MongoDB, все функции работают!**

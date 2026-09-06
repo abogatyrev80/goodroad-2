@@ -4,12 +4,12 @@
 
 1. HTTPS вариант (РЕКОМЕНДУЕТСЯ):
    Файл: /app/expo_qr_for_expo_go.png
-   URL: https://soundzummer.preview.emergentagent.com/
+   URL: https://goodroad.su/
    Использование: Работает в современных версиях Expo Go
 
 2. exp:// вариант (АЛЬТЕРНАТИВА):
    Файл: /app/expo_qr_exp.png
-   URL: exp://pothole-detect-1.preview.emergentagent.com
+   URL: exp://goodroad.su
    Использование: Для старых версий Expo Go
 
 === КАК ИСПОЛЬЗОВАТЬ ===
@@ -23,7 +23,7 @@
 
 1. Откройте Expo Go на телефоне
 2. Нажмите 'Enter URL manually'
-3. Введите: https://soundzummer.preview.emergentagent.com/
+3. Введите: https://goodroad.su/
 
 === ПРИМЕЧАНИЕ ===
 Если QR код не работает, используйте ручной ввод URL.

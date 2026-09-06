@@ -210,15 +210,15 @@ Deployed мобильное приложение может использова
 **Проверка необходима:**
 
 Убедиться, что мобильное приложение подключается к правильному backend:
-- Production: `https://roadqual-track.emergent.host`
-- Не к preview: `https://soundzummer.preview.emergentagent.com`
+- Production: `https://goodroad.su`
+- Не к preview: `https://goodroad.su`
 
 **Как проверить:**
 Открыть app.json и убедиться:
 ```json
 {
   "extra": {
-    "backendUrl": "https://roadqual-track.emergent.host"
+    "backendUrl": "https://goodroad.su"
   }
 }
 ```

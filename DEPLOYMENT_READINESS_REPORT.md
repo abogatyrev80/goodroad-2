@@ -71,7 +71,7 @@
 ## 🎯 Deployment Steps
 
 ### Шаг 1: Изменить Environment Variables
-1. Зайти в Deployment: https://roadqual-track.emergent.host
+1. Зайти в Deployment: https://goodroad.su
 2. Settings → Environment Variables
 3. Изменить DB_NAME на "test_database"
 4. Удалить REACT_APP_BACKEND_URL
@@ -82,7 +82,7 @@
 2. Дождаться завершения (~5-10 минут)
 
 ### Шаг 3: Verification
-1. Проверить Backend: curl https://roadqual-track.emergent.host/api/admin/analytics
+1. Проверить Backend: curl https://goodroad.su/api/admin/analytics
 2. Открыть QR код в Expo Go
 3. Начать мониторинг
 4. Проверить что данные отправляются

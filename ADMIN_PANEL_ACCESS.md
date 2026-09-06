@@ -19,8 +19,8 @@
 
 **Способ B: Прямая ссылка**
 ```
-Preview: exp://potholefinder.preview.emergentagent.com/admin-simple
-Deploy: exp://roadqual-track.emergent.host/admin-simple
+Preview: exp://goodroad.su/admin-simple
+Deploy: exp://goodroad.su/admin-simple
 ```
 
 ### Функции мобильной панели:
@@ -47,7 +47,7 @@ Preview через `/api` prefix может не работать из-за Expo
 
 **Deploy (✅ Работает):**
 ```
-https://roadqual-track.emergent.host/admin/dashboard
+https://goodroad.su/admin/dashboard
 ```
 
 ### Функции веб-дашборда:
@@ -65,7 +65,7 @@ https://roadqual-track.emergent.host/admin/dashboard
 ### Preview Environment:
 ```
 ✅ Мобильная панель: Работает
-   exp://potholefinder.preview.emergentagent.com/admin-simple
+   exp://goodroad.su/admin-simple
 
 ⚠️  Веб-дашборд: Только локально
    http://localhost:8001/admin/dashboard
@@ -74,10 +74,10 @@ https://roadqual-track.emergent.host/admin/dashboard
 ### Deploy Environment (после Re-Deploy):
 ```
 ✅ Мобильная панель: Будет работать
-   exp://roadqual-track.emergent.host/admin-simple
+   exp://goodroad.su/admin-simple
 
 ✅ Веб-дашборд: Работает
-   https://roadqual-track.emergent.host/admin/dashboard
+   https://goodroad.su/admin/dashboard
 ```
 
 ---
@@ -101,7 +101,7 @@ ngrok http 8001
 ### Вариант 3: Использовать Deploy
 После Re-Deploy веб-дашборд будет доступен напрямую:
 ```
-https://roadqual-track.emergent.host/admin/dashboard
+https://goodroad.su/admin/dashboard
 ```
 
 ---
@@ -131,7 +131,7 @@ https://roadqual-track.emergent.host/admin/dashboard
 **Для анализа данных на компьютере:**
 → Используйте веб-дашборд после Deploy:
 ```
-https://roadqual-track.emergent.host/admin/dashboard
+https://goodroad.su/admin/dashboard
 ```
 
 **Для локальной разработки:**
@@ -147,12 +147,12 @@ http://localhost:8001/admin/dashboard
 Добавьте в закладки:
 
 **Мобильная панель:**
-- Preview: `exp://potholefinder.preview.emergentagent.com/admin-simple`
-- Deploy: `exp://roadqual-track.emergent.host/admin-simple`
+- Preview: `exp://goodroad.su/admin-simple`
+- Deploy: `exp://goodroad.su/admin-simple`
 
 **Веб-дашборд:**
 - Локально: `http://localhost:8001/admin/dashboard`
-- Deploy: `https://roadqual-track.emergent.host/admin/dashboard`
+- Deploy: `https://goodroad.su/admin/dashboard`
 
 ---
 

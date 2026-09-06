@@ -235,11 +235,11 @@ useEffect(() => {
 
 ```bash
 # Последние данные
-curl -s 'https://road-monitor-4.emergent.host/api/admin/v2/raw-data?limit=10' \
+curl -s 'https://goodroad.su/api/admin/v2/raw-data?limit=10' \
   | jq '.data | map({timestamp, latitude, longitude, speed})'
 
 # Мониторинг в реальном времени
-watch -n 5 'curl -s "https://road-monitor-4.emergent.host/api/admin/v2/analytics" | jq ".summary"'
+watch -n 5 'curl -s "https://goodroad.su/api/admin/v2/analytics" | jq ".summary"'
 ```
 
 ---
