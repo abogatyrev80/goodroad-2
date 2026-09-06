@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual env (не должен попадать в образ)
+venv/
+.venv/
+
+# Logs
+*.log
+*.err
+*.out
+
+# Environment (секреты НЕ должны попадать в образ)
+.env
+.env.local
+.env.*.local
+
+# Backups / копии / мёртвые файлы
+*.backup*
+*_backup*
+server.py.backup_before_cleanup
+"ml_processor — копия.py"
+server-original.py
+server-optimized.py
+
+# Данные и датасеты (не нужны в рантайме)
+data/
+datasets/
+*.tar.gz
+*.zip
+*.pkl
+
+# Модели (обучаются/скачиваются отдельно, только .gitkeep)
+models/*.pt
+models/*.pth
+models/*.keras
+models/*.h5
+models/*.onnx
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

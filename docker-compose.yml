@@ -13,7 +13,12 @@ services:
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
-networks:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
       - road-monitor-network
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
@@ -48,6 +53,11 @@ networks:
   #     timeout: 10s
   #     retries: 3
   #     start_period: 40s
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
 
   # # Frontend (Expo)
   # frontend:

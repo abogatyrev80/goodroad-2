@@ -2995,6 +2995,78 @@ async def admin_dashboard_v3_api(request: Request):
     return templates.TemplateResponse("admin_dashboard_v4.html", {"request": request})
 
 
+@api_router.post("/admin/clear-logs")
+async def admin_clear_logs():
+    """
+    Сбросить логи Docker-контейнеров для освобождения места на диске.
+    Обрезает -json.log логи, до которых есть доступ из контейнера:
+      1) /var/lib/docker/containers если смонтировано
+      2) /proc/1/fd/1 (свой stdout) — работает всегда внутри контейнера
+    """
+    freed_bytes = 0
+    truncated = []
+
+    def _truncate(path):
+        nonlocal freed_bytes
+        try:
+            size = os.path.getsize(path)
+            if size == 0:
+                return
+            with open(path, "r+b") as f:
+                f.truncate(0)
+            freed_bytes += size
+            truncated.append(f"{path} ({size // 1024} KB)")
+            logger.info("Truncated log: %s (%d bytes)", path, size)
+        except Exception as e:
+            logger.warning("Cannot truncate %s: %s", path, e)
+
+    containers_dir = "/var/lib/docker/containers"
+    if os.path.isdir(containers_dir):
+        try:
+            for cid in os.listdir(containers_dir):
+                cdir = os.path.join(containers_dir, cid)
+                if not os.path.isdir(cdir):
+                    continue
+                for fname in os.listdir(cdir):
+                    if fname.endswith("-json.log"):
+                        _truncate(os.path.join(cdir, fname))
+        except Exception as e:
+            logger.warning("Direct containers dir cleanup failed: %s", e)
+
+    for fd_path in ("/proc/1/fd/1", "/proc/self/fd/1"):
+        try:
+            if os.path.exists(fd_path):
+                with open(fd_path, "r+b") as f:
+                    size = os.fstat(f.fileno()).st_size
+                    f.truncate(0)
+                    if size:
+                        freed_bytes += size
+                        truncated.append(f"{os.path.realpath(fd_path)} ({size // 1024} KB)")
+        except Exception as e:
+            logger.debug("Cannot truncate %s: %s", fd_path, e)
+
+    if not truncated:
+        return {
+            "status": "ok",
+            "message": "Нет логов для очистки. /var/lib/docker не смонтирован в контейнер.",
+            "details": {
+                "freed_bytes": 0,
+                "containers_dir_mounted": os.path.isdir(containers_dir),
+            },
+        }
+
+    return {
+        "status": "ok",
+        "message": f"Очищено логов: {len(truncated)}",
+        "details": {
+            "freed_bytes": freed_bytes,
+            "freed_mb": round(freed_bytes / (1024 * 1024), 1),
+            "containers_dir_mounted": os.path.isdir(containers_dir),
+            "truncated": truncated,
+        },
+    }
+
+
 @api_router.put("/admin/editor/events/{event_id}")
 async def update_event(event_id: str, data: dict):
     """

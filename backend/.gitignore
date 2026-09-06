@@ -25,10 +25,13 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Backups
+# Backups / dead files
 *.backup*
 *_backup*
 *_backup_*
+server-original.py
+server-optimized.py
+server.py.backup_before_cleanup
 
 # Model files
 *.keras

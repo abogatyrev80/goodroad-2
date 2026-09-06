@@ -99,3 +99,10 @@ jobs:
             done
 
             echo "Done. Running image: $(docker inspect road-monitor-backend --format '{{.Config.Image}}')"
+
+            echo "Truncating container logs to free disk space..."
+            truncate -s 0 /var/lib/docker/containers/*/*-json.log 2>/dev/null || true
+
+            echo "Pruning old Docker images and build cache..."
+            docker image prune -f --filter "until=72h"
+            docker builder prune -f

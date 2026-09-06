@@ -139,6 +139,9 @@ tr:hover{background:#1e293b}
   <div class="tab" onclick="switchTab('llm')">🤖 LLM</div>
   <div class="tab" onclick="switchTab('gpu')">🖥️ GPU Machines</div>
   <div class="tab" onclick="switchTab('warnings')">⚠️ Warnings</div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <button class="btn-sm btn-primary" onclick="clearContainerLogs()" title="Обрезать Docker-логи контейнеров (освободить место на диске)">🧹 Clear Logs</button>
+  </div>
 </div>
 
 <!-- TAB 1: Inference Monitor -->
@@ -866,6 +869,26 @@ async function fetchJSON(url) {
   } catch(e) {
     console.error('Fetch error:', url, e);
     return null;
+  }
+}
+
+async function clearContainerLogs() {
+  if (!confirm('Очистить логи Docker-контейнеров? Это освободит место на диске.')) return;
+  const btn = document.querySelector('button[onclick="clearContainerLogs()"]');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/admin/clear-logs', { method: 'POST' });
+    const res = await r.json();
+    let msg = res.message || 'Логи очищены.';
+    if (res.details && res.details.freed_bytes) {
+      const mb = (res.details.freed_bytes / (1024*1024)).toFixed(1);
+      msg += ` (освобождено ~${mb} MB)`;
+    }
+    alert(msg);
+  } catch(e) {
+    alert('Ошибка: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
