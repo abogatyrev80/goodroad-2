@@ -16,8 +16,8 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .header .status span{display:flex;align-items:center;gap:4px}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .dot.green{background:#22c55e}.dot.yellow{background:#eab308}.dot.red{background:#ef4444}.dot.gray{background:#6b7280}
-.tabs{display:flex;background:#1e293b;border-bottom:2px solid #334155;padding:0 24px}
-.tab{padding:12px 20px;cursor:pointer;font-size:14px;font-weight:500;color:#94a3b8;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tabs{display:flex;overflow-x:auto;background:#1e293b;border-bottom:2px solid #334155;padding:0 24px}
+.tab{flex-shrink:0;white-space:nowrap;padding:12px 20px;cursor:pointer;font-size:14px;font-weight:500;color:#94a3b8;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
 .tab:hover{color:#e2e8f0}
 .tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
 .content{padding:24px;display:none}
@@ -26,12 +26,12 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172
 .grid-2{grid-template-columns:1fr 1fr}
 .grid-3{grid-template-columns:1fr 1fr 1fr}
 .grid-4{grid-template-columns:repeat(4,1fr)}
-.card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
+.card{min-width:0;overflow-x:auto;background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
 .card h3{font-size:14px;font-weight:500;color:#94a3b8;margin-bottom:12px}
 .card .value{font-size:28px;font-weight:700;color:#f1f5f9}
 .card .sub{font-size:12px;color:#64748b;margin-top:4px}
 .chart-container{position:relative;height:300px}
-#map{height:500px;width:100%;border-radius:12px;border:1px solid #334155}
+#map{height:clamp(360px,65vh,760px);height:clamp(360px,65dvh,760px);width:100%;border-radius:8px;border:1px solid #334155}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:10px 12px;color:#94a3b8;font-weight:500;border-bottom:1px solid #334155}
 td{padding:10px 12px;border-bottom:1px solid #1e293b}
@@ -72,7 +72,6 @@ tr:hover{background:#1e293b}
 
 /* Map styles */
 .map-section { flex: 1; display: flex; flex-direction: column; min-height: 500px; }
-#map { flex: 1; min-height: 500px; }
 .leaflet-popup-content-wrapper { background: #1e293b; color: #e2e8f0; border-radius: 8px; }
 .leaflet-popup-tip { background: #1e293b; }
 .leaflet-container { background: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -116,6 +115,51 @@ tr:hover{background:#1e293b}
 .btn-info{background:#06b6d4;color:#fff}.btn-info:hover{background:#0891b2}
 .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
 .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-sm:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,a:focus-visible{outline:2px solid #60a5fa;outline-offset:3px}
+.maintenance-link{display:inline-flex;align-items:center;white-space:nowrap;text-decoration:none;min-height:44px}
+.map-card{overflow:visible}
+.map-frame{position:relative;isolation:isolate}
+.map-help,.selection-summary{font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:12px}
+.map-feedback{font-size:13px;line-height:1.5;overflow-wrap:anywhere;margin-bottom:12px}
+.map-feedback:empty{display:none}
+.map-feedback[data-state="error"]{color:#fca5a5}
+.map-feedback[data-state="success"]{color:#86efac}
+.map-feedback[data-state="pending"]{color:#93c5fd}
+.map-status{flex-wrap:wrap}
+.map-toolbar [aria-pressed="true"],.map-toolbar [aria-expanded="true"]{background:#334155;color:#fff}
+.bulk-buttons{display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end}
+.grid>*{min-width:0}
+@media(max-width:768px){
+  .header{padding:12px;flex-wrap:wrap;gap:10px}
+  .header h1{font-size:16px}
+  .header .status{flex-wrap:wrap;gap:8px 12px}
+  .tabs{padding:0 12px}
+  .tab{padding:12px}
+  .content{padding:12px}
+  .card{padding:14px}
+  .grid-3>.card{grid-column:auto!important}
+  .chart-container{height:250px}
+  .map-toolbar{gap:8px;padding:8px}
+  .map-toolbar .sep{display:none}
+  .map-toolbar .btn-sm{flex:1 1 130px}
+  #map-selection-count{flex-basis:100%}
+  #map{height:55vh;height:55dvh;min-height:300px}
+  #tab-map .btn-sm,#tab-map select,#tab-map input:not([type="checkbox"]){min-height:44px}
+  #tab-map input:not([type="checkbox"]),#tab-map select{font-size:16px;max-width:100%}
+  .filter-panel,.bulk-panel{padding:12px}
+  .filter-row,.bulk-actions{gap:10px}
+  .filter-group{flex:1 1 140px;min-width:0}
+  .checkbox-group{gap:4px 12px}
+  .checkbox-group label{min-height:44px}
+  .checkbox-group input{width:18px;height:18px}
+  .bulk-panel .bulk-info{min-width:0;flex-basis:100%}
+  .bulk-panel .bulk-actions{width:100%}
+  .bulk-buttons{width:100%}
+  .bulk-buttons button{flex:1 1 130px}
+  .legend{bottom:28px;right:8px;max-width:calc(100% - 64px);max-height:45%;overflow-y:auto;padding:8px}
+  .leaflet-popup-content{max-width:calc(100vw - 100px);overflow-wrap:anywhere}
+}
 </style>
 </head>
 <body>
@@ -140,7 +184,7 @@ tr:hover{background:#1e293b}
   <div class="tab" onclick="switchTab('gpu')">🖥️ GPU Machines</div>
   <div class="tab" onclick="switchTab('warnings')">⚠️ Warnings</div>
   <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-    <button class="btn-sm btn-primary" onclick="clearContainerLogs()" title="Обрезать Docker-логи контейнеров (освободить место на диске)">🧹 Clear Logs</button>
+    <a class="btn-sm btn-primary maintenance-link" href="https://github.com/abogatyrev80/goodroad-2/actions/workflows/maintenance.yml" target="_blank" rel="noopener noreferrer" title="Host maintenance via GitHub Actions (opens in a new tab)">Host Maintenance</a>
   </div>
 </div>
 
@@ -369,33 +413,36 @@ tr:hover{background:#1e293b}
 
 <!-- TAB 6: Map -->
 <div class="content" id="tab-map">
-  <div class="card" style="position:relative">
+  <div class="card map-card" style="position:relative">
     <h3 style="margin-bottom:12px">Map — Events & Clusters</h3>
     
     <div class="map-toolbar">
-      <button class="btn-sm btn-outline" onclick="toggleFilters()" id="btn-filters">Filters</button>
-      <button class="btn-sm btn-outline" onclick="toggleBoxSelect()" id="btn-boxselect">Box Select</button>
+      <button class="btn-sm btn-outline" onclick="toggleFilters()" id="btn-filters" aria-expanded="false" aria-controls="filter-panel">Filters</button>
+      <button class="btn-sm btn-outline" onclick="applyFilters()" title="Reload using the current filters and clear selection">Refresh Map</button>
+      <button class="btn-sm btn-outline" onclick="toggleTapSelect()" id="btn-tapselect" aria-pressed="false" aria-describedby="map-help">Tap Select</button>
+      <button class="btn-sm btn-outline" onclick="toggleBoxSelect()" id="btn-boxselect" aria-pressed="false">Box Select</button>
       <div class="sep"></div>
       <button class="btn-sm btn-outline" onclick="selectAllVisible()">Select All Visible</button>
       <button class="btn-sm btn-outline" onclick="clearSelection()">Clear Selection</button>
       <div class="sep"></div>
-      <button class="btn-sm btn-outline" onclick="toggleLegend()">Legend</button>
+      <button class="btn-sm btn-outline" onclick="toggleLegend()" id="btn-legend" aria-expanded="false" aria-controls="map-legend">Legend</button>
       <div class="sep"></div>
-      <span id="map-selection-count" style="font-size:12px;color:#94a3b8"></span>
+      <span id="map-selection-count" role="status" aria-live="polite" style="font-size:12px;color:#94a3b8">No items selected</span>
     </div>
+    <p class="map-help" id="map-help">Tap Select to select individual markers on mobile, or Shift-click on desktop. Select All Visible adds only markers in the current map view. Filtering or refreshing clears the selection.</p>
 
-    <div class="filter-panel" id="filter-panel">
+    <div class="filter-panel" id="filter-panel" role="region" aria-labelledby="btn-filters">
       <div class="filter-row">
         <div class="filter-group">
-          <label>Date From</label>
+          <label for="filter-date-from">Date From (events)</label>
           <input type="date" id="filter-date-from">
         </div>
         <div class="filter-group">
-          <label>Date To</label>
+          <label for="filter-date-to">Date To (events)</label>
           <input type="date" id="filter-date-to">
         </div>
         <div class="filter-group">
-          <label>Min Severity</label>
+          <label for="filter-severity-min">Min Severity</label>
           <select id="filter-severity-min">
             <option value="">Any</option>
             <option value="1">1 - Critical</option>
@@ -406,7 +453,7 @@ tr:hover{background:#1e293b}
           </select>
         </div>
         <div class="filter-group">
-          <label>Max Severity</label>
+          <label for="filter-severity-max">Max Severity</label>
           <select id="filter-severity-max">
             <option value="">Any</option>
             <option value="1">1 - Critical</option>
@@ -417,7 +464,7 @@ tr:hover{background:#1e293b}
           </select>
         </div>
         <div class="filter-group">
-          <label>Min Confidence</label>
+          <label for="filter-confidence">Min Confidence</label>
           <input type="number" id="filter-confidence" min="0" max="1" step="0.1" placeholder="0.0 - 1.0" style="width:100px">
         </div>
       </div>
@@ -462,7 +509,7 @@ tr:hover{background:#1e293b}
       </div>
       <div class="bulk-actions">
         <div class="filter-group">
-          <label>Change Type</label>
+          <label for="bulk-type">Change Type</label>
           <select id="bulk-type">
             <option value="">— Keep —</option>
             <option value="pothole">Pothole</option>
@@ -473,7 +520,7 @@ tr:hover{background:#1e293b}
           </select>
         </div>
         <div class="filter-group">
-          <label>Change Severity</label>
+          <label for="bulk-severity">Change Severity</label>
           <select id="bulk-severity">
             <option value="">— Keep —</option>
             <option value="1">1 - Critical</option>
@@ -484,7 +531,7 @@ tr:hover{background:#1e293b}
           </select>
         </div>
         <div class="filter-group">
-          <label>Cluster Status</label>
+          <label for="bulk-status">Cluster Status</label>
           <select id="bulk-status">
             <option value="">— Keep —</option>
             <option value="active">Active</option>
@@ -492,16 +539,19 @@ tr:hover{background:#1e293b}
             <option value="rejected">Rejected</option>
           </select>
         </div>
-        <div style="display:flex;gap:6px;margin-top:18px">
-          <button class="btn-sm btn-success" onclick="bulkApply()">Apply Changes</button>
-          <button class="btn-sm btn-danger" onclick="bulkDelete()">Delete Selected</button>
+        <div class="bulk-buttons">
+          <button class="btn-sm btn-success" onclick="bulkApply()" id="btn-bulk-apply" disabled>Apply Changes</button>
+          <button class="btn-sm btn-danger" onclick="bulkDelete()" id="btn-bulk-delete" disabled>Delete Selected</button>
         </div>
       </div>
     </div>
 
-    <div style="position:relative">
-      <div id="map" style="height:500px;border-radius:8px;border:1px solid #334155"></div>
-      <div class="legend" id="map-legend">
+    <p class="selection-summary" id="selection-summary">No items selected. Bulk actions affect only selected records; status changes apply to clusters only.</p>
+    <div class="map-feedback" id="bulk-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="map-feedback" id="map-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="map-frame">
+      <div id="map" aria-label="Events and clusters map" aria-describedby="map-help"></div>
+      <div class="legend" id="map-legend" style="display:none">
         <h4>Legend</h4>
         <div class="legend-item"><span class="type-dot" style="background:#ef4444"></span>Pothole</div>
         <div class="legend-item"><span class="type-dot" style="background:#f59e0b"></span>Speed Bump</div>
@@ -869,26 +919,6 @@ async function fetchJSON(url) {
   } catch(e) {
     console.error('Fetch error:', url, e);
     return null;
-  }
-}
-
-async function clearContainerLogs() {
-  if (!confirm('Очистить логи Docker-контейнеров? Это освободит место на диске.')) return;
-  const btn = document.querySelector('button[onclick="clearContainerLogs()"]');
-  if (btn) btn.disabled = true;
-  try {
-    const r = await fetch('/api/admin/clear-logs', { method: 'POST' });
-    const res = await r.json();
-    let msg = res.message || 'Логи очищены.';
-    if (res.details && res.details.freed_bytes) {
-      const mb = (res.details.freed_bytes / (1024*1024)).toFixed(1);
-      msg += ` (освобождено ~${mb} MB)`;
-    }
-    alert(msg);
-  } catch(e) {
-    alert('Ошибка: ' + e.message);
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -1421,6 +1451,21 @@ let map, eventsMarkers = [], clustersMarkers = [];
 let mapEventsData = [], mapClustersData = [];
 let selectedEvents = new Set(), selectedClusters = new Set();
 let boxSelectMode = false, boxSelectStart = null, boxSelectRect = null;
+let tapSelectMode = false, bulkBusy = false, mapLoading = false;
+let mapResizeFrame = null, mapNeedsFit = false;
+
+function resizeMap() {
+  if (mapResizeFrame !== null) cancelAnimationFrame(mapResizeFrame);
+  mapResizeFrame = requestAnimationFrame(() => {
+    mapResizeFrame = null;
+    if (!map || !map.getContainer().clientWidth || !map.getContainer().clientHeight) return;
+    map.invalidateSize({pan: false});
+    if (mapNeedsFit) {
+      mapNeedsFit = false;
+      fitMapToMarkers();
+    }
+  });
+}
 
 function initMap() {
   if (map) return;
@@ -1429,10 +1474,19 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
-  document.getElementById('map-legend').style.display = 'none';
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(resizeMap);
+    observer.observe(map.getContainer());
+  }
+  window.addEventListener('resize', resizeMap);
+  resizeMap();
 }
 
 function fitMapToMarkers() {
+  if (!map.getContainer().clientWidth || !map.getContainer().clientHeight) {
+    mapNeedsFit = true;
+    return;
+  }
   const allMarkers = [...eventsMarkers, ...clustersMarkers];
   if (allMarkers.length === 0) {
     map.setView([55.7558, 37.6173], 5);
@@ -1457,15 +1511,19 @@ function getSelectedStatuses() {
 
 function toggleFilters() {
   const panel = document.getElementById('filter-panel');
-  panel.classList.toggle('open');
+  const open = panel.classList.toggle('open');
+  document.getElementById('btn-filters').setAttribute('aria-expanded', String(open));
+  resizeMap();
 }
 
 function toggleLegend() {
   const legend = document.getElementById('map-legend');
   legend.style.display = legend.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('btn-legend').setAttribute('aria-expanded', String(legend.style.display !== 'none'));
 }
 
 function resetFilters() {
+  if (bulkBusy || mapLoading) return;
   document.getElementById('filter-date-from').value = '';
   document.getElementById('filter-date-to').value = '';
   document.getElementById('filter-severity-min').value = '';
@@ -1480,19 +1538,32 @@ function resetFilters() {
 }
 
 async function applyFilters() {
+  if (bulkBusy || mapLoading) return;
   await loadMapData();
 }
 
+function toggleTapSelect() {
+  tapSelectMode = !tapSelectMode;
+  document.getElementById('btn-tapselect').setAttribute('aria-pressed', String(tapSelectMode));
+  if (tapSelectMode && boxSelectMode) toggleBoxSelect();
+}
+
 function toggleBoxSelect() {
+  if (!map) return;
   boxSelectMode = !boxSelectMode;
   const btn = document.getElementById('btn-boxselect');
+  btn.setAttribute('aria-pressed', String(boxSelectMode));
   btn.style.background = boxSelectMode ? '#3b82f6' : '';
   btn.style.color = boxSelectMode ? '#fff' : '';
   if (boxSelectMode) {
+    if (tapSelectMode) toggleTapSelect();
+    map.dragging.disable();
     map.getContainer().style.cursor = 'crosshair';
     map.on('mousedown', onBoxSelectStart);
     map.on('mouseup', onBoxSelectEnd);
   } else {
+    map.dragging.enable();
+    boxSelectStart = null;
     map.getContainer().style.cursor = '';
     map.off('mousedown', onBoxSelectStart);
     map.off('mouseup', onBoxSelectEnd);
@@ -1504,23 +1575,24 @@ function toggleBoxSelect() {
 }
 
 function onBoxSelectStart(e) {
+  if (bulkBusy || mapLoading) return;
   boxSelectStart = e.latlng;
 }
 
 function onBoxSelectEnd(e) {
-  if (!boxSelectStart) return;
+  if (!boxSelectStart || bulkBusy || mapLoading) return;
   const bounds = L.latLngBounds(boxSelectStart, e.latlng);
   
-  eventsMarkers.forEach((marker, i) => {
+  eventsMarkers.forEach(marker => {
     if (bounds.contains(marker.getLatLng())) {
-      const id = mapEventsData[i]?.id;
+      const id = marker._eventId;
       if (id) selectedEvents.add(id);
     }
   });
   
-  clustersMarkers.forEach((marker, i) => {
+  clustersMarkers.forEach(marker => {
     if (bounds.contains(marker.getLatLng())) {
-      const id = mapClustersData[i]?.clusterId;
+      const id = marker._clusterId;
       if (id) selectedClusters.add(id);
     }
   });
@@ -1531,17 +1603,20 @@ function onBoxSelectEnd(e) {
 }
 
 function selectAllVisible() {
-  mapEventsData.forEach(ev => {
-    if (ev.latitude && ev.longitude) selectedEvents.add(ev.id);
+  if (!map || bulkBusy || mapLoading) return;
+  const bounds = map.getBounds();
+  eventsMarkers.forEach(marker => {
+    if (marker._eventId && bounds.contains(marker.getLatLng())) selectedEvents.add(marker._eventId);
   });
-  mapClustersData.forEach(cl => {
-    if (cl.location?.coordinates) selectedClusters.add(cl.clusterId);
+  clustersMarkers.forEach(marker => {
+    if (marker._clusterId && bounds.contains(marker.getLatLng())) selectedClusters.add(marker._clusterId);
   });
   updateSelectionUI();
   updateMarkerStyles();
 }
 
 function clearSelection() {
+  if (bulkBusy || mapLoading) return;
   selectedEvents.clear();
   selectedClusters.clear();
   updateSelectionUI();
@@ -1550,24 +1625,29 @@ function clearSelection() {
 
 function updateSelectionUI() {
   const total = selectedEvents.size + selectedClusters.size;
-  const text = total > 0 ? total + ' selected' : '';
+  const text = total > 0 ? total + ' selected' : 'No items selected';
   document.getElementById('map-selection-count').textContent = text;
   document.getElementById('map-selected-count').textContent = total;
   
-  const bulkPanel = document.getElementById('bulk-panel');
-  if (total > 0) {
-    bulkPanel.classList.add('open');
-    document.getElementById('bulk-count').textContent = total;
-    document.getElementById('bulk-events-count').textContent = selectedEvents.size + ' events';
-    document.getElementById('bulk-clusters-count').textContent = selectedClusters.size + ' clusters';
-  } else {
-    bulkPanel.classList.remove('open');
-  }
+  document.getElementById('bulk-panel').classList.toggle('open', total > 0 || bulkBusy);
+  document.getElementById('bulk-count').textContent = total;
+  document.getElementById('bulk-events-count').textContent = selectedEvents.size + ' events';
+  document.getElementById('bulk-clusters-count').textContent = selectedClusters.size + ' clusters';
+  document.getElementById('selection-summary').textContent =
+    `${selectedEvents.size} events and ${selectedClusters.size} clusters selected. ` +
+    'Bulk actions include selected markers outside the current view. Status changes apply to clusters only.';
+  document.querySelectorAll('.map-toolbar button, #filter-panel input, #filter-panel select, #filter-panel button, #bulk-panel select').forEach(el => {
+    el.disabled = bulkBusy || mapLoading;
+  });
+  document.getElementById('btn-bulk-apply').disabled = !total || bulkBusy || mapLoading;
+  document.getElementById('btn-bulk-delete').disabled = !total || bulkBusy || mapLoading;
+  document.getElementById('bulk-panel').setAttribute('aria-busy', String(bulkBusy));
+  resizeMap();
 }
 
 function updateMarkerStyles() {
-  eventsMarkers.forEach((marker, i) => {
-    const id = mapEventsData[i]?.id;
+  eventsMarkers.forEach(marker => {
+    const id = marker._eventId;
     const selected = selectedEvents.has(id);
     marker.setStyle({
       weight: selected ? 4 : 2,
@@ -1575,8 +1655,8 @@ function updateMarkerStyles() {
       color: selected ? '#3b82f6' : '#fff'
     });
   });
-  clustersMarkers.forEach((marker, i) => {
-    const id = mapClustersData[i]?.clusterId;
+  clustersMarkers.forEach(marker => {
+    const id = marker._clusterId;
     const selected = selectedClusters.has(id);
     marker.setStyle({
       weight: selected ? 4 : 2,
@@ -1586,7 +1666,8 @@ function updateMarkerStyles() {
 }
 
 function onMarkerClick(id, type, e) {
-  if (e.originalEvent.shiftKey) {
+  if (bulkBusy || mapLoading || !id) return;
+  if (tapSelectMode || e.originalEvent?.shiftKey) {
     if (type === 'event') {
       selectedEvents.has(id) ? selectedEvents.delete(id) : selectedEvents.add(id);
     } else {
@@ -1594,14 +1675,16 @@ function onMarkerClick(id, type, e) {
     }
     updateSelectionUI();
     updateMarkerStyles();
+    map.closePopup();
     L.DomEvent.stopPropagation(e);
     return false;
   }
 }
 
-async function loadMapData() {
+async function loadMapData({preserveSelection = false} = {}) {
+  if (mapLoading) return false;
   if (!map) initMap();
-  map.invalidateSize();
+  resizeMap();
   
   const types = getSelectedTypes();
   const statuses = getSelectedStatuses();
@@ -1610,6 +1693,19 @@ async function loadMapData() {
   const sevMin = document.getElementById('filter-severity-min').value || null;
   const sevMax = document.getElementById('filter-severity-max').value || null;
   const confMin = document.getElementById('filter-confidence').value || null;
+  const feedback = document.getElementById('map-feedback');
+  if ((dateFrom && dateTo && dateFrom > dateTo) ||
+      (sevMin && sevMax && Number(sevMin) > Number(sevMax)) ||
+      !document.getElementById('filter-confidence').checkValidity()) {
+    feedback.dataset.state = 'error';
+    feedback.textContent = 'Check the date range, severity range and confidence (0 to 1).';
+    return false;
+  }
+  mapLoading = true;
+  feedback.dataset.state = 'pending';
+  feedback.textContent = 'Loading map data...';
+  document.getElementById('map').setAttribute('aria-busy', 'true');
+  updateSelectionUI();
   
   try {
     const evBody = {
@@ -1625,16 +1721,32 @@ async function loadMapData() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(evBody)
     });
+    if (!evResp.ok) throw new Error('Events: HTTP ' + evResp.status);
     const events = await evResp.json();
+    // The clusters endpoint accepts one status and defaults to active.
+    const clusterResults = await Promise.all(statuses.map(async status => {
+      const clResp = await fetch('/api/admin/v2/clusters?limit=100000&status=' + encodeURIComponent(status));
+      if (!clResp.ok) throw new Error('Clusters: HTTP ' + clResp.status);
+      const result = await clResp.json();
+      if (!Array.isArray(result.clusters)) throw new Error('Invalid cluster data response');
+      return result;
+    }));
+    const clusters = {
+      clusters: clusterResults.flatMap(result => result.clusters),
+      total: clusterResults.reduce((sum, result) => sum + (result.total || 0), 0)
+    };
+    if (!Array.isArray(events.events)) {
+      throw new Error('Invalid map data response');
+    }
     
     eventsMarkers.forEach(m => map.removeLayer(m));
     eventsMarkers = [];
     mapEventsData = [];
     
     if (events && events.events) {
-      mapEventsData = events.events;
-      events.events.forEach(ev => {
-        if (ev.latitude && ev.longitude) {
+      mapEventsData = types.length ? events.events : [];
+      mapEventsData.forEach(ev => {
+        if (Number.isFinite(ev.latitude) && Number.isFinite(ev.longitude)) {
           const color = EVENT_COLORS[ev.eventType] || '#6b7280';
           const marker = L.circleMarker([ev.latitude, ev.longitude], {
             radius: 6, color: '#fff', weight: 2,
@@ -1662,12 +1774,6 @@ async function loadMapData() {
       });
     }
 
-    let clUrl = '/api/admin/v2/clusters?limit=100000';
-    if (statuses.length > 0 && statuses.length < 4) {
-      clUrl += '&status=' + statuses[0];
-    }
-    const clusters = await fetchJSON(clUrl);
-    
     clustersMarkers.forEach(m => map.removeLayer(m));
     clustersMarkers = [];
     mapClustersData = [];
@@ -1675,12 +1781,7 @@ async function loadMapData() {
     if (clusters && clusters.clusters) {
       let filteredClusters = clusters.clusters;
       
-      if (types.length > 0) {
-        filteredClusters = filteredClusters.filter(cl => types.includes(cl.obstacleType));
-      }
-      if (statuses.length > 0) {
-        filteredClusters = filteredClusters.filter(cl => statuses.includes(cl.status));
-      }
+      filteredClusters = filteredClusters.filter(cl => types.includes(cl.obstacleType) && statuses.includes(cl.status));
       if (sevMin) {
         filteredClusters = filteredClusters.filter(cl => cl.severity?.max >= parseInt(sevMin));
       }
@@ -1693,7 +1794,8 @@ async function loadMapData() {
       
       mapClustersData = filteredClusters;
       filteredClusters.forEach(cl => {
-        if (cl.location?.coordinates) {
+        if (Array.isArray(cl.location?.coordinates) && cl.location.coordinates.length >= 2 &&
+            cl.location.coordinates.slice(0, 2).every(Number.isFinite)) {
           const [lon, lat] = cl.location.coordinates;
           const color = cl.status === 'verified' ? '#22c55e' : (EVENT_COLORS[cl.obstacleType] || '#6b7280');
           const marker = L.circleMarker([lat, lon], {
@@ -1724,8 +1826,13 @@ async function loadMapData() {
       });
     }
     
-    document.getElementById('map-events-count').textContent = mapEventsData.length;
-    document.getElementById('map-clusters-count').textContent = mapClustersData.length;
+    if (!preserveSelection) {
+      selectedEvents.clear();
+      selectedClusters.clear();
+    }
+    updateMarkerStyles();
+    document.getElementById('map-events-count').textContent = eventsMarkers.length;
+    document.getElementById('map-clusters-count').textContent = clustersMarkers.length;
     
     const totalFiltered = mapEventsData.length + mapClustersData.length;
     const totalAvailable = (events?.total || 0) + (clusters?.total || 0);
@@ -1735,9 +1842,21 @@ async function loadMapData() {
       document.getElementById('filter-count').textContent = `Showing all ${totalFiltered}`;
     }
     
-    fitMapToMarkers();
+    feedback.dataset.state = 'success';
+    feedback.textContent = `${eventsMarkers.length} events and ${clustersMarkers.length} clusters mapped. ` +
+      (totalFiltered ? 'Up to 50,000 events and 100,000 clusters per status are requested; server limits may be lower.' : 'No results match these filters.');
+    mapNeedsFit = true;
+    resizeMap();
+    return true;
   } catch (e) {
     console.error('Map data load error:', e);
+    feedback.dataset.state = 'error';
+    feedback.textContent = 'Map refresh failed: ' + e.message + '. Use Apply Filters to retry.';
+    return false;
+  } finally {
+    mapLoading = false;
+    document.getElementById('map').setAttribute('aria-busy', 'false');
+    updateSelectionUI();
   }
 }
 
@@ -1745,77 +1864,75 @@ async function bulkApply() {
   const type = document.getElementById('bulk-type').value;
   const severity = document.getElementById('bulk-severity').value;
   const status = document.getElementById('bulk-status').value;
-  
-  if (!type && !severity && !status) {
-    alert('Select at least one field to change');
-    return;
-  }
-  
-  if (!confirm(`Apply changes to ${selectedEvents.size + selectedClusters.size} items?`)) return;
-  
-  let evResult = {modified_count: 0}, clResult = {modified_count: 0};
-  
-  if (selectedEvents.size > 0) {
-    const evIds = Array.from(selectedEvents);
-    const evBody = {ids: evIds};
-    if (type) evBody.eventType = type;
-    if (severity) evBody.severity = parseInt(severity);
-    
-    const r = await fetch('/api/admin/editor/events/bulk-update', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(evBody)
-    });
-    evResult = await r.json();
-  }
-  
-  if (selectedClusters.size > 0) {
-    const clIds = Array.from(selectedClusters);
-    const clBody = {ids: clIds};
-    if (type) clBody.obstacleType = type;
-    if (status) clBody.status = status;
-    if (severity) clBody.severity_max = parseInt(severity);
-    
-    const r = await fetch('/api/admin/editor/clusters/bulk-update', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(clBody)
-    });
-    clResult = await r.json();
-  }
-  
-  alert(`Updated: ${evResult.modified_count} events, ${clResult.modified_count} clusters`);
-  clearSelection();
-  loadMapData();
+  const eventFields = {}, clusterFields = {};
+  if (type) { eventFields.eventType = type; clusterFields.obstacleType = type; }
+  if (severity) { eventFields.severity = parseInt(severity); clusterFields.severity_max = parseInt(severity); }
+  if (status) clusterFields.status = status;
+  await runBulkAction('update', eventFields, clusterFields);
 }
 
 async function bulkDelete() {
-  const total = selectedEvents.size + selectedClusters.size;
-  if (!confirm(`DELETE ${total} items? This cannot be undone!`)) return;
-  
-  let evResult = {deleted_count: 0}, clResult = {deleted_count: 0};
-  
-  if (selectedEvents.size > 0) {
-    const r = await fetch('/api/admin/editor/events/bulk-delete', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ids: Array.from(selectedEvents)})
-    });
-    evResult = await r.json();
+  await runBulkAction('delete');
+}
+
+async function runBulkAction(action, eventFields = {}, clusterFields = {}) {
+  if (bulkBusy || mapLoading) return;
+  const feedback = document.getElementById('bulk-feedback');
+  const deleting = action === 'delete';
+  const jobs = [
+    {collection: 'events', selection: selectedEvents, fields: eventFields},
+    {collection: 'clusters', selection: selectedClusters, fields: clusterFields}
+  ].filter(job => job.selection.size && (deleting || Object.keys(job.fields).length))
+    .map(job => ({...job, ids: Array.from(job.selection)}));
+  if (!jobs.length) {
+    feedback.dataset.state = 'error';
+    feedback.textContent = deleting ? 'Select at least one record to delete.' :
+      'Select records and at least one applicable field. Status changes require selected clusters.';
+    return;
   }
-  
-  if (selectedClusters.size > 0) {
-    const r = await fetch('/api/admin/editor/clusters/bulk-delete', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ids: Array.from(selectedClusters)})
-    });
-    clResult = await r.json();
+  const scope = jobs.map(job => `${job.ids.length} ${job.collection}`).join(' and ');
+  const skipped = !deleting && !Object.keys(eventFields).length && selectedEvents.size
+    ? ' Selected events are unchanged; status applies to clusters only.' : '';
+  if (!confirm(`${deleting ? 'DELETE' : 'Apply changes to'} ${scope}?${deleting ? ' This cannot be undone!' : ''}${skipped}`)) return;
+
+  bulkBusy = true;
+  feedback.dataset.state = 'pending';
+  feedback.textContent = `${deleting ? 'Deleting' : 'Updating'} ${scope}...`;
+  updateSelectionUI();
+  const results = [];
+  let failed = false;
+  try {
+    // Collections are independent requests; retain failed selections after partial success.
+    for (const job of jobs) {
+      try {
+        const r = await fetch(`/api/admin/editor/${job.collection}/bulk-${action}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ids: job.ids, ...job.fields})
+        });
+        const result = await r.json();
+        if (!r.ok || result.success === false) {
+          throw new Error(typeof result.detail === 'string' ? result.detail : 'HTTP ' + r.status);
+        }
+        const count = result[deleting ? 'deleted_count' : 'modified_count'];
+        if (!Number.isInteger(count) || count < 0) throw new Error('Invalid response count');
+        results.push(`${deleting ? 'Deleted' : 'Updated'} ${count} of ${job.ids.length} ${job.collection}`);
+        job.ids.forEach(id => job.selection.delete(id));
+      } catch (e) {
+        failed = true;
+        results.push(`${job.collection}: ${e.message}. Selection retained; verify server state before retrying`);
+      }
+      feedback.textContent = results.join('. ') + '. Working...';
+    }
+    const refreshed = await loadMapData({preserveSelection: true});
+    feedback.dataset.state = failed || !refreshed ? 'error' : 'success';
+    feedback.textContent = results.join('. ') + '.' + skipped +
+      (refreshed ? '' : ' Map refresh failed; displayed markers may be stale.');
+  } finally {
+    bulkBusy = false;
+    updateSelectionUI();
+    updateMarkerStyles();
   }
-  
-  alert(`Deleted: ${evResult.deleted_count} events, ${clResult.deleted_count} clusters`);
-  clearSelection();
-  loadMapData();
 }
 
 function switchTab(tab) {
@@ -1825,10 +1942,8 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   
   if (tab === 'map') {
-    setTimeout(() => {
-      if (map) map.invalidateSize();
-      loadMapData();
-    }, 200);
+    resizeMap();
+    if (!map && !bulkBusy) loadMapData();
   }
   if (tab === 'llm') {
     setTimeout(() => llmCheckHealth(), 100);

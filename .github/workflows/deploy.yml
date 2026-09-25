@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/deploy.yml"
+      - "scripts/host_maintenance.py"
   workflow_dispatch:
     inputs:
       sha:
@@ -15,6 +16,13 @@ on:
 
 env:
   IMAGE: abogatyrev80/goodroad
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goodroad-production-host
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -57,23 +65,60 @@ jobs:
 
       - name: Resolve target SHA
         id: target
+        env:
+          REQUESTED_SHA: ${{ inputs.sha }}
+          BUILT_SHA: ${{ needs.build.outputs.sha }}
+        shell: bash
         run: |
-          if [ -n "${{ github.event.inputs.sha }}" ]; then
-            echo "sha=${{ github.event.inputs.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "sha=${{ needs.build.outputs.sha }}" >> $GITHUB_OUTPUT
-          fi
+          set -euo pipefail
+          SHA="${REQUESTED_SHA:-$BUILT_SHA}"
+          [[ "$SHA" =~ ^[0-9a-fA-F]{7,40}$ ]] || { echo 'Invalid Git SHA'; exit 1; }
+          printf 'sha=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to server
+      - name: Prepare private host script directory
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            set -e
-            SHA="${{ steps.target.outputs.sha }}"
-            IMAGE="${{ env.IMAGE }}"
+            set -eu
+            test ! -L /dev/shm/goodroad-maintenance
+            if [ ! -e /dev/shm/goodroad-maintenance ]; then
+              mkdir -m 700 /dev/shm/goodroad-maintenance
+            fi
+            test -d /dev/shm/goodroad-maintenance
+            test "$(stat -c '%u:%a' /dev/shm/goodroad-maintenance)" = 0:700
+
+      - name: Copy host maintenance script
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: scripts/host_maintenance.py
+          target: /dev/shm/goodroad-maintenance
+          strip_components: 1
+          tar_tmp_path: /dev/shm/goodroad-maintenance
+          overwrite: true
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+          IMAGE: ${{ env.IMAGE }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: SHA,IMAGE
+          command_timeout: 10m
+          script: |
+            set -eu
+            case "$SHA" in ''|*[!0-9a-fA-F]*) echo 'Invalid Git SHA'; exit 1 ;; esac
+            [ "${#SHA}" -ge 7 ] && [ "${#SHA}" -le 40 ]
+            [ "$IMAGE" = abogatyrev80/goodroad ]
+            cd /opt/goodroad
 
             echo "Deploying $IMAGE:$SHA"
 
@@ -81,28 +126,7 @@ jobs:
 
             sed -i "s|image: $IMAGE:.*|image: $IMAGE:$SHA|" /opt/goodroad/docker-compose.yaml
 
-            cd /opt/goodroad
-            docker compose up -d --force-recreate --no-deps backend
-
-            echo "Waiting for backend to become healthy..."
-            for i in $(seq 1 30); do
-              if docker compose exec backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')" 2>/dev/null; then
-                echo "Backend is healthy after ${i}s"
-                break
-              fi
-              if [ $i -eq 30 ]; then
-                echo "Backend health check timed out after 30s"
-                docker compose logs backend --tail=50
-                exit 1
-              fi
-              sleep 1
-            done
-
-            echo "Done. Running image: $(docker inspect road-monitor-backend --format '{{.Config.Image}}')"
-
-            echo "Truncating container logs to free disk space..."
-            truncate -s 0 /var/lib/docker/containers/*/*-json.log 2>/dev/null || true
-
-            echo "Pruning old Docker images and build cache..."
-            docker image prune -f --filter "until=72h"
-            docker builder prune -f
+            python3 /dev/shm/goodroad-maintenance/host_maintenance.py write-rotation
+            docker compose -f /opt/goodroad/docker-compose.yaml -f /opt/goodroad/docker-compose.logging.yaml up -d --force-recreate --no-deps --no-build backend
+            python3 /dev/shm/goodroad-maintenance/host_maintenance.py wait-ready
+            echo "Deployment ready: $IMAGE:$SHA"

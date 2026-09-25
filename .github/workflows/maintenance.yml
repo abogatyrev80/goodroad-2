@@ -1,0 +1,97 @@
+name: Host Log Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Inspect only, emergency clear, or recreate with bounded logging"
+        type: choice
+        options: [inspect, clear, apply-rotation]
+        default: inspect
+        required: true
+      service:
+        description: "Only this production Compose service is affected"
+        type: choice
+        options: [backend, mongodb]
+        default: backend
+        required: true
+      confirm:
+        description: "For clear only: type CLEAR_LOGS (brief service outage)"
+        type: string
+        default: ""
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goodroad-production-host
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs before SSH transport
+        id: validated
+        env:
+          REQUEST_ACTION: ${{ inputs.action }}
+          REQUEST_SERVICE: ${{ inputs.service }}
+          REQUEST_CONFIRM: ${{ inputs.confirm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$REQUEST_ACTION" in inspect|clear|apply-rotation) ;; *) echo 'Invalid action'; exit 1 ;; esac
+          case "$REQUEST_SERVICE" in backend|mongodb) ;; *) echo 'Invalid service'; exit 1 ;; esac
+          if [ "$REQUEST_ACTION" = clear ]; then
+            [ "$REQUEST_CONFIRM" = CLEAR_LOGS ] || { echo 'Clear requires CLEAR_LOGS'; exit 1; }
+          else
+            [ -z "$REQUEST_CONFIRM" ] || { echo 'Confirmation is only valid for clear'; exit 1; }
+          fi
+          printf 'action=%s\nservice=%s\nconfirm=%s\n' "$REQUEST_ACTION" "$REQUEST_SERVICE" "$REQUEST_CONFIRM" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare private RAM-backed script directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -eu
+            test ! -L /dev/shm/goodroad-maintenance
+            if [ ! -e /dev/shm/goodroad-maintenance ]; then
+              mkdir -m 700 /dev/shm/goodroad-maintenance
+            fi
+            test -d /dev/shm/goodroad-maintenance
+            test "$(stat -c '%u:%a' /dev/shm/goodroad-maintenance)" = 0:700
+
+      - name: Copy host script without building an image
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: scripts/host_maintenance.py
+          target: /dev/shm/goodroad-maintenance
+          strip_components: 1
+          tar_tmp_path: /dev/shm/goodroad-maintenance
+          overwrite: true
+
+      - name: Run selected host maintenance
+        uses: appleboy/ssh-action@v1
+        env:
+          MAINTENANCE_ACTION: ${{ steps.validated.outputs.action }}
+          MAINTENANCE_SERVICE: ${{ steps.validated.outputs.service }}
+          MAINTENANCE_CONFIRM: ${{ steps.validated.outputs.confirm }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: MAINTENANCE_ACTION,MAINTENANCE_SERVICE,MAINTENANCE_CONFIRM
+          command_timeout: 10m
+          script: |
+            set -eu
+            python3 /dev/shm/goodroad-maintenance/host_maintenance.py "$MAINTENANCE_ACTION" --service "$MAINTENANCE_SERVICE" --confirm "$MAINTENANCE_CONFIRM"

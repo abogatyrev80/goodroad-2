@@ -6,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 import asyncio
 import csv
 import io
+import json
 import logging
 import os
 import uuid
@@ -20,7 +21,7 @@ from config import (
     get_limits_from_db, save_limits_to_db, check_rate_limit,
 )
 import config as _config
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from models import (
     AccelerometerReading, RawSensorData, RawDataBatch,
     ProcessedEvent, UserWarning, LimitsConfig,
@@ -37,6 +38,7 @@ from dataset_exporter import DatasetExporter
 from model_registry import ModelRegistry
 from external_training_api import external_training_router, init_external_training
 from inference_worker import InferenceWorker
+from ingestion_validation import read_raw_json, validate_raw_batch
 from auto_trainer import AutoTrainer
 from nn_admin_api import nn_admin_router, init_nn_admin
 from llm_tasks import start as llm_task_start, get as llm_task_get
@@ -69,6 +71,9 @@ async def startup_event():
     """
     import asyncio
     logger.info("Starting Good Road API...")
+    app.state.services_ready = False
+    app.state.workers = []
+    app.state.maintenance_task = None
 
     async def _init_after_mongo():
         await connect_to_mongodb()
@@ -100,6 +105,7 @@ async def startup_event():
                 logger.warning("Could not create LLM indexes: %s", e)
             inference_worker = InferenceWorker(_db, event_classifier, _config.obstacle_clusterer)
             auto_trainer = AutoTrainer(_db, event_classifier.neural_classifier, dataset_exporter)
+            app.state.workers = [inference_worker, auto_trainer]
             init_nn_admin(_db, inference_worker, auto_trainer)
             await inference_worker.start()
             await auto_trainer.start()
@@ -115,18 +121,28 @@ async def startup_event():
                         logger.error("Periodic maintenance error: %s", e)
                     await asyncio.sleep(3600)
 
-            asyncio.create_task(_periodic_maintenance())
+            app.state.maintenance_task = asyncio.create_task(_periodic_maintenance())
             logger.info("Periodic maintenance started (hourly)")
 
-        model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
+        else:
+            raise RuntimeError("MongoDB initialization returned without a database")
+
+        model_path = os.environ.get("NEURAL_MODEL_PATH") or str(ROOT_DIR / "models" / "accel_lstm.pt")
         if os.path.exists(model_path):
             info = event_classifier.neural_classifier.reload(model_path)
             logger.info("Neural model loaded: available=%s", info.get('available'))
         else:
             logger.warning("Neural model not found at %s", model_path)
         logger.info("All services initialized successfully")
+        app.state.services_ready = True
 
-    asyncio.create_task(_init_after_mongo())
+    async def _initialize_services():
+        try:
+            await _init_after_mongo()
+        except Exception:
+            logger.exception("Service initialization failed")
+
+    app.state.startup_task = asyncio.create_task(_initialize_services())
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -134,6 +150,17 @@ async def shutdown_event():
     Cleanup on shutdown
     """
     logger.info("🛑 Shutting down Good Road API...")
+    app.state.services_ready = False
+    for name in ("startup_task", "maintenance_task"):
+        task = getattr(app.state, name, None)
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+    for worker in getattr(app.state, "workers", []):
+        try:
+            await worker.stop()
+        except Exception:
+            logger.exception("Worker shutdown failed")
     await close_mongodb_connection()
     logger.info("Shutdown complete")
 
@@ -163,17 +190,19 @@ async def readiness_check():
     """
     if _config.mongodb_connecting:
         logger.info("Readiness check: MongoDB connection in progress")
-        return {
+        return JSONResponse(status_code=503, content={
             "status": "connecting",
             "service": "Good Road API",
             "mongodb": "connecting",
             "database": db_name,
             "timestamp": datetime.utcnow().isoformat()
-        }
+        })
 
-    if not _config.mongodb_connected:
+    if not _config.mongodb_connected or _config.client is None:
         logger.warning("Readiness check failed: MongoDB not connected")
         raise HTTPException(status_code=503, detail="MongoDB not connected")
+    if not getattr(app.state, "services_ready", False):
+        raise HTTPException(status_code=503, detail="Services not initialized")
     
     try:
         # Quick ping to verify MongoDB is still responsive
@@ -205,12 +234,8 @@ async def root():
 async def ingest_raw_data(request: Request):
     """Приём сырых данных с мобильных устройств (GPS + акселерометр)"""
     try:
-        body = await request.json()
-        device_id = body.get("deviceId")
-        data_points = body.get("data", [])
-        
-        if not device_id or not data_points:
-            raise HTTPException(status_code=400, detail="deviceId and data array required")
+        body = await read_raw_json(request)
+        device_id, data_points = validate_raw_batch(body)
         
         if not check_rate_limit(device_id):
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
@@ -237,6 +262,8 @@ async def ingest_raw_data(request: Request):
             inserted += 1
         
         return {"status": "ok", "inserted": inserted}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
     except HTTPException:
         raise
     except Exception as e:
@@ -255,15 +282,8 @@ async def ingest_raw_events(request: Request):
         user_report  — ручное сообщение пользователя
     """
     try:
-        body = await request.json()
-        device_id = body.get("deviceId")
-        events = body.get("events") or body.get("data") or []
-        if not device_id:
-            raise HTTPException(status_code=400, detail="deviceId required")
-        if not events:
-            raise HTTPException(status_code=400, detail="events array required")
-        if not isinstance(events, list):
-            raise HTTPException(status_code=400, detail="events must be an array")
+        body = await read_raw_json(request)
+        device_id, events = validate_raw_batch(body, adaptive=True)
 
         if not check_rate_limit(device_id):
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
@@ -294,6 +314,8 @@ async def ingest_raw_events(request: Request):
 
         config = await get_collector_config(_config.db)
         return {"status": "ok", "inserted": inserted, "collectorConfig": config}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
     except HTTPException:
         raise
     except Exception as e:
@@ -569,7 +591,7 @@ async def recalc_status(job_id: str):
 
 @api_router.post("/admin/cleanup-old-data")
 async def cleanup_old_data(
-    days: int = 30,
+    days: int = Query(30, ge=1),
     delete_events: bool = False,
     delete_clusters: bool = False,
     delete_raw_data: bool = True
@@ -583,6 +605,8 @@ async def cleanup_old_data(
         delete_clusters: Удалить старые кластеры
         delete_raw_data: Удалить старые сырые данные (по умолчанию True)
     """
+    if days <= 0:
+        raise HTTPException(status_code=400, detail="days must be positive")
     try:
         from datetime import datetime, timedelta
         
@@ -1003,7 +1027,7 @@ async def admin_import_roads(request: Request):
 @api_router.get("/admin/roads-geojson")
 async def admin_roads_geojson(
     bbox: str = "",
-    limit: int = 50000,
+    limit: int = Query(50000, ge=1),
 ):
     """
     Возвращает road_segments как GeoJSON FeatureCollection.
@@ -1770,7 +1794,7 @@ async def delete_event(event_id: str):
 @api_router.delete("/admin/clear-database")
 async def clear_database(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
-    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)")
+    days: Optional[int] = Query(None, ge=1, description="Удалить данные старше N дней (если не указано - удалить все)")
 ):
     """
     Очистить базу данных (локальную или Atlas) с возможностью фильтрации по периоду
@@ -1790,6 +1814,8 @@ async def clear_database(
             detail="Для подтверждения передайте параметр confirm=CONFIRM"
         )
     
+    if days is not None and days <= 0:
+        raise HTTPException(status_code=400, detail="days must be positive")
     try:
         collections_to_clear = [
             'raw_sensor_data',
@@ -1819,7 +1845,11 @@ async def clear_database(
         for collection_name in collections_to_clear:
             try:
                 # Выбираем правильный фильтр в зависимости от структуры коллекции
-                if collection_name in ['raw_sensor_data', 'sensor_data']:
+                if collection_name == 'raw_sensor_data':
+                    filter_to_use = {"receivedAt": {"$lt": cutoff_date}} if days else {}
+                elif collection_name == 'calibration_profiles':
+                    filter_to_use = {"last_updated": {"$lt": cutoff_date}} if days else {}
+                elif collection_name == 'sensor_data':
                     filter_to_use = date_filter_timestamp if days else {}
                 elif collection_name in ['road_conditions', 'road_warnings', 'user_warnings', 'processed_events', 'events']:
                     filter_to_use = date_filter_created if days else {}
@@ -1918,7 +1948,11 @@ async def clear_database_v2(
         for collection_name in collections_to_clear:
             try:
                 # Выбираем правильный фильтр в зависимости от структуры коллекции
-                if collection_name in ['raw_sensor_data', 'sensor_data']:
+                if collection_name == 'raw_sensor_data':
+                    filter_to_use = {"receivedAt": timestamp_conditions} if (date_from or date_to) else {}
+                elif collection_name == 'calibration_profiles':
+                    filter_to_use = {"last_updated": timestamp_conditions} if (date_from or date_to) else {}
+                elif collection_name == 'sensor_data':
                     filter_to_use = date_filter_timestamp if (date_from or date_to) else {}
                 elif collection_name in ['road_conditions', 'road_warnings', 'user_warnings', 'processed_events', 'events']:
                     filter_to_use = date_filter_created if (date_from or date_to) else {}
@@ -2997,74 +3031,10 @@ async def admin_dashboard_v3_api(request: Request):
 
 @api_router.post("/admin/clear-logs")
 async def admin_clear_logs():
-    """
-    Сбросить логи Docker-контейнеров для освобождения места на диске.
-    Обрезает -json.log логи, до которых есть доступ из контейнера:
-      1) /var/lib/docker/containers если смонтировано
-      2) /proc/1/fd/1 (свой stdout) — работает всегда внутри контейнера
-    """
-    freed_bytes = 0
-    truncated = []
-
-    def _truncate(path):
-        nonlocal freed_bytes
-        try:
-            size = os.path.getsize(path)
-            if size == 0:
-                return
-            with open(path, "r+b") as f:
-                f.truncate(0)
-            freed_bytes += size
-            truncated.append(f"{path} ({size // 1024} KB)")
-            logger.info("Truncated log: %s (%d bytes)", path, size)
-        except Exception as e:
-            logger.warning("Cannot truncate %s: %s", path, e)
-
-    containers_dir = "/var/lib/docker/containers"
-    if os.path.isdir(containers_dir):
-        try:
-            for cid in os.listdir(containers_dir):
-                cdir = os.path.join(containers_dir, cid)
-                if not os.path.isdir(cdir):
-                    continue
-                for fname in os.listdir(cdir):
-                    if fname.endswith("-json.log"):
-                        _truncate(os.path.join(cdir, fname))
-        except Exception as e:
-            logger.warning("Direct containers dir cleanup failed: %s", e)
-
-    for fd_path in ("/proc/1/fd/1", "/proc/self/fd/1"):
-        try:
-            if os.path.exists(fd_path):
-                with open(fd_path, "r+b") as f:
-                    size = os.fstat(f.fileno()).st_size
-                    f.truncate(0)
-                    if size:
-                        freed_bytes += size
-                        truncated.append(f"{os.path.realpath(fd_path)} ({size // 1024} KB)")
-        except Exception as e:
-            logger.debug("Cannot truncate %s: %s", fd_path, e)
-
-    if not truncated:
-        return {
-            "status": "ok",
-            "message": "Нет логов для очистки. /var/lib/docker не смонтирован в контейнер.",
-            "details": {
-                "freed_bytes": 0,
-                "containers_dir_mounted": os.path.isdir(containers_dir),
-            },
-        }
-
-    return {
-        "status": "ok",
-        "message": f"Очищено логов: {len(truncated)}",
-        "details": {
-            "freed_bytes": freed_bytes,
-            "freed_mb": round(freed_bytes / (1024 * 1024), 1),
-            "containers_dir_mounted": os.path.isdir(containers_dir),
-            "truncated": truncated,
-        },
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Host log maintenance is available through the authorized GitHub Actions workflow, not the public API.",
+    )
 
 
 @api_router.put("/admin/editor/events/{event_id}")
@@ -3241,6 +3211,8 @@ async def get_limits_api():
 
 @api_router.post("/admin/settings/limits/api")
 async def save_limits_api(limits: LimitsConfig):
+    if any(value <= 0 for value in limits.model_dump().values()):
+        raise HTTPException(status_code=400, detail="Limits must be positive")
     saved = await save_limits_to_db(limits)
     return {"status": "ok", "limits": saved.model_dump()}
 
@@ -3393,7 +3365,7 @@ class LLMRequest(BaseModel):
     model: str = ""
 
 class DataQualityRequest(BaseModel):
-    limit: int = 100
+    limit: int = Field(100, ge=1)
     collection: str = "processed_events"
 
 class SyntheticRequest(BaseModel):

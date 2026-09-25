@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import uuid
 from collections import Counter
 
+from pymongo.errors import DuplicateKeyError
+
 from services.geo import calculate_distance
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,12 @@ class ObstacleClusterer:
         self.MIN_REPORT_COUNT = 3  # минимум отчётов для "подтверждённого" кластера
         self.CONFIDENCE_INCREMENT = 0.05  # прирост уверенности за каждое подтверждение
         self.road_service = None
+        self._event_index_ready = False
+
+    @staticmethod
+    def _event_id(event):
+        value = event.get('id') or event.get('_id')
+        return str(value) if value is not None else None
 
     def set_road_service(self, rs):
         self.road_service = rs
@@ -156,6 +164,7 @@ class ObstacleClusterer:
 
         cluster = {
             "_id": cluster_id,
+            "revision": 0,
             "obstacleType": event['eventType'],
             "location": {
                 "latitude": event['latitude'],
@@ -186,6 +195,9 @@ class ObstacleClusterer:
             "created_at": datetime.utcnow()
         }
         
+        event_id = self._event_id(event)
+        if event_id is not None:
+            cluster['event_ids'] = [event_id]
         await self.db.obstacle_clusters.insert_one(cluster)
         logger.info("Создан новый кластер %s: %s at (%.5f, %.5f)", cluster_id, event['eventType'], event['latitude'], event['longitude'])
         
@@ -209,9 +221,12 @@ class ObstacleClusterer:
             ID кластера
         """
         cluster_id = cluster['_id']
+        event_id = self._event_id(event)
+        if event_id is not None and event_id in cluster.get('event_ids', []):
+            return cluster_id
         
         # Добавляем устройство если уникальное
-        devices = cluster['devices']
+        devices = list(cluster['devices'])
         is_new_device = device_id not in devices
         if is_new_device:
             devices.append(device_id)
@@ -220,7 +235,7 @@ class ObstacleClusterer:
         new_report_count = len(devices)  # reportCount = количество уникальных устройств!
         
         # Обновляем severity
-        severity_history = cluster['severity']['history']
+        severity_history = list(cluster['severity']['history'])
         severity_history.append(event['severity'])
         
         severity_counter = Counter(severity_history)
@@ -235,7 +250,7 @@ class ObstacleClusterer:
         }
         
         # Обновляем информацию о дороге
-        speeds = cluster['roadInfo']['speeds']
+        speeds = list(cluster['roadInfo']['speeds'])
         speeds.append(event['speed'])
         
         avg_speed = sum(speeds) / len(speeds)
@@ -253,6 +268,7 @@ class ObstacleClusterer:
         
         # Обновляем кластер
         update_doc = {
+            "$inc": {"revision": 1},
             "$set": {
                 "obstacleType": new_obstacle_type,
                 "severity": new_severity,
@@ -264,6 +280,8 @@ class ObstacleClusterer:
                 "roadInfo": new_road_info
             }
         }
+        if event_id is not None:
+            update_doc['$addToSet'] = {'event_ids': event_id}
 
         # Добавляем roadSnap если его нет и сервис доступен
         if "roadSnap" not in cluster or not cluster.get("roadSnap", {}).get("road_id"):
@@ -275,10 +293,16 @@ class ObstacleClusterer:
                 if road_data:
                     update_doc["$set"]["roadSnap"] = road_data
 
-        await self.db.obstacle_clusters.update_one(
-            {"_id": cluster_id},
+        # The receipt and histories commit together; a stale snapshot must not overwrite them.
+        result = await self.db.obstacle_clusters.update_one(
+            {"_id": cluster_id, "revision": cluster.get('revision', {"$exists": False})},
             update_doc
         )
+        if result.matched_count == 0:
+            applied = await self.db.obstacle_clusters.find_one({'event_ids': event_id}) if event_id is not None else None
+            if applied is not None:
+                return applied['_id']
+            raise RuntimeError("Cluster changed concurrently; retry event")
         
         logger.info("Обновлен кластер %s: reportCount=%d, confidence=%.2f", cluster_id, new_report_count, self._calculate_confidence(new_report_count))
         
@@ -299,21 +323,30 @@ class ObstacleClusterer:
         Returns:
             ID кластера (новый или существующий)
         """
-        # Ищем ближайший кластер
-        nearby_cluster = await self.find_nearby_cluster(
-            event['latitude'],
-            event['longitude'],
-            event['eventType']
-        )
-        
-        if nearby_cluster:
-            # Обновляем существующий кластер
-            cluster_id = await self.update_cluster(nearby_cluster, event, device_id)
-        else:
-            # Создаем новый кластер
-            cluster_id = await self.create_cluster(event, device_id)
-        
-        return cluster_id
+        event_id = self._event_id(event)
+        if event_id is not None:
+            if not self._event_index_ready:
+                await self.db.obstacle_clusters.create_index(
+                    [('event_ids', 1)], unique=True, sparse=True
+                )
+                self._event_index_ready = True
+            applied = await self.db.obstacle_clusters.find_one({'event_ids': event_id})
+            if applied is not None:
+                return applied['_id']
+
+        try:
+            nearby_cluster = await self.find_nearby_cluster(
+                event['latitude'], event['longitude'], event['eventType']
+            )
+            if nearby_cluster:
+                return await self.update_cluster(nearby_cluster, event, device_id)
+            return await self.create_cluster(event, device_id)
+        except DuplicateKeyError:
+            # Concurrent workers may have chosen different clusters for this same event.
+            applied = await self.db.obstacle_clusters.find_one({'event_ids': event_id}) if event_id is not None else None
+            if applied is not None:
+                return applied['_id']
+            raise
     
     async def get_active_clusters(self, limit: int = 1000) -> List[Dict]:
         """

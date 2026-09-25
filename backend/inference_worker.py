@@ -6,16 +6,29 @@ Background Inference Worker
 
 import asyncio
 import logging
+import math
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
+
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
+
+import warning_service
+from ingestion_validation import MAX_SENSOR_AXIS, MAX_SAMPLES_PER_EVENT
 
 logger = logging.getLogger(__name__)
 
 INFERENCE_INTERVAL = int(os.getenv('NN_INFERENCE_INTERVAL', '30'))
 BATCH_SIZE = int(os.getenv('NN_INFERENCE_BATCH_SIZE', '50'))
+MAX_ATTEMPTS = int(os.getenv('NN_INFERENCE_MAX_ATTEMPTS', '3'))
+RETRY_SECONDS = int(os.getenv('NN_INFERENCE_RETRY_SECONDS', '60'))
 USE_NN_BACKEND = os.getenv('NN_USE_NN_BACKEND', 'false').lower() == 'true'
+
+
+class ClassificationError(ValueError):
+    """Deterministic malformed input/output or classifier arithmetic failure."""
 
 
 class InferenceWorker:
@@ -26,12 +39,15 @@ class InferenceWorker:
     """
 
     def __init__(self, db, event_classifier, obstacle_clusterer=None):
+        if min(INFERENCE_INTERVAL, BATCH_SIZE, MAX_ATTEMPTS, RETRY_SECONDS) <= 0:
+            raise ValueError("Inference interval, batch size, max attempts and retry delay must be positive")
         self.db = db
         self.event_classifier = event_classifier
         self.obstacle_clusterer = obstacle_clusterer
         self._task: Optional[asyncio.Task] = None
         self._running = False
         self._nn_backend = None
+        self._retry_after = {}
         self._stats: Dict[str, Any] = {
             'total_processed': 0,
             'events_detected': 0,
@@ -60,16 +76,16 @@ class InferenceWorker:
         if self._running:
             logger.warning("InferenceWorker already running")
             return
-        self._running = True
-        self._stats['started_at'] = datetime.utcnow()
-
         await self.db.inference_logs.create_index([("timestamp", -1)])
         await self.db.inference_logs.create_index([("device_id", 1)])
         await self.db.raw_sensor_data.create_index([("processed_by_inference", 1), ("timestamp", 1)])
+        await self.db.processed_events.create_index([("id", 1)])
 
         if USE_NN_BACKEND:
             self._init_nn_backend()
 
+        self._running = True
+        self._stats['started_at'] = datetime.utcnow()
         logger.info(
             f"InferenceWorker started (interval={INFERENCE_INTERVAL}s, batch={BATCH_SIZE}, backend={self._stats.get('backend_name', 'event_classifier')})"
         )
@@ -115,9 +131,24 @@ class InferenceWorker:
 
     async def _process_batch(self):
         now = datetime.utcnow()
+        self._retry_after = {key: deadline for key, deadline in self._retry_after.items() if deadline > now}
 
         raw_docs = await self.db.raw_sensor_data.find(
-            {"processed_by_inference": {"$ne": True}}
+            {
+                "_id": {"$nin": list(self._retry_after)},
+                "processed_by_inference": {"$ne": True},
+                "inference_quarantined": {"$ne": True},
+                "$and": [
+                    {"$or": [
+                        {"inference_attempts": {"$exists": False}},
+                        {"inference_attempts": {"$lt": MAX_ATTEMPTS}},
+                    ]},
+                    {"$or": [
+                        {"inference_retry_after": {"$exists": False}},
+                        {"inference_retry_after": {"$lte": now}},
+                    ]},
+                ],
+            }
         ).sort("timestamp", 1).limit(BATCH_SIZE).to_list(BATCH_SIZE)
 
         if not raw_docs:
@@ -133,8 +164,9 @@ class InferenceWorker:
                 event, method = await self._process_single(doc)
                 await self.db.raw_sensor_data.update_one(
                     {"_id": doc["_id"]},
-                    {"$set": {"processed_by_inference": True}}
+                    {"$set": {"processed_by_inference": True}, "$unset": {"inference_retry_after": ""}}
                 )
+                self._retry_after.pop(doc['_id'], None)
                 if event:
                     events_in_batch += 1
                     if method == 'neural_network':
@@ -142,6 +174,30 @@ class InferenceWorker:
             except Exception as e:
                 logger.error(f"Error processing doc {doc.get('_id')}: {e}")
                 self._stats['errors'] += 1
+                retry_after = datetime.utcnow() + timedelta(seconds=RETRY_SECONDS)
+                self._retry_after[doc['_id']] = retry_after
+                classification_failed = isinstance(e, ClassificationError)
+                update = {"$set": {
+                    "inference_last_error": str(e)[:1000],
+                    "inference_failed_at": datetime.utcnow(),
+                    "inference_retry_after": retry_after,
+                    "inference_failure_kind": "classification" if classification_failed else "transient",
+                }}
+                if classification_failed:
+                    update['$inc'] = {'inference_attempts': 1}
+                try:
+                    failed = await self.db.raw_sensor_data.find_one_and_update(
+                        {"_id": doc["_id"], "processed_by_inference": {"$ne": True}},
+                        update, return_document=ReturnDocument.AFTER,
+                    )
+                    if classification_failed and failed and failed.get("inference_attempts", 0) >= MAX_ATTEMPTS:
+                        await self.db.raw_sensor_data.update_one(
+                            {"_id": doc["_id"], "processed_by_inference": {"$ne": True}},
+                            {"$set": {"inference_quarantined": True}},
+                        )
+                except Exception:
+                    # Keep local backoff if Mongo cannot persist it; continue later records.
+                    logger.exception("Could not save inference retry state for %s", doc['_id'])
 
         batch_elapsed = (time.monotonic() - batch_start) * 1000
         self._stats['last_batch_at'] = now
@@ -153,22 +209,33 @@ class InferenceWorker:
         )
 
     async def _process_single(self, doc: Dict) -> tuple:
+        # Resume the saved result after a warning/log/ack failure, without reclassifying.
+        existing = await self.db.processed_events.find_one({"_id": doc['_id']})
+        if existing is None:
+            existing = await self.db.processed_events.find_one({"id": str(doc['_id'])})
+        if existing:
+            method = existing.get('detection_method', 'heuristic')
+            await self._finish_result(doc, existing, method, existing.get('sample_count', 1), 0)
+            return existing, method
+
         device_id = doc.get('deviceId', 'unknown')
         timestamp = doc.get('timestamp', datetime.utcnow())
         kind = doc.get('kind', 'legacy')
 
         gps = doc.get('gps', {}) or {}
         if isinstance(gps, dict):
-            latitude = gps.get('latitude') or doc.get('latitude')
-            longitude = gps.get('longitude') or doc.get('longitude')
-            speed = gps.get('speed', 0) or doc.get('speed', 0)
+            latitude = gps.get('latitude', doc.get('latitude'))
+            longitude = gps.get('longitude', doc.get('longitude'))
+            speed = gps.get('speed', doc.get('speed', 0)) or 0
         else:
             latitude = doc.get('latitude')
             longitude = doc.get('longitude')
             speed = doc.get('speed', 0)
 
         accel_array = doc.get('accelerometer', [])
-        if not isinstance(accel_array, list) or len(accel_array) == 0:
+        if isinstance(accel_array, dict):
+            accel_array = [accel_array]
+        if accel_array is None or accel_array == []:
             accel_array = [{
                 'x': doc.get('accelerometer_x', 0),
                 'y': doc.get('accelerometer_y', 0),
@@ -193,35 +260,13 @@ class InferenceWorker:
                 "longitude": longitude,
                 "speed": speed,
             }
-            await self.db.inference_logs.insert_one(log_doc)
+            await self.db.inference_logs.update_one(
+                {"_id": doc["_id"]}, {"$setOnInsert": log_doc}, upsert=True
+            )
             return (None, 'background')
 
         inference_start = time.monotonic()
-        detected_event = None
-
-        # Оконная классификация (триггер/пре-арм окна) — анализирует весь массив
-        if isinstance(accel_array, list) and len(accel_array) >= 3:
-            detected_event = self.event_classifier.analyze_accelerometer_array(
-                device_id=device_id,
-                accelerometer_data=accel_array,
-                speed=speed
-            )
-        else:
-            for pt in accel_array:
-                if not isinstance(pt, dict):
-                    continue
-                ax = pt.get('x', 0)
-                ay = pt.get('y', 0)
-                az = pt.get('z', 0)
-                ev = self.event_classifier.analyze_data_point(
-                    device_id=device_id,
-                    accel_x=ax,
-                    accel_y=ay,
-                    accel_z=az,
-                    speed=speed
-                )
-                if ev and ev.get('eventType'):
-                    detected_event = ev
+        detected_event = self._classify(device_id, accel_array, speed)
 
         inference_ms = (time.monotonic() - inference_start) * 1000
 
@@ -242,24 +287,10 @@ class InferenceWorker:
             else:
                 self._stats['heuristic_predictions'] += 1
 
-            cluster_id = None
-            if self.obstacle_clusterer and latitude and longitude:
-                try:
-                    cluster_id = await self.obstacle_clusterer.process_event(
-                        event={
-                            'eventType': event_type,
-                            'severity': severity,
-                            'latitude': latitude,
-                            'longitude': longitude,
-                            'speed': speed
-                        },
-                        device_id=device_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Clustering error: {e}")
-
             processed_event = {
+                "_id": doc['_id'],
                 "id": str(doc.get('_id')),
+                "raw_id": str(doc['_id']),
                 "deviceId": device_id,
                 "timestamp": timestamp,
                 "eventType": event_type,
@@ -276,7 +307,8 @@ class InferenceWorker:
                 "accelerometer_deltaZ": detected_event.get('accelerometer', {}).get('deltaZ', 0),
                 "accelerometer_variance": detected_event.get('accelerometer', {}).get('variance', 0),
                 "roadType": detected_event.get('roadType', 'unknown'),
-                "clusterId": cluster_id,
+                "clusterId": None,
+                "clustering_completed": False,
                 "detection_method": detection_method,
                 "kind": kind,
                 "sample_count": detected_event.get('sample_count', len(accel_array)),
@@ -285,26 +317,106 @@ class InferenceWorker:
                 "max_magnitude": doc.get('max_magnitude'),
                 "created_at": datetime.utcnow()
             }
-            await self.db.processed_events.insert_one(processed_event)
+            # MongoDB's built-in unique _id index enforces one result per raw record.
+            try:
+                result = await self.db.processed_events.update_one(
+                    {"_id": doc['_id']}, {"$setOnInsert": processed_event}, upsert=True
+                )
+                inserted = result.upserted_id is not None
+            except DuplicateKeyError:
+                inserted = False
+            if not inserted:
+                processed_event = await self.db.processed_events.find_one({"_id": doc['_id']})
+                if processed_event is None:
+                    raise RuntimeError("Processed event disappeared after concurrent upsert")
+            detected_event = processed_event
+            detection_method = processed_event.get('detection_method', 'heuristic')
 
-            if warning_service.should_warn(severity):
-                from warning_service import create_warning_from_event
-                await create_warning_from_event(self.db, processed_event, source="inference")
+        await self._finish_result(doc, detected_event, detection_method, len(accel_array), inference_ms)
+        return (detected_event, detection_method)
 
+    def _classify(self, device_id, samples, speed):
+        try:
+            if not isinstance(samples, list) or not 1 <= len(samples) <= MAX_SAMPLES_PER_EVENT:
+                raise ValueError("Invalid accelerometer sample array")
+            for sample in samples:
+                for axis in ('x', 'y', 'z'):
+                    value = sample[axis]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or abs(value) > MAX_SENSOR_AXIS:
+                        raise ValueError("Accelerometer axis outside supported range")
+            if not math.isfinite(speed) or abs(speed) > 1000:
+                raise ValueError("Speed outside supported range")
+
+            detected = None
+            if len(samples) >= 3:
+                detected = self.event_classifier.analyze_accelerometer_array(
+                    device_id=device_id, accelerometer_data=samples, speed=speed
+                )
+            else:
+                for sample in samples:
+                    event = self.event_classifier.analyze_data_point(
+                        device_id=device_id, accel_x=sample['x'], accel_y=sample['y'],
+                        accel_z=sample['z'], speed=speed
+                    )
+                    if event is not None and not isinstance(event, dict):
+                        raise ValueError("Invalid classifier result")
+                    if event and event.get('eventType'):
+                        detected = event
+            if detected is not None and not isinstance(detected, dict):
+                raise ValueError("Invalid classifier result")
+            if detected and detected.get('eventType'):
+                if not isinstance(detected['eventType'], str):
+                    raise ValueError("Invalid classifier event type")
+                severity = detected.get('severity', 5)
+                if isinstance(severity, bool) or severity not in (1, 2, 3, 4, 5):
+                    raise ValueError("Invalid classifier severity")
+                confidence = detected.get('confidence', 0)
+                if isinstance(confidence, bool) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+                    raise ValueError("Invalid classifier confidence")
+                for value in detected.get('accelerometer', {}).values():
+                    if not math.isfinite(value):
+                        raise ValueError("Invalid classifier accelerometer metrics")
+                return detected
+            return None
+        except (ValueError, TypeError, KeyError, AttributeError, ArithmeticError) as exc:
+            raise ClassificationError(str(exc)) from exc
+
+    async def _finish_result(self, doc, event, method, sample_count, inference_ms):
+        if event and not event.get('clustering_completed'):
+            cluster_id = event.get('clusterId')
+            if cluster_id is None and event.get('latitude') is not None and event.get('longitude') is not None:
+                if self.obstacle_clusterer is None:
+                    raise RuntimeError("Obstacle clusterer unavailable")
+                cluster_id = await self.obstacle_clusterer.process_event(
+                    event=event, device_id=event.get('deviceId', doc.get('deviceId', 'unknown'))
+                )
+                if cluster_id is None:
+                    raise RuntimeError("Clustering returned no result")
+            completion = {'clusterId': cluster_id, 'clustering_completed': True}
+            await self.db.processed_events.update_one(
+                {'_id': event.get('_id', doc['_id'])}, {'$set': completion}
+            )
+            event.update(completion)
+        if event and warning_service.should_warn(event.get('severity', 5)):
+            await warning_service.create_warning_from_event(self.db, event, source="inference")
+
+        gps = doc.get('gps') or {}
+        if not isinstance(gps, dict):
+            gps = {}
         log_doc = {
             "timestamp": datetime.utcnow(),
-            "device_id": device_id,
-            "kind": kind,
-            "input_samples": len(accel_array) if isinstance(accel_array, list) else 1,
+            "device_id": doc.get('deviceId', 'unknown'),
+            "kind": doc.get('kind', 'legacy'),
+            "input_samples": sample_count,
             "processing_time_ms": round(inference_ms, 2),
-            "detection_method": detection_method,
-            "result_event_type": event_type,
-            "result_confidence": round(confidence, 4),
-            "result_severity": severity,
-            "latitude": latitude,
-            "longitude": longitude,
-            "speed": speed,
+            "detection_method": method,
+            "result_event_type": event.get('eventType') if event else None,
+            "result_confidence": round(event.get('confidence', 0), 4) if event else 0,
+            "result_severity": event.get('severity', 5) if event else 5,
+            "latitude": gps.get('latitude', doc.get('latitude')),
+            "longitude": gps.get('longitude', doc.get('longitude')),
+            "speed": gps.get('speed', doc.get('speed', 0)),
         }
-        await self.db.inference_logs.insert_one(log_doc)
-
-        return (detected_event, detection_method) if detected_event else (None, detection_method)
+        await self.db.inference_logs.update_one(
+            {"_id": doc['_id']}, {"$setOnInsert": log_doc}, upsert=True
+        )
