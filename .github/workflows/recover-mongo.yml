@@ -11,6 +11,7 @@ on:
         options:
           - full
           - status-only
+          - fix-network
           - restart-mongo
           - restart-backend
 
@@ -44,23 +45,36 @@ jobs:
             cd /opt/goodroad
             docker compose ps -a || true
 
+            echo "===== NETWORKS OF CONTAINERS ====="
+            echo -n "backend:  "; docker inspect road-monitor-backend --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null || echo "n/a"
+            echo -n "mongodb:  "; docker inspect road-monitor-mongodb --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null || echo "n/a"
+
+            echo "===== BACKEND ENV (MONGO*) ====="
+            docker inspect road-monitor-backend --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep -i -E 'mongo|url' || echo "n/a"
+
+            echo "===== NETWORK LS ====="
+            docker network ls
+
             if [ "$ACTION" = "status-only" ]; then
               exit 0
             fi
 
-            if [ "$ACTION" = "full" ] || [ "$ACTION" = "restart-mongo" ]; then
-              echo "===== MONGODB LOGS (last 50) ====="
-              docker logs --tail 50 road-monitor-mongodb 2>&1 || docker logs --tail 50 goodroad-mongodb 2>&1 || echo "mongo container not found"
-
-              echo "===== RESTARTING MONGODB ====="
-              docker compose up -d mongodb || docker compose up -d mongo || true
+            if [ "$ACTION" = "restart-mongo" ]; then
+              echo "===== RESTART MONGODB ====="
+              docker compose up -d --force-recreate mongodb
               sleep 10
-              docker compose ps mongodb || docker compose ps mongo || true
             fi
 
-            if [ "$ACTION" = "full" ] || [ "$ACTION" = "restart-backend" ]; then
-              echo "===== RESTARTING BACKEND (required: config.py does not reconnect) ====="
+            if [ "$ACTION" = "restart-backend" ]; then
+              echo "===== RESTART BACKEND ====="
               docker compose up -d --force-recreate --no-deps backend
+            fi
+
+            if [ "$ACTION" = "fix-network" ] || [ "$ACTION" = "full" ]; then
+              echo "===== RECREATING MONGODB + BACKEND (same compose network) ====="
+              docker compose up -d --force-recreate mongodb backend
+              echo "===== WAITING 15s FOR MONGO TO ACCEPT CONNECTIONS ====="
+              sleep 15
             fi
 
             if [ "$ACTION" = "full" ]; then
@@ -71,14 +85,20 @@ jobs:
                   break
                 fi
                 if [ $i -eq 60 ]; then
-                  echo "Backend not ready after 60s"
-                  docker compose logs backend --tail=50
+                  echo "Backend not ready after 120s"
+                  docker compose logs backend --tail=80
                   exit 1
                 fi
                 sleep 2
               done
-              echo "===== HEALTH CHECK ====="
+
+              echo "===== FINAL NETWORKS ====="
+              echo -n "backend:  "; docker inspect road-monitor-backend --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+              echo -n "mongodb:  "; docker inspect road-monitor-mongodb --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+
+              echo "===== HEALTH ====="
               docker compose exec -T backend python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/health').read().decode())" || true
+              docker compose exec -T backend python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/ready').read().decode())" || true
             fi
 
             echo "===== FINAL STATUS ====="
