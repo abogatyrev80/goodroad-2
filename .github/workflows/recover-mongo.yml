@@ -1,0 +1,85 @@
+name: Recover MongoDB
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        type: choice
+        required: true
+        default: full
+        options:
+          - full
+          - status-only
+          - restart-mongo
+          - restart-backend
+
+env:
+  IMAGE: abogatyrev80/goodroad
+
+jobs:
+  recover:
+    name: Diagnose & Recover
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            ACTION="${{ github.event.inputs.action }}"
+
+            echo "===== DISK ====="
+            df -h
+
+            echo "===== DOCKER CONTAINERS ====="
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+
+            echo "===== COMPOSE SERVICES ====="
+            cd /opt/goodroad
+            docker compose ps -a || true
+
+            if [ "$ACTION" = "status-only" ]; then
+              exit 0
+            fi
+
+            if [ "$ACTION" = "full" ] || [ "$ACTION" = "restart-mongo" ]; then
+              echo "===== MONGODB LOGS (last 50) ====="
+              docker logs --tail 50 road-monitor-mongodb 2>&1 || docker logs --tail 50 goodroad-mongodb 2>&1 || echo "mongo container not found"
+
+              echo "===== RESTARTING MONGODB ====="
+              docker compose up -d mongodb || docker compose up -d mongo || true
+              sleep 10
+              docker compose ps mongodb || docker compose ps mongo || true
+            fi
+
+            if [ "$ACTION" = "full" ] || [ "$ACTION" = "restart-backend" ]; then
+              echo "===== RESTARTING BACKEND (required: config.py does not reconnect) ====="
+              docker compose up -d --force-recreate --no-deps backend
+            fi
+
+            if [ "$ACTION" = "full" ]; then
+              echo "===== WAITING FOR READY ====="
+              for i in $(seq 1 60); do
+                if docker compose exec -T backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/ready')" 2>/dev/null; then
+                  echo "Backend ready after ${i}s"
+                  break
+                fi
+                if [ $i -eq 60 ]; then
+                  echo "Backend not ready after 60s"
+                  docker compose logs backend --tail=50
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "===== HEALTH CHECK ====="
+              docker compose exec -T backend python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/health').read().decode())" || true
+            fi
+
+            echo "===== FINAL STATUS ====="
+            docker ps --format 'table {{.Names}}\t{{.Status}}'
