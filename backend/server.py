@@ -30,6 +30,7 @@ from services.geo import (
     validate_gps_coords, calculate_distance,
 )
 from ml_processor import merge_nearby_obstacles
+from ml_stats import get_ml_stats_tracker
 from collector_config import (
     get_collector_config, save_collector_config,
     load_ml_thresholds, save_ml_thresholds,
