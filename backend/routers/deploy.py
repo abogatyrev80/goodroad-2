@@ -2,15 +2,17 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from config import templates
+from security import require_admin_auth
 from services.updater import BackendUpdater, DeployError
 
 logger = logging.getLogger(__name__)
 
-deploy_router = APIRouter(prefix="/api/admin/deploy", tags=["Deploy"])
+deploy_router = APIRouter(prefix="/api/admin/deploy", tags=["Deploy"],
+                       dependencies=[require_admin_auth])
 updater = BackendUpdater()
 
 

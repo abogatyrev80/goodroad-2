@@ -2,14 +2,16 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette.requests import Request
 
 from config import db, mongodb_connected, event_classifier, templates
+from security import require_admin_auth
 
 logger = logging.getLogger(__name__)
 
-opencode_router = APIRouter(prefix="/api/admin/opencode", tags=["Opencode"])
+opencode_router = APIRouter(prefix="/api/admin/opencode", tags=["Opencode"],
+                         dependencies=[require_admin_auth])
 
 
 @opencode_router.get("/health")

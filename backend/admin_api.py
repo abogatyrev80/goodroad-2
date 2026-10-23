@@ -3,7 +3,8 @@ Admin API - Endpoints для управления данными
 Редактирование, фильтрация, удаление кластеров и событий
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from security import verify_admin_token
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -47,8 +48,9 @@ class SeverityMetrics(BaseModel):
     typical_damage: str
     recommended_speed: int
 
-# Создаем роутер
-admin_editor_router = APIRouter(prefix="/api/admin/editor", tags=["Admin Editor"])
+# Создаем роутер (полные пути в декораторах; include идемпотентен)
+admin_editor_router = APIRouter(tags=["Admin Editor"],
+                                dependencies=[Depends(verify_admin_token)])
 
 # ====================================
 # SEVERITY METRICS - Критерии оценки
@@ -108,7 +110,7 @@ SEVERITY_METRICS: List[SeverityMetrics] = [
     )
 ]
 
-@admin_editor_router.get("/severity-metrics")
+@admin_editor_router.get("/api/admin/editor/severity-metrics")
 async def get_severity_metrics():
     """Получить детальные критерии severity для понимания масштаба"""
     return {
@@ -125,10 +127,13 @@ async def get_severity_metrics():
 # CLUSTERS - Управление кластерами
 # ====================================
 
-async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
+def register_admin_editor_routes(database: AsyncIOMotorDatabase):
+    if getattr(admin_editor_router, "_routes_registered", False):
+        return admin_editor_router
+    admin_editor_router._routes_registered = True
     """Инициализация с доступом к БД"""
     
-    @admin_editor_router.get("/clusters/{cluster_id}")
+    @admin_editor_router.get("/api/admin/editor/clusters/{cluster_id}")
     async def get_cluster_detail(cluster_id: str):
         """Получить детальную информацию о кластере"""
         cluster = await database.obstacle_clusters.find_one({"_id": cluster_id})
@@ -148,7 +153,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return cluster
     
-    @admin_editor_router.put("/clusters/{cluster_id}")
+    @admin_editor_router.put("/api/admin/editor/clusters/{cluster_id}")
     async def update_cluster(cluster_id: str, update: ClusterUpdate):
         """Обновить параметры кластера"""
         update_data = update.dict(exclude_unset=True)
@@ -185,7 +190,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return {"success": True, "updated_fields": list(update_data.keys())}
     
-    @admin_editor_router.delete("/clusters/{cluster_id}")
+    @admin_editor_router.delete("/api/admin/editor/clusters/{cluster_id}")
     async def delete_cluster(cluster_id: str, reason: Optional[str] = None):
         """Удалить кластер"""
         # Сначала получаем кластер для логирования
@@ -207,7 +212,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return {"success": True, "deleted_id": cluster_id}
     
-    @admin_editor_router.post("/clusters/bulk-delete")
+    @admin_editor_router.post("/api/admin/editor/clusters/bulk-delete")
     async def bulk_delete_clusters(request: BulkDeleteRequest):
         """Массовое удаление кластеров"""
         if not request.ids:
@@ -235,7 +240,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     # EVENTS - Управление событиями
     # ====================================
     
-    @admin_editor_router.get("/events/{event_id}")
+    @admin_editor_router.get("/api/admin/editor/events/{event_id}")
     async def get_event_detail(event_id: str):
         """Получить детальную информацию о событии"""
         event = await database.processed_events.find_one({"id": event_id})
@@ -251,7 +256,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return event
     
-    @admin_editor_router.put("/events/{event_id}")
+    @admin_editor_router.put("/api/admin/editor/events/{event_id}")
     async def update_event(event_id: str, update: EventUpdate):
         """Обновить параметры события"""
         update_data = update.dict(exclude_unset=True)
@@ -274,7 +279,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return {"success": True, "updated_fields": list(update_data.keys())}
     
-    @admin_editor_router.delete("/events/{event_id}")
+    @admin_editor_router.delete("/api/admin/editor/events/{event_id}")
     async def delete_event(event_id: str, reason: Optional[str] = None):
         """Удалить событие"""
         result = await database.processed_events.delete_one({"id": event_id})
@@ -286,7 +291,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
         
         return {"success": True, "deleted_id": event_id}
     
-    @admin_editor_router.post("/events/bulk-delete")
+    @admin_editor_router.post("/api/admin/editor/events/bulk-delete")
     async def bulk_delete_events(request: BulkDeleteRequest):
         """Массовое удаление событий"""
         if not request.ids:
@@ -307,7 +312,7 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
     # FILTERS - Расширенная фильтрация
     # ====================================
     
-    @admin_editor_router.get("/clusters/filter")
+    @admin_editor_router.get("/api/admin/editor/clusters/filter")
     async def filter_clusters(
         obstacle_type: Optional[str] = None,
         min_severity: Optional[int] = None,
@@ -357,5 +362,5 @@ async def init_admin_editor_routes(database: AsyncIOMotorDatabase):
 
 # Функция для подключения роутера
 def get_admin_editor_router(db: AsyncIOMotorDatabase):
-    """Получить роутер с доступом к БД"""
-    return init_admin_editor_routes(db)
+    """Получить роутер с доступом к БД (синхронно, для include на старте)"""
+    return register_admin_editor_routes(db)

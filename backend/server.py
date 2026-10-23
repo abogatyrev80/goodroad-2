@@ -1,4 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
+from pydantic import BaseModel
+import math
+import statistics
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
@@ -13,7 +16,8 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from config import (
-    ROOT_DIR, templates, client, db, mongodb_connected,
+    ROOT_DIR, templates, client, db, db_name, mongodb_connected,
+    _default_model_path,
     obstacle_clusterer, event_classifier, warning_generator,
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
@@ -25,6 +29,7 @@ from models import (
 from services.geo import (
     validate_gps_coords, calculate_distance,
 )
+from security import is_production, validate_admin_config_at_startup
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,25 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# ---------------------------------------------------------------------------
+# Защита административных эндпоинтов: все пути /admin* требуют ADMIN_API_TOKEN.
+# Токен передаётся в заголовке Authorization: Bearer <token>, X-Admin-Token
+# или query-параметром ?token=<token>. В dev без заданного токена — открыто.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def admin_auth_middleware(request, call_next):
+    from security import check_admin_token_request
+    path = request.url.path
+    # /admin и /api/admin... (включая deploy/opencode/editor), но не публичные страницы вне admin
+    if path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin") \
+            or path.startswith("/api/v1/admin"):
+        status_code = await check_admin_token_request(request)
+        if status_code is not None:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=status_code,
+                                content={"detail": "Unauthorized: valid admin token required"})
+    return await call_next(request)
+
 @app.on_event("startup")
 async def startup_event():
     """
@@ -42,6 +66,7 @@ async def startup_event():
     Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
     logger.info("Starting Good Road API...")
+    validate_admin_config_at_startup()
     try:
         await connect_to_mongodb()
         model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
@@ -187,7 +212,7 @@ async def get_v2_analytics():
 @api_router.get("/admin/v2/raw-data")
 async def get_raw_data(
     limit: int = Query(100, ge=1, le=50000, description="Максимальное количество записей (1-50000)"),
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска")
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
 ):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
@@ -212,7 +237,7 @@ async def get_raw_data(
 async def get_processed_events(
     limit: int = Query(100, ge=1, le=50000, description="Максимальное количество событий (1-50000)"),
     skip: int = Query(0, ge=0, description="Количество событий для пропуска"),
-    event_type: str = None
+    event_type: str = None,
 ):
     """Получить обработанные события из коллекции processed_events"""
     try:
@@ -241,7 +266,7 @@ async def get_processed_events(
 async def get_obstacle_clusters(
     limit: Optional[int] = Query(None, ge=1, le=100000, description="Максимальное количество кластеров"),
     status: str = "active",
-    min_reports: int = 0
+    min_reports: int = 0,
 ):
     limits = await get_limits_from_db()
     limit = limit or limits.clusters_default_limit
@@ -367,7 +392,7 @@ async def cleanup_old_data(
     days: int = 30,
     delete_events: bool = False,
     delete_clusters: bool = False,
-    delete_raw_data: bool = True
+    delete_raw_data: bool = True,
 ):
     """
     Очистить старые данные
@@ -435,7 +460,7 @@ async def delete_all_data(
     confirm: str = None,
     delete_events: bool = False,
     delete_clusters: bool = False,
-    delete_raw_data: bool = False
+    delete_raw_data: bool = False,
 ):
     """
      Удалить ВСЕ данные (требует подтверждение)
@@ -881,7 +906,7 @@ async def delete_event(event_id: str):
 @api_router.delete("/admin/clear-database")
 async def clear_database(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
-    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)")
+    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)"),
 ):
     """
     Очистить базу данных (локальную или Atlas) с возможностью фильтрации по периоду
@@ -955,16 +980,12 @@ async def clear_database(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 # API для очистки базы данных V2 с фильтром по диапазону дат
 @api_router.delete("/admin/clear-database-v2")
 async def clear_database_v2(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
     date_from: Optional[str] = Query(None, description="Начальная дата для удаления (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Конечная дата для удаления (YYYY-MM-DD)")
+    date_to: Optional[str] = Query(None, description="Конечная дата для удаления (YYYY-MM-DD)"),
 ):
     """
     Очистить базу данных с возможностью фильтрации по диапазону дат
@@ -1181,7 +1202,7 @@ async def get_all_sensor_data(
 @api_router.patch("/admin/sensor-data/{point_id}")
 async def update_sensor_data_classification(
     point_id: str,
-    updates: AdminSensorDataUpdate
+    updates: AdminSensorDataUpdate,
 ):
     """
     Update sensor data point classification by administrator
@@ -1331,7 +1352,7 @@ async def get_heatmap_data(
     southwest_lng: float = Query(..., description="Southwest corner longitude"), 
     northeast_lat: float = Query(..., description="Northeast corner latitude"),
     northeast_lng: float = Query(..., description="Northeast corner longitude"),
-    zoom_level: int = Query(10, description="Map zoom level for data density")
+    zoom_level: int = Query(10, description="Map zoom level for data density"),
 ):
     """
     Get sensor data formatted for heatmap display on maps
@@ -1988,7 +2009,7 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
 async def export_sensor_data_csv(
     date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта")
+    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта"),
 ):
     limits = await get_limits_from_db()
     limit = limit or limits.csv_export_default_limit
@@ -2514,9 +2535,11 @@ if cors_origins == "*":
 else:
     allowed_origins = [o.strip() for o in cors_origins.split(",")]
 
+# allow_credentials нельзя использовать с wildcard-origin (невалидная комбинация CORS):
+# credentials включаем только когда задан явный список origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=(allowed_origins != ["*"]),
     allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
