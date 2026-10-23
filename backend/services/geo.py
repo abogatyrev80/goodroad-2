@@ -14,7 +14,8 @@ def validate_gps_coords(lat: Optional[float], lon: Optional[float]) -> bool:
 
 
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371000
+    """Haversine distance between two points, in KILOMETERS."""
+    R = 6371.0
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
     delta_lat = math.radians(lat2 - lat1)

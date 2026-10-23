@@ -951,7 +951,7 @@ class WarningGenerator:
     """Генератор предупреждений для пользователей"""
     
     def __init__(self):
-        self.warning_distance = 200  # метров - расстояние для предупреждения
+        self.warning_distance = 0.2  # километров (200 м) - расстояние для предупреждения
         self.warning_ttl = timedelta(hours=1)  # Время жизни предупреждения
     
     def should_warn_user(
@@ -992,9 +992,9 @@ class WarningGenerator:
             'vibration': 'ПЛОХОЕ ПОКРЫТИЕ'
         }.get(event_type, 'ОПАСНОСТЬ')
         
-        if distance < 1:
+        if distance < 0.001:
             return f"{severity_text}: {event_text} рядом с вами"
-        return f"{severity_text}: {event_text} через {int(distance)}м"
+        return f"{severity_text}: {event_text} через {int(distance * 1000)}м"
     
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         return calculate_distance(lat1, lon1, lat2, lon2)

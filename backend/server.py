@@ -572,13 +572,14 @@ async def get_nearby_obstacles(
         # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
         nearby_obstacles = []
         for cluster in all_clusters:
-            distance = obstacle_clusterer.haversine_distance(
+            distance_km = obstacle_clusterer.haversine_distance(
                 latitude, longitude,
                 cluster['location']['latitude'],
                 cluster['location']['longitude']
             )
             
-            if distance <= radius:
+            if distance_km <= radius / 1000.0:  # radius в метрах, distance_km в км
+                distance = distance_km * 1000.0  # наружу отдаём метры (контракт API)
                 # Оптимизированный формат для мобильного приложения
                 obstacle = {
                     "id": str(cluster['_id']),
@@ -639,7 +640,7 @@ async def get_road_conditions(
             distance = calculate_distance(
                 latitude, longitude,
                 condition["latitude"], condition["longitude"]
-            )
+            ) * 1000.0  # км -> метры, radius в метрах
             
             if distance <= radius:
                 condition["distance"] = distance
@@ -678,7 +679,7 @@ async def get_road_warnings(
             distance = calculate_distance(
                 latitude, longitude,
                 warning["latitude"], warning["longitude"]
-            )
+            ) * 1000.0  # км -> метры, radius в метрах
             
             if distance <= radius:
                 warning["distance"] = distance
