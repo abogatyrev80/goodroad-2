@@ -20,3 +20,11 @@ def test_window_expiry(monkeypatch):
     monkeypatch.setattr(time, "time", lambda: real_time() + config.RATE_LIMIT_WINDOW + 1)
     assert config.check_rate_limit(dev) is True
     _reset(dev)
+
+
+def test_memory_bounded_under_device_flood(monkeypatch):
+    """Store must not grow unboundedly when many unique devices appear."""
+    monkeypatch.setattr(config, "RATE_LIMIT_MAX_KEYS", 50)
+    for i in range(300):
+        config.check_rate_limit(f"flood-device-{i}")
+    assert len(config.rate_limit_store) <= 51

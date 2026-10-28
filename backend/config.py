@@ -47,19 +47,29 @@ if not os.environ.get("NEURAL_MODEL_PATH") and _default_model_path.exists():
 rate_limit_store: Dict[str, List[float]] = {}
 RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
+# Max distinct device_ids kept in the sliding-window store. Without a cap,
+# an attacker (or just many devices) could grow the dict unboundedly.
+RATE_LIMIT_MAX_KEYS = int(os.environ.get("RATE_LIMIT_MAX_KEYS", "10000"))
 
 
 def check_rate_limit(device_id: str) -> bool:
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW
-    if device_id not in rate_limit_store:
-        rate_limit_store[device_id] = []
-    rate_limit_store[device_id] = [
-        t for t in rate_limit_store[device_id] if t > window_start
-    ]
-    if len(rate_limit_store[device_id]) >= RATE_LIMIT_REQUESTS:
+
+    # Evict stale buckets entirely; this also bounds memory usage.
+    if len(rate_limit_store) > RATE_LIMIT_MAX_KEYS:
+        for key in [k for k, v in rate_limit_store.items() if not v or v[-1] < window_start]:
+            del rate_limit_store[key]
+        # Still over cap: drop oldest-active buckets (LRU-ish by last hit).
+        if len(rate_limit_store) > RATE_LIMIT_MAX_KEYS:
+            for key in sorted(rate_limit_store, key=lambda k: rate_limit_store[k][-1] if rate_limit_store[k] else 0)[: len(rate_limit_store) - RATE_LIMIT_MAX_KEYS]:
+                del rate_limit_store[key]
+
+    bucket = rate_limit_store.setdefault(device_id, [])
+    bucket[:] = [t for t in bucket if t > window_start]
+    if len(bucket) >= RATE_LIMIT_REQUESTS:
         return False
-    rate_limit_store[device_id].append(now)
+    bucket.append(now)
     return True
 
 
