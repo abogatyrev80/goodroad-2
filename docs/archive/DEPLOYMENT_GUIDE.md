@@ -211,7 +211,7 @@ curl https://ваш-deployment-url.emergent.host/api/admin/analytics
 1. **Протестируйте приложение** на реальном устройстве
 2. **Совершите тестовую поездку** (5-10 минут)
 3. **Проверьте данные** в MongoDB Atlas
-4. **Запустите анализ**: `python3 /app/analyze_trip_data.py`
+4. **Запустите анализ**: `python3 scripts/adhoc/analyze_trip_data.py`
 5. **Проверьте warnings** - должны появляться при критических событиях
 
 ## 📝 Важные заметки
