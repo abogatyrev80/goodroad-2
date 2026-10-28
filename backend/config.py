@@ -63,6 +63,58 @@ def check_rate_limit(device_id: str) -> bool:
     return True
 
 
+async def ensure_indexes(db):
+    """Create all required MongoDB indexes in one place.
+
+    Idempotent: create_index on an existing spec is a no-op server-side.
+    Replaces the scattered try/except-pass index creation from startup.
+
+    Retention (TTL) collections, controlled by env vars (days; 0 disables):
+      - RAW_DATA_TTL_DAYS   -> sensor_data, raw_sensor_data (default 30)
+      - ML_LOGS_TTL_DAYS    -> ml_inference_logs           (default 90)
+    Note: obstacle_clusters already has its own 'expiresAt' TTL logic.
+    """
+    raw_ttl_days = int(os.environ.get("RAW_DATA_TTL_DAYS", "30"))
+    ml_ttl_days = int(os.environ.get("ML_LOGS_TTL_DAYS", "90"))
+
+    # Hot query paths: device_id + timestamp range scans
+    await db.sensor_data.create_index([("device_id", 1), ("timestamp", -1)])
+    await db.raw_sensor_data.create_index([("device_id", 1), ("timestamp", -1)])
+    await db.processed_events.create_index([("timestamp", -1)])
+    await db.processed_events.create_index(
+        [("device_id", 1), ("timestamp", -1)]
+    )
+    await db.ml_inference_logs.create_index([("timestamp", -1)])
+
+    # Obstacle clusters: status lookups + geo queries + expiry
+    await db.obstacle_clusters.create_index([("status", 1)])
+    await db.obstacle_clusters.create_index([("expiresAt", 1)])
+    await db.obstacle_clusters.create_index([("location.latitude", 1)])
+    await db.obstacle_clusters.create_index([("location.longitude", 1)])
+
+    # Automatic retention for unbounded growth (TTL on ingest time field).
+    if raw_ttl_days > 0:
+        expire_after = raw_ttl_days * 86400
+        await db.sensor_data.create_index(
+            [("timestamp", 1)], expireAfterSeconds=expire_after,
+            name="ttl_sensor_data",
+        )
+        await db.raw_sensor_data.create_index(
+            [("timestamp", 1)], expireAfterSeconds=expire_after,
+            name="ttl_raw_sensor_data",
+        )
+        logger.info("TTL indexes enabled for raw data (%d days)", raw_ttl_days)
+    if ml_ttl_days > 0:
+        await db.ml_inference_logs.create_index(
+            [("timestamp", 1)],
+            expireAfterSeconds=ml_ttl_days * 86400,
+            name="ttl_ml_inference_logs",
+        )
+        logger.info("TTL index enabled for ml_inference_logs (%d days)", ml_ttl_days)
+
+    logger.info("MongoDB indexes ensured")
+
+
 async def connect_to_mongodb(max_retries=5, retry_delay=5):
     global client, db, mongodb_connected, obstacle_clusterer
     logger.info("Attempting to connect to MongoDB database: %s", db_name)
@@ -89,23 +141,15 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
 
             tracker = init_ml_stats_tracker(db)
             await tracker.load_history_from_db(hours=24)
+            # Centralized index management (see ensure_indexes below).
             try:
-                await db.ml_inference_logs.create_index([("timestamp", -1)])
-            except Exception:
-                pass
+                await ensure_indexes(db)
+            except Exception as e:
+                logger.warning("ensure_indexes failed (non-fatal): %s", e)
             logger.info("ML stats tracker initialized")
 
             obstacle_clusterer = ObstacleClusterer(db)
             logger.info("Obstacle clusterer initialized")
-
-            try:
-                await db.obstacle_clusters.create_index([("status", 1)])
-                await db.obstacle_clusters.create_index([("expiresAt", 1)])
-                await db.obstacle_clusters.create_index([("location.latitude", 1)])
-                await db.obstacle_clusters.create_index([("location.longitude", 1)])
-                logger.info("Created indexes for obstacle_clusters collection")
-            except Exception as e:
-                logger.warning("Could not create indexes (may already exist): %s", e)
             return
         except Exception as e:
             logger.error("MongoDB connection attempt %d/%d failed: %s", attempt, max_retries, e)
