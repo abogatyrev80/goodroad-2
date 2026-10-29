@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { localDB, LocalSensorData, LocalWarning, SyncStatus } from './LocalDatabase';
 import { backendConfigService } from './BackendConfigService';
+import { getDeviceId } from './deviceId';
 
 interface RegionData {
   code: string;
@@ -106,7 +107,7 @@ export class SyncService {
 
 
     try {
-      const deviceId = 'mobile-app-' + Date.now();
+      const deviceId = await getDeviceId();
       const batchSize = 50;
       for (let i = 0; i < unsyncedData.length; i += batchSize) {
         const batch = unsyncedData.slice(i, i + batchSize);

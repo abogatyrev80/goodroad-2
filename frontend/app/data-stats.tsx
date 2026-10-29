@@ -12,6 +12,7 @@ import {
   Pressable,
   StatusBar,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ export default function DataStatsScreen() {
   const [backendMode, setBackendMode] = useState<BackendMode>('auto');
   const [backendUrl, setBackendUrl] = useState<string>('');
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [localUrlInput, setLocalUrlInput] = useState<string>('');
 
   const loadStats = useCallback(async () => {
     const instance = RawDataCollector.currentInstance;
@@ -43,6 +45,7 @@ export default function DataStatsScreen() {
     await backendConfigService.initialize();
     setBackendMode(backendConfigService.getMode());
     setBackendUrl(backendConfigService.getActiveUrl());
+    setLocalUrlInput(backendConfigService.getLocalUrl());
   }, []);
 
   useEffect(() => {
@@ -66,13 +69,30 @@ export default function DataStatsScreen() {
 
   const testBackendConnection = async () => {
     setTestResult('Проверка...');
+    await backendConfigService.refresh();
     const url = backendConfigService.getActiveUrl();
+    setBackendUrl(url);
     const result = await backendConfigService.testConnection(url);
     if (result.ok) {
       setTestResult(`OK - ${url} (${result.latencyMs}мс)`);
-    } else {
-      setTestResult(`Ошибка: ${result.error || 'Нет ответа'}`);
+      return;
     }
+    let message = `Ошибка (${url}): ${result.error || 'нет ответа'}`;
+    if (backendConfigService.getMode() === 'auto') {
+      const prodUrl = backendConfigService.getProdUrl();
+      const prod = await backendConfigService.testConnection(prodUrl);
+      message += prod.ok
+        ? `\nProduction OK - ${prodUrl} (${prod.latencyMs}мс)`
+        : `\nProduction (${prodUrl}): ${prod.error || 'нет ответа'}`;
+    }
+    setTestResult(message);
+  };
+
+  const saveLocalUrl = async () => {
+    if (!localUrlInput.trim()) return;
+    await backendConfigService.setLocalUrl(localUrlInput.trim());
+    setBackendUrl(backendConfigService.getActiveUrl());
+    setTestResult('Локальный URL сохранён');
   };
 
   const handleForceSend = async () => {
@@ -202,8 +222,27 @@ export default function DataStatsScreen() {
             </Pressable>
           </View>
 
+          {/* Редактирование локального сервера */}
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.urlText}>Локальный сервер (IP:порт):</Text>
+            <View style={styles.localUrlRow}>
+              <TextInput
+                style={styles.localUrlInput}
+                value={localUrlInput}
+                onChangeText={setLocalUrlInput}
+                placeholder="http://192.168.1.213:8000"
+                placeholderTextColor="#64748b"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable style={styles.saveUrlButton} onPress={saveLocalUrl}>
+                <Text style={styles.saveUrlText}>Сохранить</Text>
+              </Pressable>
+            </View>
+          </View>
+
           <Text style={[styles.urlText, { marginTop: 12 }]}>
-            URL: {backendUrl}
+            Текущий URL: {backendUrl}
           </Text>
 
           {testResult && (
@@ -385,5 +424,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  localUrlRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  localUrlInput: {
+    flex: 1,
+    backgroundColor: '#2d2d5f',
+    color: '#fff',
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 14,
+  },
+  saveUrlButton: {
+    backgroundColor: '#00d4ff',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  saveUrlText: {
+    color: '#0f0f23',
+    fontWeight: '600',
   },
 });

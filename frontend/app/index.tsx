@@ -38,6 +38,7 @@ import AdaptiveCollector from '../services/AdaptiveCollector';
 import BackgroundSensorService from '../services/BackgroundSensorService';
 import { clientLogService } from '../services/ClientLogService';
 import { backendConfigService } from '../services/BackendConfigService';
+import { getDeviceId } from '../services/deviceId';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
@@ -571,7 +572,7 @@ export default function HomeScreen() {
 
       // Инициализируем коллектор данных
       if (!rawDataCollector.current) {
-        const deviceId = 'mobile-app-' + Date.now();
+        const deviceId = await getDeviceId();
         const backendUrl = backendConfigService.getActiveUrl();
         rawDataCollector.current = new RawDataCollector(
           deviceId,
@@ -582,7 +583,7 @@ export default function HomeScreen() {
       }
       // Адаптивный коллектор (маркерный сбор, пороги с сервера)
       if (!adaptiveCollector.current) {
-        const deviceId = 'mobile-app-' + Date.now();
+        const deviceId = await getDeviceId();
         const backendUrl = backendConfigService.getActiveUrl();
         adaptiveCollector.current = new AdaptiveCollector(backendUrl, deviceId, (hz: number) => {
           // Пре-арм: повышаем частоту акселерометра у зон, baseline в остальное время
@@ -1051,8 +1052,32 @@ export default function HomeScreen() {
           onPress={() => router.push('/data-stats')}
         >
           <Ionicons name="stats-chart" size={24} color="#00d4ff" />
-          <Text style={styles.compactButtonText}>ОТПРАВКА ДАННЫХ</Text>
+          <Text style={styles.compactButtonText}>ОТПРАВКА ДАННЫХ / СЕРВЕР</Text>
         </Pressable>
+
+        {/* Быстрый выбор локального сервера */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 8 }}>
+          <Pressable
+            style={[styles.compactButton, { flex: 1 }]}
+            onPress={async () => {
+              await backendConfigService.setMode('local');
+              showToast('Переключено на локальный сервер');
+            }}
+          >
+            <Ionicons name="laptop" size={20} color="#22c55e" />
+            <Text style={[styles.compactButtonText, { fontSize: 13 }]}>ЛОКАЛЬНЫЙ</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.compactButton, { flex: 1 }]}
+            onPress={async () => {
+              await backendConfigService.setMode('prod');
+              showToast('Production сервер');
+            }}
+          >
+            <Ionicons name="cloud" size={20} color="#f59e0b" />
+            <Text style={[styles.compactButtonText, { fontSize: 13 }]}>PRODUCTION</Text>
+          </Pressable>
+        </View>
 
         {/* Ручная отметка препятствия */}
         <Pressable

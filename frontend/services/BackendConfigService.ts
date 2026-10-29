@@ -1,16 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+
 
 export type BackendMode = 'auto' | 'local' | 'prod';
 
 const STORAGE_KEY = '@backend_mode';
+const LOCAL_URL_KEY = '@backend_local_url';
 const PROD_URL = 'https://goodroad.su';
-const LOCAL_URL = 'http://192.168.8.213:8000';
+const DEFAULT_LOCAL_URL = 'http://192.168.1.213:8000';
 const HEALTH_TIMEOUT_MS = 2000;
 
 class BackendConfigService {
-  private mode: BackendMode = 'auto';
+  private mode: BackendMode = 'prod';
   private activeUrl: string = PROD_URL;
+  private customLocalUrl: string = DEFAULT_LOCAL_URL;
   private lastCheckedAt: number = 0;
   private checkPromise: Promise<string> | null = null;
   private isInitialized = false;
@@ -21,6 +23,10 @@ class BackendConfigService {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored && ['auto', 'local', 'prod'].includes(stored)) {
         this.mode = stored as BackendMode;
+      }
+      const custom = await AsyncStorage.getItem(LOCAL_URL_KEY);
+      if (custom) {
+        this.customLocalUrl = custom;
       }
     } catch {}
     await this.resolve();
@@ -44,7 +50,19 @@ class BackendConfigService {
   }
 
   getLocalUrl(): string {
-    return LOCAL_URL;
+    return this.customLocalUrl;
+  }
+
+  async setLocalUrl(url: string): Promise<void> {
+    this.customLocalUrl = url;
+    try {
+      await AsyncStorage.setItem(LOCAL_URL_KEY, url);
+    } catch {}
+    if (this.mode === 'local') {
+      this.activeUrl = url;
+    } else if (this.mode === 'auto') {
+      await this.resolve();
+    }
   }
 
   getProdUrl(): string {
@@ -59,7 +77,7 @@ class BackendConfigService {
   private async resolve(): Promise<void> {
     switch (this.mode) {
       case 'local':
-        this.activeUrl = LOCAL_URL;
+        this.activeUrl = this.customLocalUrl;
         return;
       case 'prod':
         this.activeUrl = PROD_URL;
@@ -86,8 +104,8 @@ class BackendConfigService {
   }
 
   private async _doAutoDetect(): Promise<string> {
-    const localOk = await this.checkHealth(LOCAL_URL);
-    if (localOk) return LOCAL_URL;
+    const localOk = await this.checkHealth(this.customLocalUrl);
+    if (localOk) return this.customLocalUrl;
     return PROD_URL;
   }
 
@@ -95,7 +113,7 @@ class BackendConfigService {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
-      const res = await fetch(`${baseUrl}/`, {
+      const res = await fetch(`${baseUrl}/api`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -108,14 +126,25 @@ class BackendConfigService {
 
   async testConnection(url: string): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
     const start = Date.now();
+    let timer: ReturnType<typeof setTimeout> | null = null;
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(`${url}/`, { method: 'GET', signal: controller.signal });
-      clearTimeout(timer);
-      return { ok: res.ok, latencyMs: Date.now() - start };
+      timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`${url}/api`, { method: 'GET', signal: controller.signal });
+      return {
+        ok: res.ok,
+        latencyMs: Date.now() - start,
+        error: res.ok ? undefined : `HTTP ${res.status}`,
+      };
     } catch (e: any) {
-      return { ok: false, latencyMs: Date.now() - start, error: e?.message || 'Connection failed' };
+      const aborted = e?.name === 'AbortError';
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: aborted ? 'таймаут 5с' : (e?.message || 'нет ответа'),
+      };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
