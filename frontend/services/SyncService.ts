@@ -18,7 +18,7 @@ interface RegionData {
 }
 
 export class SyncService {
-  private syncInterval: NodeJS.Timeout | null = null;
+  private syncInterval: ReturnType<typeof setInterval> | null = null;
   private isInitialized = false;
   private networkUnsubscribe: (() => void) | null = null;
 
@@ -28,7 +28,7 @@ export class SyncService {
     try {
       await localDB.initialize();
       
-      if (localDB.getDatabaseStats) {
+      if (typeof localDB.getDatabaseStats === 'function') {
         this.startPeriodicSync();
         if (Platform.OS !== 'web') {
           const sub = Network.addNetworkStateListener((state) => {

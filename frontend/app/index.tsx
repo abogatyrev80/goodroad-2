@@ -66,10 +66,10 @@ export default function HomeScreen() {
   const adaptiveCollector = useRef<AdaptiveCollector | null>(null);
   const batterySubscription = useRef<any>(null);
   const dataCollectionInterval = useRef<NodeJS.Timeout | null>(null);
-  const bluetoothCheckInterval = useRef<NodeJS.Timeout | null>(null);
-  const chargeCheckInterval = useRef<NodeJS.Timeout | null>(null);
-  const appsCheckInterval = useRef<NodeJS.Timeout | null>(null);
-  const autostopCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const bluetoothCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chargeCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const appsCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autostopCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateSubscription = useRef<any>(null);
   
   // Буферы для сбора данных
@@ -350,7 +350,7 @@ export default function HomeScreen() {
       if (isTracking && wasAutoStarted) {
         const currentMode = await AsyncStorage.getItem('autostart_mode');
         let shouldStop = false;
-        let autoStopEnabled = false;
+        let autoStopEnabled: string | null = null;
 
         if (currentMode === 'onBluetooth') {
           autoStopEnabled = await AsyncStorage.getItem('autostop_on_bluetooth_disconnect');
@@ -464,7 +464,7 @@ export default function HomeScreen() {
           // 1) Проверяем, есть ли уже активное соединение (сокет) от нашего приложения
           try {
             const connectedDevice = await RNBluetoothClassic.getConnectedDevice(device.address);
-            if (connectedDevice && connectedDevice.isConnected()) {
+            if (connectedDevice && (await connectedDevice.isConnected())) {
               return true;
             }
           } catch {
@@ -892,21 +892,22 @@ export default function HomeScreen() {
   // Ручная отметка препятствия
   const reportObstacle = async () => {
     if (!currentLocation) {
-      showToast('warning', '⚠️ Нет GPS', 'Невозможно определить местоположение', 3000);
+      showToast('info', '⚠️ Нет GPS', 'Невозможно определить местоположение', 3000);
       return;
     }
 
     try {
       const backendUrl = backendConfigService.getActiveUrl();
-      
+      const reportDeviceId = await getDeviceId();
+
       // Отправляем ручную отметку на сервер
       const response = await fetch(`${backendUrl}/api/raw-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceId: rawDataCollector.current?.deviceId || 'manual-report',
+          deviceId: reportDeviceId,
           data: [{
-            deviceId: rawDataCollector.current?.deviceId || 'manual-report',
+            deviceId: reportDeviceId,
             timestamp: Date.now(),
             gps: {
               latitude: currentLocation.coords.latitude,
@@ -1061,7 +1062,7 @@ export default function HomeScreen() {
             style={[styles.compactButton, { flex: 1 }]}
             onPress={async () => {
               await backendConfigService.setMode('local');
-              showToast('Переключено на локальный сервер');
+              showToast('info', 'Переключено на локальный сервер');
             }}
           >
             <Ionicons name="laptop" size={20} color="#22c55e" />
@@ -1071,7 +1072,7 @@ export default function HomeScreen() {
             style={[styles.compactButton, { flex: 1 }]}
             onPress={async () => {
               await backendConfigService.setMode('prod');
-              showToast('Production сервер');
+              showToast('info', 'Production сервер');
             }}
           >
             <Ionicons name="cloud" size={20} color="#f59e0b" />
