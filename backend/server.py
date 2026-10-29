@@ -1684,7 +1684,7 @@ async def ml_model_stats():
     tracker = get_ml_stats_tracker()
     runtime = tracker.snapshot() if tracker else {}
     db_stats = {}
-    if _config.db and _config.mongodb_connected:
+    if _config.db is not None and _config.mongodb_connected:
         since = datetime.utcnow() - timedelta(hours=24)
         pipeline = [
             {"$match": {"timestamp": {"$gte": since}}},
