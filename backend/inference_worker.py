@@ -220,6 +220,13 @@ class InferenceWorker:
 
         device_id = doc.get('deviceId', 'unknown')
         timestamp = doc.get('timestamp', datetime.utcnow())
+        if isinstance(timestamp, (int, float)):
+            timestamp = datetime.utcfromtimestamp(timestamp / 1000)
+        elif isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).replace(tzinfo=None)
+            except (ValueError, AttributeError):
+                timestamp = datetime.utcnow()
         kind = doc.get('kind', 'legacy')
 
         gps = doc.get('gps', {}) or {}

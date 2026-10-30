@@ -292,10 +292,15 @@ async def ingest_raw_events(request: Request):
         now = datetime.utcnow()
         inserted = 0
         for ev in events:
+            ts = ev.get("timestamp")
+            if isinstance(ts, (int, float)):
+                ts = datetime.utcfromtimestamp(ts / 1000)
+            if not isinstance(ts, datetime):
+                ts = now
             doc = {
                 "deviceId": device_id,
                 "kind": ev.get("kind", "trigger"),
-                "timestamp": ev.get("timestamp", int(now.timestamp() * 1000)),
+                "timestamp": ts,
                 "gps": ev.get("gps"),
                 "accelerometer": ev.get("accelerometer") or [],
                 "userReported": ev.get("userReported", False),
@@ -482,6 +487,7 @@ async def get_obstacle_clusters(
             query["expiresAt"] = {"$gt": datetime.utcnow()}
         if min_reports > 0:
             query["reportCount"] = {"$gte": min_reports}
+        total = await _config.db.obstacle_clusters.count_documents(query)
         clusters = await _config.db.obstacle_clusters.find(
             query,
             {"_id": 1, "obstacleType": 1, "location": 1, "severity": 1,
@@ -498,7 +504,7 @@ async def get_obstacle_clusters(
                 del cluster['severity']['history']
             if 'roadInfo' in cluster and 'speeds' in cluster['roadInfo']:
                 del cluster['roadInfo']['speeds']
-        return {"total": len(clusters), "clusters": clusters}
+        return {"total": total, "clusters": clusters}
     except HTTPException:
         raise
     except Exception as e:
@@ -535,38 +541,48 @@ async def recalculate_all_clusters():
             logger.info("[recalc %s] Всего событий: %d", job_id, total)
 
             processed = 0
-            cursor = _config.db.processed_events.find({}, no_cursor_timeout=True)
-            async for event in cursor:
-                try:
-                    lat = event.get('latitude')
-                    lon = event.get('longitude')
-                    etype = event.get('eventType')
-                    if not lat or not lon or not etype:
-                        if processed < 10:
-                            logger.warning("[recalc %s] skip event (lat=%s lon=%s type=%s)", job_id, lat, lon, etype)
+            batch_size = 5000
+            last_id = None
+            while True:
+                page_query = {} if last_id is None else {"_id": {"$gt": last_id}}
+                batch = await _config.db.processed_events.find(
+                    page_query
+                ).sort("_id", 1).limit(batch_size).to_list(batch_size)
+                if not batch:
+                    break
+                for event in batch:
+                    try:
+                        lat = event.get('latitude')
+                        lon = event.get('longitude')
+                        etype = event.get('eventType')
+                        if not lat or not lon or not etype:
+                            if processed < 10:
+                                logger.warning("[recalc %s] skip event (lat=%s lon=%s type=%s)", job_id, lat, lon, etype)
+                            continue
+                        ce = {
+                            '_id': str(event['_id']),
+                            'eventType': etype,
+                            'latitude': lat,
+                            'longitude': lon,
+                            'severity': event.get('severity', 3),
+                            'confidence': event.get('confidence', 0.7),
+                            'speed': event.get('speed', 0),
+                            'timestamp': event.get('timestamp'),
+                        }
+                        await _config.obstacle_clusterer.process_event(
+                            event=ce,
+                            device_id=event.get('deviceId', 'unknown')
+                        )
+                        processed += 1
+                        if processed % 1000 == 0:
+                            _recalc_jobs[job_id]["processed"] = processed
+                            logger.info("[recalc %s] %d/%d clusters=%d", job_id, processed, total, await _config.db.obstacle_clusters.count_documents({}))
+                    except Exception as exc:
+                        if processed < 5:
+                            logger.warning("[recalc %s] error on event %s: %s", job_id, event.get('_id'), exc)
                         continue
-                    ce = {
-                        '_id': str(event['_id']),
-                        'eventType': etype,
-                        'latitude': lat,
-                        'longitude': lon,
-                        'severity': event.get('severity', 3),
-                        'confidence': event.get('confidence', 0.7),
-                        'speed': event.get('speed', 0),
-                        'timestamp': event.get('timestamp'),
-                    }
-                    await _config.obstacle_clusterer.process_event(
-                        event=ce,
-                        device_id=event.get('deviceId', 'unknown')
-                    )
-                    processed += 1
-                    if processed % 1000 == 0:
-                        _recalc_jobs[job_id]["processed"] = processed
-                        logger.info("[recalc %s] %d/%d clusters=%d", job_id, processed, total, await _config.db.obstacle_clusters.count_documents({}))
-                except Exception as exc:
-                    if processed < 5:
-                        logger.warning("[recalc %s] error on event %s: %s", job_id, event.get('_id'), exc)
-                    continue
+                last_id = batch[-1]["_id"]
+                _recalc_jobs[job_id]["processed"] = processed
 
             final = await _config.db.obstacle_clusters.count_documents({})
             _recalc_jobs[job_id].update(
