@@ -4,6 +4,7 @@
 """
 
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import uuid
@@ -59,9 +60,21 @@ class ObstacleClusterer:
         Returns:
             Кластер или None если не найден
         """
-        # Получаем все активные кластеры
+        # Кандидаты только в bounding box радиуса (индексы по location.*), жирные массивы режем $slice
+        lat_delta = self.CLUSTER_RADIUS / 111320.0
+        cos_lat = max(0.01, abs(math.cos(math.radians(latitude))))
+        lon_delta = self.CLUSTER_RADIUS / (111320.0 * cos_lat)
         clusters = await self.db.obstacle_clusters.find({
-            "status": "active"
+            "status": "active",
+            "location.latitude": {"$gte": latitude - lat_delta, "$lte": latitude + lat_delta},
+            "location.longitude": {"$gte": longitude - lon_delta, "$lte": longitude + lon_delta},
+        }, {
+            "location": 1, "obstacleType": 1, "revision": 1, "devices": 1,
+            "severity.max": 1, "severity.min": 1,
+            "severity.history": {"$slice": -100},
+            "roadInfo.speeds": {"$slice": -100},
+            "roadSnap": 1,
+            "event_ids": {"$slice": -500},
         }).to_list(length=None)
         
         # Ищем ближайший кластер в радиусе
@@ -234,23 +247,24 @@ class ObstacleClusterer:
         # ИСПРАВЛЕНО: Обновляем счетчик отчетов только при НОВОМ устройстве
         new_report_count = len(devices)  # reportCount = количество уникальных устройств!
         
-        # Обновляем severity
-        severity_history = list(cluster['severity']['history'])
+        # Обновляем severity (history приходит урезанной $slice-проекцией — это и есть кап)
+        severity_data = cluster.get('severity', {})
+        severity_history = list(severity_data.get('history', []))
         severity_history.append(event['severity'])
-        
+
         severity_counter = Counter(severity_history)
         mode_severity = severity_counter.most_common(1)[0][0]
-        
+
         new_severity = {
             "average": sum(severity_history) / len(severity_history),
-            "max": min(cluster['severity']['max'], event['severity']),  # min потому что 1=critical, 5=info
-            "min": max(cluster['severity']['min'], event['severity']),
+            "max": min(severity_data.get('max', event['severity']), event['severity']),  # min потому что 1=critical, 5=info
+            "min": max(severity_data.get('min', event['severity']), event['severity']),
             "mode": mode_severity,
             "history": severity_history
         }
-        
+
         # Обновляем информацию о дороге
-        speeds = list(cluster['roadInfo']['speeds'])
+        speeds = list(cluster.get('roadInfo', {}).get('speeds', []))
         speeds.append(event['speed'])
         
         avg_speed = sum(speeds) / len(speeds)
@@ -262,9 +276,15 @@ class ObstacleClusterer:
             "speeds": speeds
         }
         
-        # Пересчитываем тип препятствия (может измениться с новыми данными)
-        all_types = [cluster['obstacleType']] * (new_report_count - 1) + [event['eventType']]
-        new_obstacle_type = self._determine_obstacle_type(all_types)
+        # Пересчитываем тип препятствия без построения списка длиной reportCount
+        if new_report_count >= 4:
+            new_obstacle_type = cluster['obstacleType']
+        elif new_report_count == 1:
+            new_obstacle_type = event['eventType']
+        else:
+            new_obstacle_type = self._determine_obstacle_type(
+                [cluster['obstacleType'], event['eventType']]
+            )
         
         # Обновляем кластер
         update_doc = {

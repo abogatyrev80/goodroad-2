@@ -29,6 +29,15 @@ from pymongo.errors import AutoReconnect
 from models import LimitsConfig
 
 
+def _resolve(doc, key):
+    value = doc
+    for part in key.split('.'):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
 def matches(doc, query):
     for key, value in query.items():
         if key == "$or":
@@ -41,7 +50,7 @@ def matches(doc, query):
             for op, operand in value.items():
                 if op not in ("$exists", "$ne", "$nin", "$lt", "$lte", "$gt", "$gte"):
                     raise AssertionError(f"Unsupported fake query operator: {op}")
-                actual = doc.get(key)
+                actual = _resolve(doc, key)
                 if op == "$exists" and (key in doc) != operand:
                     return False
                 if op == "$ne" and actual == operand:
@@ -59,10 +68,10 @@ def matches(doc, query):
                         return False
                     if op == "$gte" and not actual >= operand:
                         return False
-        elif isinstance(doc.get(key), list) and not isinstance(value, list):
-            if value not in doc[key]:
+        elif isinstance(_resolve(doc, key), list) and not isinstance(value, list):
+            if value not in _resolve(doc, key):
                 return False
-        elif doc.get(key) != value:
+        elif _resolve(doc, key) != value:
             return False
     return True
 
@@ -113,7 +122,7 @@ class Collection:
                 if set(values).intersection(other_values):
                     raise inference_worker.DuplicateKeyError(f"duplicate {self_field}")
 
-    def find(self, query):
+    def find(self, query, projection=None):
         return Cursor([doc for doc in self.docs.values() if matches(doc, query)])
 
     async def find_one(self, query):
