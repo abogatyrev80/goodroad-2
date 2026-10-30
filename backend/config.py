@@ -51,6 +51,9 @@ RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
 # an attacker (or just many devices) could grow the dict unboundedly.
 RATE_LIMIT_MAX_KEYS = int(os.environ.get("RATE_LIMIT_MAX_KEYS", "10000"))
 
+# Retention (days) for idempotent replay of mobile uploads (X-Package-Id).
+IDEMPOTENCY_TTL_DAYS = int(os.environ.get("IDEMPOTENCY_TTL_DAYS", "7"))
+
 
 def check_rate_limit(device_id: str) -> bool:
     now = time.time()
@@ -121,6 +124,13 @@ async def ensure_indexes(db):
             name="ttl_ml_inference_logs",
         )
         logger.info("TTL index enabled for ml_inference_logs (%d days)", ml_ttl_days)
+
+    # Idempotency store for retried mobile uploads (X-Package-Id).
+    await db.api_idempotency.create_index(
+        [("expires_at", 1)],
+        expireAfterSeconds=IDEMPOTENCY_TTL_DAYS * 86400,
+        name="ttl_api_idempotency",
+    )
 
     logger.info("MongoDB indexes ensured")
 

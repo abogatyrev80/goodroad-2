@@ -3,11 +3,12 @@
 Приём сырых данных с мобильного приложения (вынесено из server.py).
 """
 import logging
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from config import (
-    db, mongodb_connected, check_rate_limit,
+    db, mongodb_connected, check_rate_limit, IDEMPOTENCY_TTL_DAYS,
     obstacle_clusterer, event_classifier, warning_generator,
 )
 from models import RawDataBatch
@@ -17,9 +18,49 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
+IDEMPOTENCY_TTL_DAYS = 7
 
+
+async def _idempotency_check(package_id: str | None) -> dict | None:
+    """Return a previously stored response for this package id, or None.
+
+    Uses the capped collection api_idempotency with a TTL index so retried
+    uploads from mobile clients are not double-processed.
+    """
+    if not package_id:
+        return None
+    try:
+        doc = await db.api_idempotency.find_one({"_id": package_id})
+        if doc and doc.get("response") is not None:
+            logger.info("Idempotent replay for package %s", package_id)
+            return doc["response"]
+    except Exception as e:  # pragma: no cover - best effort
+        logger.warning("Idempotency lookup failed: %s", e)
+    return None
+
+
+async def _idempotency_store(package_id: str | None, response: dict) -> None:
+    if not package_id:
+        return
+    try:
+        await db.api_idempotency.update_one(
+            {"_id": package_id},
+            {
+                "$set": {"response": response, "created_at": datetime.utcnow()},
+                "$setOnInsert": {"expires_at": datetime.utcnow()},
+            },
+            upsert=True,
+        )
+    except Exception as e:  # pragma: no cover - best effort
+        logger.warning("Idempotency store failed: %s", e)
+
+
+@router.post("/sensor-data", status_code=201)
 @router.post("/raw-data", status_code=201)
-async def ingest_raw_data(batch: RawDataBatch):
+async def ingest_raw_data(
+    batch: RawDataBatch,
+    x_package_id: str | None = Header(None, alias="X-Package-Id"),
+):
     """
     Приём сырых данных акселерометра + GPS с мобильного приложения.
     Сохраняет в raw_sensor_data, прогоняет через ML классификатор,
@@ -30,6 +71,12 @@ async def ingest_raw_data(batch: RawDataBatch):
 
     if not check_rate_limit(batch.deviceId):
         raise HTTPException(429, detail="Rate limit exceeded")
+
+    # Idempotency: retried offline uploads (same X-Package-Id) return the
+    # original response instead of duplicating raw points/clusters.
+    cached = await _idempotency_check(x_package_id)
+    if cached is not None:
+        return cached
 
     if not batch.data:
         raise HTTPException(400, detail="Empty data batch")
@@ -137,10 +184,12 @@ async def ingest_raw_data(batch: RawDataBatch):
             logger.error("Error processing data point: %s", e)
             continue
 
-    return {
+    response = {
         "received": received,
         "processed": len(detected_events),
         "events": detected_events[:20],
         "warnings": warnings[:10],
     }
+    await _idempotency_store(x_package_id, response)
+    return response
 
