@@ -113,9 +113,9 @@ class ClientLogService {
   error(message: string, error?: Error, context?: Record<string, any>) {
     this.log('error', message, {
       ...context,
-      stack: error?.stack,
-      name: error?.name,
-      message: error?.message,
+      error_stack: error?.stack,
+      error_name: error?.name,
+      error_message: error?.message,
     });
   }
 
