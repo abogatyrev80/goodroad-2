@@ -36,6 +36,19 @@ export interface DataPackage {
   timestamp: number;
   priority: 'critical' | 'high' | 'normal'; // Приоритет отправки
   retryCount: number; // Количество попыток отправки
+  nextRetryAt?: number; // Экспоненциальный backoff: не раньше этого времени
+}
+
+// Retry policy: exponential backoff with jitter (server may answer 429/5xx)
+const MAX_RETRY_COUNT = 6;
+const BACKOFF_BASE_MS = 2000;   // 2s, 4s, 8s, 16s, 32s, 64s...
+const BACKOFF_MAX_MS = 120000;  // cap at 2 minutes
+
+/** Exponential backoff delay for attempt n (1-based) with ±20% jitter. */
+export function backoffDelayMs(retryCount: number): number {
+  const exp = Math.min(BACKOFF_BASE_MS * 2 ** (retryCount - 1), BACKOFF_MAX_MS);
+  const jitter = exp * 0.2 * (Math.random() * 2 - 1);
+  return Math.round(exp + jitter);
 }
 
 export interface BatchStats {
@@ -333,7 +346,12 @@ class BatchOfflineManager {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Idempotency key: server replays the original response on retry,
+          // so retried offline uploads never duplicate raw points/clusters.
+          'X-Package-Id': dataPackage.id,
+        },
         body: JSON.stringify(payload),
         timeout: 10000,
       });
@@ -345,6 +363,12 @@ class BatchOfflineManager {
         this.stats.lastSyncTime = Date.now();
         this.updateStats();
         return true;
+      } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        // Client error (bad payload/validation): retrying is pointless - drop.
+        console.error(`⛔ Package ${dataPackage.id}: HTTP ${response.status} - отброшен без retry`);
+        this.stats.failedSends++;
+        this.updateStats();
+        return false;
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -352,10 +376,11 @@ class BatchOfflineManager {
       console.error(`❌ Ошибка отправки package ${dataPackage.id}:`, error.message);
       this.stats.failedSends++;
       
-      // Добавить в offline очередь для retry
+      // Add to offline queue for retry with exponential backoff + jitter
       dataPackage.retryCount++;
-      if (dataPackage.retryCount <= 3) { // Максимум 3 попытки
-        console.log(`🔄 Retry ${dataPackage.retryCount}/3 - добавление в offline очередь`);
+      if (dataPackage.retryCount <= MAX_RETRY_COUNT) {
+        dataPackage.nextRetryAt = Date.now() + backoffDelayMs(dataPackage.retryCount);
+        console.log(`🔄 Retry ${dataPackage.retryCount}/${MAX_RETRY_COUNT} через ${Math.round((dataPackage.nextRetryAt - Date.now()) / 1000)}с`);
         this.addToOfflineQueue(dataPackage);
       } else {
         console.log(`❌ Превышен лимит retry для package ${dataPackage.id} - отброшен`);
@@ -408,12 +433,21 @@ class BatchOfflineManager {
     });
     
     const successfulIds: string[] = [];
+    const now = Date.now();
     
     // Отправка по одному с задержкой
     for (const dataPackage of sortedQueue) {
+      // Respect exponential backoff: skip packages not yet due for retry
+      if (dataPackage.nextRetryAt && dataPackage.nextRetryAt > now) {
+        continue;
+      }
+
       const success = await this.sendPackage(dataPackage);
       if (success) {
         successfulIds.push(dataPackage.id);
+      } else if (!this.isOnline) {
+        // Network went down mid-flush: stop hammering, keep queue intact
+        break;
       }
       
       // Задержка между отправками (чтобы не перегрузить сервер)

@@ -1,4 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
+from pydantic import BaseModel
+import math
+import statistics
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
@@ -13,7 +16,8 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from config import (
-    ROOT_DIR, templates, client, db, mongodb_connected,
+    ROOT_DIR, templates, client, db, db_name, mongodb_connected,
+    _default_model_path,
     obstacle_clusterer, event_classifier, warning_generator,
     connect_to_mongodb, close_mongodb_connection,
     get_limits_from_db, save_limits_to_db, check_rate_limit,
@@ -25,6 +29,7 @@ from models import (
 from services.geo import (
     validate_gps_coords, calculate_distance,
 )
+from security import is_production, validate_admin_config_at_startup
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,25 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# ---------------------------------------------------------------------------
+# Защита административных эндпоинтов: все пути /admin* требуют ADMIN_API_TOKEN.
+# Токен передаётся в заголовке Authorization: Bearer <token>, X-Admin-Token
+# или query-параметром ?token=<token>. В dev без заданного токена — открыто.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def admin_auth_middleware(request, call_next):
+    from security import check_admin_token_request
+    path = request.url.path
+    # /admin и /api/admin... (включая deploy/opencode/editor), но не публичные страницы вне admin
+    if path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin") \
+            or path.startswith("/api/v1/admin"):
+        status_code = await check_admin_token_request(request)
+        if status_code is not None:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=status_code,
+                                content={"detail": "Unauthorized: valid admin token required"})
+    return await call_next(request)
+
 @app.on_event("startup")
 async def startup_event():
     """
@@ -42,6 +66,7 @@ async def startup_event():
     Graceful degradation: API starts even if MongoDB is temporarily unavailable
     """
     logger.info("Starting Good Road API...")
+    validate_admin_config_at_startup()
     try:
         await connect_to_mongodb()
         model_path = os.environ.get("NEURAL_MODEL_PATH") or str(_default_model_path)
@@ -69,6 +94,10 @@ async def shutdown_event():
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+from routers.calibration import router as calibration_router  # noqa: E402
+app.include_router(calibration_router)
+from routers.ingest import router as ingest_router  # noqa: E402
+app.include_router(ingest_router)
 
 
 # Health Check Endpoints (for Kubernetes probes)
@@ -187,7 +216,7 @@ async def get_v2_analytics():
 @api_router.get("/admin/v2/raw-data")
 async def get_raw_data(
     limit: int = Query(100, ge=1, le=50000, description="Максимальное количество записей (1-50000)"),
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска")
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска"),
 ):
     """Получить сырые данные из коллекции raw_sensor_data"""
     try:
@@ -212,7 +241,7 @@ async def get_raw_data(
 async def get_processed_events(
     limit: int = Query(100, ge=1, le=50000, description="Максимальное количество событий (1-50000)"),
     skip: int = Query(0, ge=0, description="Количество событий для пропуска"),
-    event_type: str = None
+    event_type: str = None,
 ):
     """Получить обработанные события из коллекции processed_events"""
     try:
@@ -241,7 +270,7 @@ async def get_processed_events(
 async def get_obstacle_clusters(
     limit: Optional[int] = Query(None, ge=1, le=100000, description="Максимальное количество кластеров"),
     status: str = "active",
-    min_reports: int = 0
+    min_reports: int = 0,
 ):
     limits = await get_limits_from_db()
     limit = limit or limits.clusters_default_limit
@@ -367,7 +396,7 @@ async def cleanup_old_data(
     days: int = 30,
     delete_events: bool = False,
     delete_clusters: bool = False,
-    delete_raw_data: bool = True
+    delete_raw_data: bool = True,
 ):
     """
     Очистить старые данные
@@ -435,7 +464,7 @@ async def delete_all_data(
     confirm: str = None,
     delete_events: bool = False,
     delete_clusters: bool = False,
-    delete_raw_data: bool = False
+    delete_raw_data: bool = False,
 ):
     """
      Удалить ВСЕ данные (требует подтверждение)
@@ -543,13 +572,14 @@ async def get_nearby_obstacles(
         # Фильтруем по расстоянию и добавляем расстояние к каждому кластеру
         nearby_obstacles = []
         for cluster in all_clusters:
-            distance = obstacle_clusterer.haversine_distance(
+            distance_km = obstacle_clusterer.haversine_distance(
                 latitude, longitude,
                 cluster['location']['latitude'],
                 cluster['location']['longitude']
             )
             
-            if distance <= radius:
+            if distance_km <= radius / 1000.0:  # radius в метрах, distance_km в км
+                distance = distance_km * 1000.0  # наружу отдаём метры (контракт API)
                 # Оптимизированный формат для мобильного приложения
                 obstacle = {
                     "id": str(cluster['_id']),
@@ -610,7 +640,7 @@ async def get_road_conditions(
             distance = calculate_distance(
                 latitude, longitude,
                 condition["latitude"], condition["longitude"]
-            )
+            ) * 1000.0  # км -> метры, radius в метрах
             
             if distance <= radius:
                 condition["distance"] = distance
@@ -649,7 +679,7 @@ async def get_road_warnings(
             distance = calculate_distance(
                 latitude, longitude,
                 warning["latitude"], warning["longitude"]
-            )
+            ) * 1000.0  # км -> метры, radius в метрах
             
             if distance <= radius:
                 warning["distance"] = distance
@@ -675,21 +705,6 @@ class AdminSensorDataUpdate(BaseModel):
     severity: Optional[str] = None
     is_verified: Optional[bool] = None
     admin_notes: Optional[str] = None
-
-class CalibrationData(BaseModel):
-    deviceId: str
-    accelerometerData: List[Dict[str, float]]  # [{x, y, z, timestamp}]
-    speed: float
-    roadType: Optional[str] = "unknown"  # urban, highway, unpaved
-
-class CalibrationProfile(BaseModel):
-    deviceId: str
-    baseline: Dict[str, float]  # mean values for x, y, z
-    thresholds: Dict[str, float]  # detection thresholds
-    std_dev: Dict[str, float]  # standard deviations
-    sample_count: int
-    last_updated: datetime
-    road_type: str
 
 class AdminAnalytics(BaseModel):
     total_points: int
@@ -881,7 +896,7 @@ async def delete_event(event_id: str):
 @api_router.delete("/admin/clear-database")
 async def clear_database(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
-    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)")
+    days: Optional[int] = Query(None, description="Удалить данные старше N дней (если не указано - удалить все)"),
 ):
     """
     Очистить базу данных (локальную или Atlas) с возможностью фильтрации по периоду
@@ -955,16 +970,12 @@ async def clear_database(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 # API для очистки базы данных V2 с фильтром по диапазону дат
 @api_router.delete("/admin/clear-database-v2")
 async def clear_database_v2(
     confirm: str = Query(..., description="Введите 'CONFIRM' для подтверждения"),
     date_from: Optional[str] = Query(None, description="Начальная дата для удаления (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Конечная дата для удаления (YYYY-MM-DD)")
+    date_to: Optional[str] = Query(None, description="Конечная дата для удаления (YYYY-MM-DD)"),
 ):
     """
     Очистить базу данных с возможностью фильтрации по диапазону дат
@@ -1181,7 +1192,7 @@ async def get_all_sensor_data(
 @api_router.patch("/admin/sensor-data/{point_id}")
 async def update_sensor_data_classification(
     point_id: str,
-    updates: AdminSensorDataUpdate
+    updates: AdminSensorDataUpdate,
 ):
     """
     Update sensor data point classification by administrator
@@ -1331,7 +1342,7 @@ async def get_heatmap_data(
     southwest_lng: float = Query(..., description="Southwest corner longitude"), 
     northeast_lat: float = Query(..., description="Northeast corner latitude"),
     northeast_lng: float = Query(..., description="Northeast corner longitude"),
-    zoom_level: int = Query(10, description="Map zoom level for data density")
+    zoom_level: int = Query(10, description="Map zoom level for data density"),
 ):
     """
     Get sensor data formatted for heatmap display on maps
@@ -1513,355 +1524,6 @@ async def cleanup_test_data():
         logging.error(f"Error during test data cleanup: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during test data cleanup: {str(e)}")
 
-# === CALIBRATION ENDPOINTS ===
-
-@api_router.post("/calibration/submit")
-async def submit_calibration_data(calibration: CalibrationData):
-    """
-    Submit calibration data for statistical analysis and adaptive threshold calculation
-    """
-    try:
-        if len(calibration.accelerometerData) < 10:
-            raise HTTPException(status_code=400, detail="Need at least 10 data points for calibration")
-        
-        # Extract accelerometer values
-        x_values = [d['x'] for d in calibration.accelerometerData]
-        y_values = [d['y'] for d in calibration.accelerometerData]
-        z_values = [d['z'] for d in calibration.accelerometerData]
-        
-        # Calculate statistical metrics
-        baseline = {
-            'x': statistics.mean(x_values),
-            'y': statistics.mean(y_values),
-            'z': statistics.mean(z_values)
-        }
-        
-        std_dev = {
-            'x': statistics.stdev(x_values) if len(x_values) > 1 else 0,
-            'y': statistics.stdev(y_values) if len(y_values) > 1 else 0,
-            'z': statistics.stdev(z_values) if len(z_values) > 1 else 0
-        }
-        
-        # Calculate adaptive thresholds (mean + 2*std for anomaly detection)
-        thresholds = {
-            'x_max': baseline['x'] + 2 * std_dev['x'],
-            'x_min': baseline['x'] - 2 * std_dev['x'],
-            'y_max': baseline['y'] + 2 * std_dev['y'],
-            'y_min': baseline['y'] - 2 * std_dev['y'],
-            'z_max': baseline['z'] + 2 * std_dev['z'],
-            'z_min': baseline['z'] - 2 * std_dev['z'],
-            # Threshold for total acceleration change
-            'total_deviation': 2 * math.sqrt(std_dev['x']**2 + std_dev['y']**2 + std_dev['z']**2)
-        }
-        
-        # Check if profile exists
-        existing_profile = await db.calibration_profiles.find_one({"deviceId": calibration.deviceId})
-        
-        if existing_profile:
-            # Update existing profile with weighted average (70% old, 30% new)
-            old_count = existing_profile.get('sample_count', 0)
-            new_count = len(calibration.accelerometerData)
-            total_count = old_count + new_count
-            
-            weight_old = old_count / total_count if total_count > 0 else 0
-            weight_new = new_count / total_count if total_count > 0 else 1
-            
-            # Weighted average for baseline
-            updated_baseline = {
-                'x': existing_profile['baseline']['x'] * weight_old + baseline['x'] * weight_new,
-                'y': existing_profile['baseline']['y'] * weight_old + baseline['y'] * weight_new,
-                'z': existing_profile['baseline']['z'] * weight_old + baseline['z'] * weight_new
-            }
-            
-            # Weighted average for std_dev
-            updated_std = {
-                'x': existing_profile['std_dev']['x'] * weight_old + std_dev['x'] * weight_new,
-                'y': existing_profile['std_dev']['y'] * weight_old + std_dev['y'] * weight_new,
-                'z': existing_profile['std_dev']['z'] * weight_old + std_dev['z'] * weight_new
-            }
-            
-            # Recalculate thresholds
-            updated_thresholds = {
-                'x_max': updated_baseline['x'] + 2 * updated_std['x'],
-                'x_min': updated_baseline['x'] - 2 * updated_std['x'],
-                'y_max': updated_baseline['y'] + 2 * updated_std['y'],
-                'y_min': updated_baseline['y'] - 2 * updated_std['y'],
-                'z_max': updated_baseline['z'] + 2 * updated_std['z'],
-                'z_min': updated_baseline['z'] - 2 * updated_std['z'],
-                'total_deviation': 2 * math.sqrt(updated_std['x']**2 + updated_std['y']**2 + updated_std['z']**2)
-            }
-            
-            # Update document
-            await db.calibration_profiles.update_one(
-                {"deviceId": calibration.deviceId},
-                {"$set": {
-                    "baseline": updated_baseline,
-                    "thresholds": updated_thresholds,
-                    "std_dev": updated_std,
-                    "sample_count": total_count,
-                    "last_updated": datetime.now(),
-                    "road_type": calibration.roadType
-                }}
-            )
-            
-            return {
-                "message": "Calibration profile updated",
-                "deviceId": calibration.deviceId,
-                "baseline": updated_baseline,
-                "thresholds": updated_thresholds,
-                "std_dev": updated_std,
-                "sample_count": total_count,
-                "update_type": "adaptive"
-            }
-        else:
-            # Create new profile
-            profile = {
-                "deviceId": calibration.deviceId,
-                "baseline": baseline,
-                "thresholds": thresholds,
-                "std_dev": std_dev,
-                "sample_count": len(calibration.accelerometerData),
-                "last_updated": datetime.now(),
-                "road_type": calibration.roadType,
-                "created_at": datetime.now()
-            }
-            
-            await db.calibration_profiles.insert_one(profile)
-            
-            return {
-                "message": "Calibration profile created",
-                "deviceId": calibration.deviceId,
-                "baseline": baseline,
-                "thresholds": thresholds,
-                "std_dev": std_dev,
-                "sample_count": len(calibration.accelerometerData),
-                "update_type": "new"
-            }
-            
-    except Exception as e:
-        logging.error(f"Error processing calibration data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing calibration: {str(e)}")
-
-@api_router.get("/calibration/profile/{device_id}")
-async def get_calibration_profile(device_id: str):
-    """
-    Get calibration profile for a specific device
-    """
-    try:
-        profile = await db.calibration_profiles.find_one({"deviceId": device_id})
-        
-        if not profile:
-            # Return default thresholds if no profile exists
-            return {
-                "deviceId": device_id,
-                "has_profile": False,
-                "message": "No calibration profile found. Using default thresholds.",
-                "default_thresholds": {
-                    "total_deviation": 2.0,  # Default threshold
-                    "x_max": 2.0,
-                    "x_min": -2.0,
-                    "y_max": 2.0,
-                    "y_min": -2.0,
-                    "z_max": 12.0,  # Adjusted for gravity
-                    "z_min": 8.0
-                }
-            }
-        
-        # Convert ObjectId to string
-        profile['_id'] = str(profile['_id'])
-        profile['has_profile'] = True
-        
-        return profile
-        
-    except Exception as e:
-        logging.error(f"Error getting calibration profile: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error getting calibration profile: {str(e)}")
-
-@api_router.delete("/calibration/profile/{device_id}")
-async def reset_calibration_profile(device_id: str):
-    """
-    Reset/delete calibration profile for a device (forces recalibration)
-    """
-    try:
-        result = await db.calibration_profiles.delete_one({"deviceId": device_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Calibration profile not found")
-        
-        return {
-            "message": "Calibration profile reset successfully",
-            "deviceId": device_id,
-            "note": "Device will use default thresholds until recalibrated"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error resetting calibration profile: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error resetting calibration: {str(e)}")
-
-@api_router.get("/calibration/stats")
-async def get_calibration_stats():
-    """
-    Get statistics about calibrated devices
-    """
-    try:
-        total_profiles = await db.calibration_profiles.count_documents({})
-        
-        # Get profiles with most samples
-        top_profiles = await db.calibration_profiles.find({}) \
-            .sort("sample_count", -1) \
-            .limit(10) \
-            .to_list(10)
-        
-        profiles_summary = []
-        for profile in top_profiles:
-            profiles_summary.append({
-                "deviceId": profile['deviceId'],
-                "sample_count": profile['sample_count'],
-                "road_type": profile.get('road_type', 'unknown'),
-                "last_updated": profile['last_updated'].isoformat()
-            })
-        
-        return {
-            "total_calibrated_devices": total_profiles,
-            "top_calibrated_devices": profiles_summary
-        }
-        
-    except Exception as e:
-        logging.error(f"Error getting calibration stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error getting calibration stats: {str(e)}")
-
-# ==============================================================================
-# DATA INGESTION — приём сырых данных с мобильного приложения
-# ==============================================================================
-
-@api_router.post("/raw-data", status_code=201)
-async def ingest_raw_data(batch: RawDataBatch):
-    """
-    Приём сырых данных акселерометра + GPS с мобильного приложения.
-    Сохраняет в raw_sensor_data, прогоняет через ML классификатор,
-    сохраняет события и генерирует предупреждения.
-    """
-    if not mongodb_connected:
-        raise HTTPException(503, detail="MongoDB not connected")
-
-    if not check_rate_limit(batch.deviceId):
-        raise HTTPException(429, detail="Rate limit exceeded")
-
-    if not batch.data:
-        raise HTTPException(400, detail="Empty data batch")
-
-    received = len(batch.data)
-    detected_events = []
-    warnings = []
-
-    for point in batch.data:
-        try:
-            gps = point.gps
-            lat = gps.get("latitude")
-            lng = gps.get("longitude")
-            if not validate_gps_coords(lat, lng):
-                logger.warning("Invalid GPS: device=%s lat=%s lng=%s", batch.deviceId, lat, lng)
-                continue
-
-            speed = gps.get("speed", 0)
-
-            raw_doc = {
-                "deviceId": batch.deviceId,
-                "timestamp": point.timestamp,
-                "gps": gps,
-                "accelerometer": point.accelerometer,
-                "userReported": point.userReported or False,
-                "eventType": point.eventType,
-                "severity": point.severity,
-                "created_at": datetime.utcnow(),
-            }
-            await db.raw_sensor_data.insert_one(raw_doc)
-
-            accel = point.accelerometer
-            if isinstance(accel, list) and len(accel) >= 8:
-                event = event_classifier.analyze_accelerometer_array(
-                    batch.deviceId,
-                    [{"x": a.x, "y": a.y, "z": a.z, "timestamp": a.timestamp or point.timestamp} for a in accel],
-                    speed,
-                )
-
-                if event and event.get("eventType"):
-                    event_type = event["eventType"]
-                    severity = event.get("severity", 2)
-                    confidence = event.get("confidence", 0.5)
-
-                    event_doc = {
-                        "deviceId": batch.deviceId,
-                        "timestamp": datetime.utcnow(),
-                        "eventType": event_type,
-                        "severity": severity,
-                        "confidence": confidence,
-                        "latitude": lat,
-                        "longitude": lng,
-                        "speed": speed,
-                        "accelerometer_data": {
-                            "mean_x": event.get("stats", {}).get("mean_x", 0),
-                            "mean_y": event.get("stats", {}).get("mean_y", 0),
-                            "mean_z": event.get("stats", {}).get("mean_z", 0),
-                            "max_magnitude": event.get("stats", {}).get("max_magnitude", 0),
-                        },
-                        "roadType": event.get("roadType", "unknown"),
-                        "created_at": datetime.utcnow(),
-                    }
-                    await db.processed_events.insert_one(event_doc)
-                    detected_events.append({
-                        "eventType": event_type,
-                        "severity": severity,
-                        "confidence": confidence,
-                        "latitude": lat,
-                        "longitude": lng,
-                    })
-
-                    if obstacle_clusterer:
-                        try:
-                            nearby = await obstacle_clusterer.find_nearby_cluster(lat, lng, event_type)
-                            if nearby:
-                                await obstacle_clusterer.update_cluster(lat, lng, event_type, batch.deviceId, confidence)
-                            else:
-                                await obstacle_clusterer.create_cluster(lat, lng, severity, event_type, batch.deviceId, confidence)
-                        except Exception as e:
-                            logger.warning("Cluster error: %s", e)
-
-                    warn, dist = warning_generator.should_warn_user(lat, lng, lat, lng, event_type, severity)
-                    if warn:
-                        msg = warning_generator.create_warning_message(event_type, severity, dist)
-                        warnings.append({
-                            "eventType": event_type,
-                            "severity": severity,
-                            "distance": dist,
-                            "message": msg,
-                            "latitude": lat,
-                            "longitude": lng,
-                        })
-
-            if point.userReported and point.eventType:
-                detected_events.append({
-                    "eventType": point.eventType,
-                    "severity": point.severity or 2,
-                    "confidence": 1.0,
-                    "latitude": lat,
-                    "longitude": lng,
-                    "userReported": True,
-                })
-
-        except Exception as e:
-            logger.error("Error processing data point: %s", e)
-            continue
-
-    return {
-        "received": received,
-        "processed": len(detected_events),
-        "events": detected_events[:20],
-        "warnings": warnings[:10],
-    }
-
 # === BULK OPERATIONS MODELS ===
 
 class BulkDeleteFilters(BaseModel):
@@ -1988,7 +1650,7 @@ async def bulk_delete_sensor_data(filters: BulkDeleteFilters):
 async def export_sensor_data_csv(
     date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта")
+    limit: Optional[int] = Query(None, ge=1, le=200000, description="Максимальное количество записей для экспорта"),
 ):
     limits = await get_limits_from_db()
     limit = limit or limits.csv_export_default_limit
@@ -2514,9 +2176,11 @@ if cors_origins == "*":
 else:
     allowed_origins = [o.strip() for o in cors_origins.split(",")]
 
+# allow_credentials нельзя использовать с wildcard-origin (невалидная комбинация CORS):
+# credentials включаем только когда задан явный список origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=(allowed_origins != ["*"]),
     allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],

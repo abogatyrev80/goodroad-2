@@ -47,20 +47,92 @@ if not os.environ.get("NEURAL_MODEL_PATH") and _default_model_path.exists():
 rate_limit_store: Dict[str, List[float]] = {}
 RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
+# Max distinct device_ids kept in the sliding-window store. Without a cap,
+# an attacker (or just many devices) could grow the dict unboundedly.
+RATE_LIMIT_MAX_KEYS = int(os.environ.get("RATE_LIMIT_MAX_KEYS", "10000"))
+
+# Retention (days) for idempotent replay of mobile uploads (X-Package-Id).
+IDEMPOTENCY_TTL_DAYS = int(os.environ.get("IDEMPOTENCY_TTL_DAYS", "7"))
 
 
 def check_rate_limit(device_id: str) -> bool:
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW
-    if device_id not in rate_limit_store:
-        rate_limit_store[device_id] = []
-    rate_limit_store[device_id] = [
-        t for t in rate_limit_store[device_id] if t > window_start
-    ]
-    if len(rate_limit_store[device_id]) >= RATE_LIMIT_REQUESTS:
+
+    # Evict stale buckets entirely; this also bounds memory usage.
+    if len(rate_limit_store) > RATE_LIMIT_MAX_KEYS:
+        for key in [k for k, v in rate_limit_store.items() if not v or v[-1] < window_start]:
+            del rate_limit_store[key]
+        # Still over cap: drop oldest-active buckets (LRU-ish by last hit).
+        if len(rate_limit_store) > RATE_LIMIT_MAX_KEYS:
+            for key in sorted(rate_limit_store, key=lambda k: rate_limit_store[k][-1] if rate_limit_store[k] else 0)[: len(rate_limit_store) - RATE_LIMIT_MAX_KEYS]:
+                del rate_limit_store[key]
+
+    bucket = rate_limit_store.setdefault(device_id, [])
+    bucket[:] = [t for t in bucket if t > window_start]
+    if len(bucket) >= RATE_LIMIT_REQUESTS:
         return False
-    rate_limit_store[device_id].append(now)
+    bucket.append(now)
     return True
+
+
+async def ensure_indexes(db):
+    """Create all required MongoDB indexes in one place.
+
+    Idempotent: create_index on an existing spec is a no-op server-side.
+    Replaces the scattered try/except-pass index creation from startup.
+
+    Retention (TTL) collections, controlled by env vars (days; 0 disables):
+      - RAW_DATA_TTL_DAYS   -> sensor_data, raw_sensor_data (default 30)
+      - ML_LOGS_TTL_DAYS    -> ml_inference_logs           (default 90)
+    Note: obstacle_clusters already has its own 'expiresAt' TTL logic.
+    """
+    raw_ttl_days = int(os.environ.get("RAW_DATA_TTL_DAYS", "30"))
+    ml_ttl_days = int(os.environ.get("ML_LOGS_TTL_DAYS", "90"))
+
+    # Hot query paths: device_id + timestamp range scans
+    await db.sensor_data.create_index([("device_id", 1), ("timestamp", -1)])
+    await db.raw_sensor_data.create_index([("device_id", 1), ("timestamp", -1)])
+    await db.processed_events.create_index([("timestamp", -1)])
+    await db.processed_events.create_index(
+        [("device_id", 1), ("timestamp", -1)]
+    )
+    await db.ml_inference_logs.create_index([("timestamp", -1)])
+
+    # Obstacle clusters: status lookups + geo queries + expiry
+    await db.obstacle_clusters.create_index([("status", 1)])
+    await db.obstacle_clusters.create_index([("expiresAt", 1)])
+    await db.obstacle_clusters.create_index([("location.latitude", 1)])
+    await db.obstacle_clusters.create_index([("location.longitude", 1)])
+
+    # Automatic retention for unbounded growth (TTL on ingest time field).
+    if raw_ttl_days > 0:
+        expire_after = raw_ttl_days * 86400
+        await db.sensor_data.create_index(
+            [("timestamp", 1)], expireAfterSeconds=expire_after,
+            name="ttl_sensor_data",
+        )
+        await db.raw_sensor_data.create_index(
+            [("timestamp", 1)], expireAfterSeconds=expire_after,
+            name="ttl_raw_sensor_data",
+        )
+        logger.info("TTL indexes enabled for raw data (%d days)", raw_ttl_days)
+    if ml_ttl_days > 0:
+        await db.ml_inference_logs.create_index(
+            [("timestamp", 1)],
+            expireAfterSeconds=ml_ttl_days * 86400,
+            name="ttl_ml_inference_logs",
+        )
+        logger.info("TTL index enabled for ml_inference_logs (%d days)", ml_ttl_days)
+
+    # Idempotency store for retried mobile uploads (X-Package-Id).
+    await db.api_idempotency.create_index(
+        [("expires_at", 1)],
+        expireAfterSeconds=IDEMPOTENCY_TTL_DAYS * 86400,
+        name="ttl_api_idempotency",
+    )
+
+    logger.info("MongoDB indexes ensured")
 
 
 async def connect_to_mongodb(max_retries=5, retry_delay=5):
@@ -89,23 +161,15 @@ async def connect_to_mongodb(max_retries=5, retry_delay=5):
 
             tracker = init_ml_stats_tracker(db)
             await tracker.load_history_from_db(hours=24)
+            # Centralized index management (see ensure_indexes below).
             try:
-                await db.ml_inference_logs.create_index([("timestamp", -1)])
-            except Exception:
-                pass
+                await ensure_indexes(db)
+            except Exception as e:
+                logger.warning("ensure_indexes failed (non-fatal): %s", e)
             logger.info("ML stats tracker initialized")
 
             obstacle_clusterer = ObstacleClusterer(db)
             logger.info("Obstacle clusterer initialized")
-
-            try:
-                await db.obstacle_clusters.create_index([("status", 1)])
-                await db.obstacle_clusters.create_index([("expiresAt", 1)])
-                await db.obstacle_clusters.create_index([("location.latitude", 1)])
-                await db.obstacle_clusters.create_index([("location.longitude", 1)])
-                logger.info("Created indexes for obstacle_clusters collection")
-            except Exception as e:
-                logger.warning("Could not create indexes (may already exist): %s", e)
             return
         except Exception as e:
             logger.error("MongoDB connection attempt %d/%d failed: %s", attempt, max_retries, e)

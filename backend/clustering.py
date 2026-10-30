@@ -21,7 +21,8 @@ class ObstacleClusterer:
     
     def __init__(self, db):
         self.db = db
-        self.CLUSTER_RADIUS = 1.0  # метров - радиус объединения в один кластер (УМЕНЬШЕНО до 1м для максимальной точности)
+        # calculate_distance возвращает КИЛОМЕТРЫ (см. services/geo.py)
+        self.CLUSTER_RADIUS = 0.001  # 1 метр - радиус объединения в один кластер
         self.DEFAULT_TTL_DAYS = 15  # дней - время жизни кластера
         self.MIN_CONFIDENCE = 0.80  # минимальная уверенность для нового кластера (повышено с 0.70)
         self.MIN_REPORT_COUNT = 3  # минимум отчётов для "подтверждённого" кластера
