@@ -39,6 +39,7 @@ import BackgroundSensorService from '../services/BackgroundSensorService';
 import { clientLogService } from '../services/ClientLogService';
 import { backendConfigService } from '../services/BackendConfigService';
 import { getDeviceId } from '../services/deviceId';
+import { startBackgroundLocationTask, stopBackgroundLocationTask } from '../services/BackgroundLocationTask';
 import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
@@ -71,6 +72,7 @@ export default function HomeScreen() {
   const appsCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const autostopCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateSubscription = useRef<any>(null);
+  const accelTicks = useRef(0);
   
   // Буферы для сбора данных
   const accelerometerBuffer = useRef<Array<{ x: number; y: number; z: number; timestamp: number }>>([]);
@@ -264,6 +266,7 @@ export default function HomeScreen() {
     }
     
     appStateSubscription.current = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      clientLogService.info('AppState change', { state: nextAppState, isTracking: isTrackingRef.current });
       if (nextAppState === 'background' || nextAppState === 'inactive') {
         lastBackgroundTimeRef.current = Date.now();
       }
@@ -750,6 +753,14 @@ export default function HomeScreen() {
             { x: data.x, y: data.y, z: data.z },
             Date.now()
           );
+          accelTicks.current += 1;
+          if (accelTicks.current % 3000 === 0) {
+            clientLogService.debug('accel alive', {
+              ticks: accelTicks.current,
+              appState: AppState.currentState,
+              isTracking: isTrackingRef.current,
+            });
+          }
         });
         accelerometerSubscription.current = accelSubscription;
         adaptiveCollector.current?.refreshCaptureRate();
@@ -768,12 +779,13 @@ export default function HomeScreen() {
 
       // Запускаем foreground service для сбора данных в фоне
       BackgroundSensorService.start().catch(() => {});
+      void startBackgroundLocationTask();
 
       // Не выключать экран и минимальная яркость во время мониторинга
       if (Platform.OS !== 'web') {
         try {
           const keepScreenOn = await AsyncStorage.getItem('keep_screen_on');
-          if (keepScreenOn === 'true') {
+          if (keepScreenOn !== 'false') {
             await activateKeepAwakeAsync();
 
             // Установить минимальную яркость (сохраняем текущую и восстанавливаем при остановке)
@@ -858,6 +870,7 @@ export default function HomeScreen() {
 
       // Останавливаем foreground service
       BackgroundSensorService.stop().catch(() => {});
+      void stopBackgroundLocationTask();
 
       setIsTracking(false);
       isTrackingRef.current = false;

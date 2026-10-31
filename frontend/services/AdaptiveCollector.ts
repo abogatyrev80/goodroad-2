@@ -15,6 +15,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BG_SAMPLE_LAST_SENT_KEY } from './BackgroundLocationTask';
 
 export interface AccelSample {
   x: number;
@@ -216,6 +217,13 @@ export class AdaptiveCollector {
       accuracy: location.coords.accuracy || 0,
     };
     this.checkPrearm();
+    // GPS-тики как "часы": setTimeout-петли Android ставит на паузу при выключенном экране
+    const now = Date.now();
+    if (now - this.lastBackgroundAt >= this.config.background.interval_ms) {
+      this.lastBackgroundAt = now;
+      void this.sendBackgroundSample();
+    }
+    void this.refreshZones();
   }
 
   private distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -391,6 +399,9 @@ export class AdaptiveCollector {
       speed_kmh: (gps.speed || 0) * 3.6,
     };
     await this.sendEvent(event);
+    try {
+      await AsyncStorage.setItem(BG_SAMPLE_LAST_SENT_KEY, String(Date.now()));
+    } catch {}
   }
 
   // ─── Отправка ────────────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { AndroidAppList } from '../services/AndroidAppList';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
@@ -54,7 +55,7 @@ export default function AutostartSettingsScreen() {
   const [autoStopBluetooth, setAutoStopBluetooth] = useState(false);
   const [autoStopApps, setAutoStopApps] = useState(false);
   const [autoStopCharge, setAutoStopCharge] = useState(false);
-  const [keepScreenOn, setKeepScreenOn] = useState(false);
+  const [keepScreenOn, setKeepScreenOn] = useState(true);
   const [minBrightness, setMinBrightness] = useState(0.1); // 0–1, по умолчанию 10%
   
   // Модальные окна
@@ -179,11 +180,9 @@ export default function AutostartSettingsScreen() {
         setAutoStopCharge(true);
       }
 
-      // Не выключать экран во время мониторинга
+      // Не выключать экран во время мониторинга (включено по умолчанию)
       const savedKeepScreenOn = await AsyncStorage.getItem('keep_screen_on');
-      if (savedKeepScreenOn === 'true') {
-        setKeepScreenOn(true);
-      }
+      setKeepScreenOn(savedKeepScreenOn !== 'false');
 
       // Минимальная яркость при мониторинге (0–1)
       const savedMinBrightness = await AsyncStorage.getItem('min_brightness');
@@ -439,6 +438,18 @@ export default function AutostartSettingsScreen() {
   const saveMinBrightness = async (value: number) => {
     setMinBrightness(value);
     await AsyncStorage.setItem('min_brightness', String(value));
+  };
+
+  const openBatteryOptimizationSettings = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      await IntentLauncher.startActivityAsync(
+        'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+        { data: 'package:com.goodroad.app' }
+      );
+    } catch {
+      Alert.alert('Настройки батареи', 'Не удалось открыть системные настройки');
+    }
   };
 
   const getModeText = (mode: AutostartMode): string => {
@@ -815,6 +826,21 @@ export default function AutostartSettingsScreen() {
               </Text>
             </View>
             {keepScreenOn && <Ionicons name="checkmark-circle" size={24} color="#00ff88" />}
+          </Pressable>
+
+          {/* Отключение оптимизации батареи */}
+          <Pressable
+            style={styles.modeOption}
+            onPress={openBatteryOptimizationSettings}
+          >
+            <Ionicons name="battery-charging" size={32} color="#f59e0b" />
+            <View style={styles.modeInfo}>
+              <Text style={styles.modeTitle}>Оптимизация батареи</Text>
+              <Text style={styles.modeDescription}>
+                Отключите оптимизацию для Good Road — иначе Android может останавливать сбор данных в фоне
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#8b94a8" />
           </Pressable>
 
           {/* Минимальная яркость при мониторинге */}
