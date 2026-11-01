@@ -44,6 +44,8 @@ import { useObstacleAlerts } from '../hooks/useObstacleAlerts';
 import ObstacleWarningOverlay, { WarningSize, WarningPosition } from '../components/ObstacleWarningOverlay';
 import alertSettingsService from '../services/AlertSettingsService';
 
+const IDLE_STOP_MS = 5 * 60 * 1000;
+
 export default function HomeScreen() {
   // Основные состояния
   const [isTracking, setIsTracking] = useState(false);
@@ -83,6 +85,8 @@ export default function HomeScreen() {
   }>>([]);
   const currentLocationRef = useRef<any>(null);
   const isTrackingRef = useRef(false);
+  const wasAutoStartedRef = useRef(false);
+  const lastMovementRef = useRef(Date.now());
   const savedBrightnessRef = useRef<number | null>(null);
   const gpsTrailRef = useRef<Array<{ latitude: number; longitude: number; timestamp: number }>>([]);
 
@@ -144,6 +148,10 @@ export default function HomeScreen() {
   useEffect(() => {
     isTrackingRef.current = isTracking;
   }, [isTracking]);
+
+  useEffect(() => {
+    wasAutoStartedRef.current = wasAutoStarted;
+  }, [wasAutoStarted]);
 
   // Проверка автозапуска при загрузке и настройка фонового мониторинга
   useEffect(() => {
@@ -350,7 +358,7 @@ export default function HomeScreen() {
 
     // Проверка автоматической остановки (каждые 5 секунд)
     autostopCheckInterval.current = setInterval(async () => {
-      if (isTracking && wasAutoStarted) {
+      if (isTrackingRef.current && wasAutoStartedRef.current) {
         const currentMode = await AsyncStorage.getItem('autostart_mode');
         let shouldStop = false;
         let autoStopEnabled: string | null = null;
@@ -726,6 +734,15 @@ export default function HomeScreen() {
           setCurrentSpeed((location.coords.speed || 0) * 3.6);
           adaptiveCollector.current?.updateGps(location);
 
+          // Автостоп по простою: авто-запущенный мониторинг гасим после 5 минут без движения
+          const speedNowKmh = (location.coords.speed || 0) * 3.6;
+          if (speedNowKmh > 3) {
+            lastMovementRef.current = Date.now();
+          } else if (wasAutoStartedRef.current && Date.now() - lastMovementRef.current > IDLE_STOP_MS) {
+            lastMovementRef.current = Date.now();
+            void stopTracking();
+          }
+
           const now = Date.now();
           gpsTrailRef.current.push({
             latitude: location.coords.latitude,
@@ -776,6 +793,7 @@ export default function HomeScreen() {
 
       setIsTracking(true);
       isTrackingRef.current = true;
+      lastMovementRef.current = Date.now();
 
       // Запускаем foreground service для сбора данных в фоне
       BackgroundSensorService.start().catch(() => {});
