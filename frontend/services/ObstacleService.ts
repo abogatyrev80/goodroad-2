@@ -144,6 +144,12 @@ class ObstacleService {
     try {
       await this.ensureInitialized();
 
+      // Кэш как у fetchNearbyObstacles — иначе каждый вызов это POST в сеть
+      const now = Date.now();
+      if (now - this.lastFetchTime < this.CACHE_DURATION && this.cachedObstacles.length > 0) {
+        return this.filterActiveObstacles(this.cachedObstacles, latitude, longitude);
+      }
+
       const url = `${backendConfigService.getActiveUrl()}/api/obstacles/along-road`;
       const response = await fetch(url, {
         method: 'POST',

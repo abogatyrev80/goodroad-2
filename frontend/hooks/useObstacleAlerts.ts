@@ -28,6 +28,7 @@ export function useObstacleAlerts(
   const lastForegroundTimeRef = useRef<number>(Date.now());
   const bearingHistory = useRef<number[]>([]);
   const mountedRef = useRef(true);
+  const lastFetchTsRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -63,6 +64,10 @@ export function useObstacleAlerts(
     }
 
     const fetchObstacles = async () => {
+      // Троттлинг: эффект перезапускается на каждый GPS-тик, но в сеть ходим не чаще 30с
+      const nowTs = Date.now();
+      if (nowTs - lastFetchTsRef.current < 30000) return;
+      lastFetchTsRef.current = nowTs;
       try {
         const lat = currentLocation.coords.latitude;
         const lon = currentLocation.coords.longitude;
